@@ -9,10 +9,9 @@
   "peerDependencies": {
     "typescript": "^5"
   },
-  "pi": {
-    "extensions": "./index.ts"
-  },
   "dependencies": {
-    "@sinclair/typebox": "^0.34.49"
+    "@mariozechner/pi-coding-agent": "^0.72.1",
+    "@mariozechner/pi-tui": "^0.72.1",
+    "typebox": "^1.1.37"
   }
 }

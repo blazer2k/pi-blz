@@ -1,30 +1,30 @@
 import { homedir } from "node:os";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { Type } from "@sinclair/typebox";
-import { TypeCompiler } from "@sinclair/typebox/compiler";
+import { Type } from "typebox";
+import { Compile } from "typebox/compile";
 
 const configPath = join(homedir(), ".pi", "agent", "search.json");
 
 export interface Config {
-  timeoutMs: number;
   limit: number;
+  timeoutMs: number;
   safesearch: 0 | 1 | 2;
 }
 
 const defaultConfig: Config = {
-  timeoutMs: 15000,
   limit: 10,
+  timeoutMs: 15000,
   safesearch: 0,
 };
 
 const ConfigSchema = Type.Object({
-  timeoutMs: Type.Number(),
   limit: Type.Number(),
+  timeoutMs: Type.Number(),
   safesearch: Type.Union([Type.Literal(0), Type.Literal(1), Type.Literal(2)]),
 });
 
-const configValidator = TypeCompiler.Compile(ConfigSchema);
+const configValidator = Compile(ConfigSchema);
 
 function validateConfig(raw: unknown): Config {
   if (typeof raw !== "object" || raw === null) return defaultConfig;
@@ -45,5 +45,26 @@ export function loadConfig(): Config {
   } catch (error) {
     console.error(`Failed to load config from ${configPath}:`, error);
     return defaultConfig;
+  }
+}
+
+export function saveConfig(id: string, value: string): void {
+  try {
+    const current = loadConfig();
+    let parsed: unknown = value;
+
+    if (id === "safesearch") {
+      const num = Number(parsed);
+      if ([0, 1, 2].includes(num)) parsed = num as 0 | 1 | 2;
+    } else {
+      parsed = Number(value);
+    }
+
+    const updated = { ...current, [id]: parsed };
+    if (configValidator.Check(updated)) {
+      writeFileSync(configPath, JSON.stringify(updated, null, 2));
+    }
+  } catch (err) {
+    console.error("Failed to save config:", err);
   }
 }
