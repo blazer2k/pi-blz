@@ -1,3 +1,13 @@
+import { loadConfig } from "./config";
 import { search } from "./search";
 
-console.log(await search("Hello World"));
+const config = loadConfig();
+
+console.log(
+  await search(
+    "Hello World",
+    config.limit,
+    config.timeoutMs,
+    config.safesearch,
+  ),
+);
