@@ -5,14 +5,13 @@ import type {
   Theme,
 } from "@mariozechner/pi-coding-agent";
 import { keyHint } from "@mariozechner/pi-coding-agent";
-import { getConfig } from "./config";
 
 export function formatSearchResults(response: SearchResponse): string {
   const results = response.results;
 
   const resultsString =
     results.length === 0
-      ? `No results found."`
+      ? "No results found."
       : results
           .map(
             (r, i) =>
@@ -30,9 +29,10 @@ export function formatRenderResult(
   }>,
   options: ToolRenderResultOptions,
   theme: Theme,
+  verbose: boolean,
 ): string {
   let text = "";
-  const verbose = getConfig().verbose;
+
   if (!verbose) {
     const resultsCount = result.details.resultCount || 0;
 

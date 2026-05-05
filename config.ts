@@ -20,20 +20,30 @@ const defaultConfig: Config = {
   verbose: true,
 };
 
-const ConfigSchema = Type.Object({
-  limit: Type.Number(),
-  timeoutMs: Type.Number(),
-  safesearch: Type.Union([Type.Literal(0), Type.Literal(1), Type.Literal(2)]),
-  verbose: Type.Boolean(),
-});
+const ConfigSchema = Type.Object(
+  {
+    limit: Type.Number({ minimum: 1, maximum: 50 }),
+    timeoutMs: Type.Number({ minimum: 1000, maximum: 120000 }),
+    safesearch: Type.Union([Type.Literal(0), Type.Literal(1), Type.Literal(2)]),
+    verbose: Type.Boolean(),
+  },
+  { additionalProperties: false },
+);
 
-let config: Config = defaultConfig;
+export type ConfigKey = keyof Config;
+
+let config: Config = { ...defaultConfig };
 const configValidator = Compile(ConfigSchema);
 
 function validateConfig(raw: unknown): Config {
   if (typeof raw !== "object" || raw === null) return defaultConfig;
 
-  return configValidator.Check(raw) ? (raw as Config) : defaultConfig;
+  const merged = { ...defaultConfig, ...raw };
+  if (!configValidator.Check(merged)) {
+    return { ...defaultConfig };
+  }
+
+  return merged as Config;
 }
 
 export function loadConfig(): void {
@@ -53,27 +63,33 @@ export function loadConfig(): void {
   }
 }
 
-export function saveConfig(id: string, value: string): void {
-  try {
-    let parsed: unknown = value;
+function parseConfigValue(id: ConfigKey, value: string): Config[ConfigKey] {
+  switch (id) {
+    case "limit":
+      return Number(value);
+    case "timeoutMs":
+      return Number(value);
+    case "safesearch":
+      const num = Number(value);
+      if (num !== 0 && num !== 1 && num !== 2) {
+        throw new Error(`Invalid safesearch value: ${value}`);
+      }
+      return num;
+    case "verbose":
+      return value === "true";
+  }
+}
 
-    switch (id) {
-      case "safesearch":
-        const num = Number(parsed);
-        if ([0, 1, 2].includes(num)) parsed = num as 0 | 1 | 2;
-        break;
-      case "verbose":
-        parsed = value === "true";
-        break;
-      default:
-        parsed = Number(value);
-    }
+export function saveConfig(id: ConfigKey, value: string): void {
+  try {
+    let parsed = parseConfigValue(id, value);
 
     const updated = { ...config, [id]: parsed };
-    if (configValidator.Check(updated)) {
-      config = updated;
-      writeFileSync(configPath, JSON.stringify(updated, null, 2));
+    if (!configValidator.Check(updated)) {
+      throw new Error(`Invalid config update: ${id}=${value}`);
     }
+    config = updated as Config;
+    writeFileSync(configPath, JSON.stringify(updated, null, 2));
   } catch (err) {
     console.error("Failed to save config:", err);
   }
