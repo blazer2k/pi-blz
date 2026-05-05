@@ -33,7 +33,12 @@ export function formatRenderResult(
 ): string {
   let text = "";
   const verbose = getConfig().verbose;
-  // Scaffold
+  if (!verbose) {
+    const resultsCount = result.details.resultCount || 0;
+
+    text += `${theme.fg("dim", `${resultsCount} results`)}`;
+    return text;
+  }
 
   const output = result.content.find((c) => c.type === "text")?.text ?? "";
   if (output) {
