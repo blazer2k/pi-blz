@@ -3,6 +3,7 @@ import { search } from "./search";
 import {
   type ExtensionAPI,
   getSettingsListTheme,
+  keyHint,
 } from "@mariozechner/pi-coding-agent";
 import {
   Container,
@@ -71,11 +72,27 @@ export default function (pi: ExtensionAPI) {
         theme.fg("toolTitle", "search") +
           " " +
           theme.fg("accent", `"${query}"`),
+        0,
+        0,
       );
     },
     renderResult(result, options, theme, context) {
-      const text = result.content.find((c) => c.type === "text")?.text ?? "";
-      return new Text(theme.fg("dim", text));
+      const output = result.content.find((c) => c.type === "text")?.text ?? "";
+
+      let text = "";
+      if (output) {
+        const lines = output.split("\n");
+        const maxLines = options.expanded ? lines.length : 20;
+        const displayLines = lines.slice(0, maxLines);
+        const remainingLines = lines.length - maxLines;
+
+        text += `\n${displayLines.map((line) => theme.fg("toolOutput", line)).join("\n")}`;
+
+        if (remainingLines > 0) {
+          text += `${theme.fg("muted", `\n... (${remainingLines} more lines,`)} ${keyHint("app.tools.expand", "to expand")})`;
+        }
+      }
+      return new Text(theme.fg("dim", text), 0, 0);
     },
   });
 
