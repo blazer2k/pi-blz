@@ -1,5 +1,4 @@
 import { parseHTML } from "linkedom";
-import { Readability } from "@mozilla/readability";
 import TurndownService from "turndown";
 import type {
   AgentToolResult,
@@ -48,6 +47,50 @@ function getValidUrl(value: string): string | null {
   }
 }
 
+function denoiseBody(body: Element) {
+  body
+    .querySelectorAll(
+      `
+    nav, header, footer,
+    [role="navigation"], [role="banner"], [role="contentinfo"],
+    .breadcrumb, .breadcrumbs,
+    .webring, .related-posts, .post-navigation,
+    .sidebar, .aside,
+    .cookie-banner, .cookie-notice,
+    .share-buttons, .social-share,
+    .comments, #comments,
+    .newsletter, .subscribe,
+    script, style, noscript, svg, iframe, link, meta
+  `,
+    )
+    .forEach((el) => el.remove());
+}
+
+function absolutizeUrls(body: Element, url: string) {
+  body.querySelectorAll("a[href], img[src]").forEach((el) => {
+    for (const attr of ["href", "src"] as const) {
+      const val = el.getAttribute(attr);
+      if (
+        val &&
+        !val.startsWith("http") &&
+        !val.startsWith("//") &&
+        !val.startsWith("data:")
+      ) {
+        el.setAttribute(attr, new URL(val, url).toString());
+      }
+    }
+  });
+}
+
+function getMarkdownFromHTML(html: Element["innerHTML"]) {
+  let markdown = turndown
+    .turndown(html ?? "")
+    .replace(/^(?:\d+\s*)+/, "")
+    .trimStart();
+
+  return markdown;
+}
+
 export async function webExtract(url: string, options: ExtractContentOptions) {
   const validatedUrl = getValidUrl(url);
 
@@ -72,15 +115,41 @@ export async function webExtract(url: string, options: ExtractContentOptions) {
     }
 
     const raw = await res.text();
-    const parsedDocument = parseHTML(raw).document;
-    const reader = new Readability(parsedDocument);
-    const article = reader.parse();
+    const { document } = parseHTML(raw);
+    const body = document.body;
 
-    if (!article) {
-      return `Couldn't parse content`;
-    }
+    if (!body) return "(empty body)";
 
-    return turndown.turndown(article.content);
+    const meta = (name: string): string =>
+      document
+        .querySelector(`meta[name="${name}"], meta[property="${name}"]`)
+        ?.getAttribute("content") ?? "";
+
+    const title = document.title || meta("og:title") || "";
+    const author = meta("author") || meta("article:author") || "";
+    const date =
+      meta("article:published_time") ||
+      meta("og:published_time") ||
+      meta("date") ||
+      "";
+    const description = meta("description") || meta("og:description") || "";
+
+    const metadata = [
+      `Title: ${title}`,
+      `URL Source: ${validatedUrl}`,
+      author ? `Author: ${author}` : null,
+      date ? `Published: ${date}` : null,
+      description ? `Description: ${description}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    denoiseBody(body);
+    absolutizeUrls(body, url);
+
+    const markdown = getMarkdownFromHTML(body.innerHTML ?? "");
+
+    return `${metadata}\n\n---\n\n${markdown}`;
   } finally {
     clearTimeout(timer);
   }
