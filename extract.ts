@@ -91,7 +91,10 @@ function getMarkdownFromHTML(html: Element["innerHTML"]) {
   return markdown;
 }
 
-export async function webExtract(url: string, options: ExtractContentOptions) {
+export async function webExtract(
+  url: string,
+  options: ExtractContentOptions,
+): Promise<string> {
   const validatedUrl = getValidUrl(url);
 
   if (!validatedUrl) {
@@ -118,7 +121,7 @@ export async function webExtract(url: string, options: ExtractContentOptions) {
     const { document } = parseHTML(raw);
     const body = document.body;
 
-    if (!body) return "(empty body)";
+    if (!body) throw new Error("Fetch returned empty body");
 
     const meta = (name: string): string =>
       document
