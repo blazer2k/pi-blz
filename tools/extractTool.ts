@@ -1,10 +1,22 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  AgentToolResult,
+} from "@mariozechner/pi-coding-agent";
 import { Type } from "typebox";
 import { getConfig } from "../helpers/config";
 import { webExtract } from "../api/webExtract";
 import { Text } from "@mariozechner/pi-tui";
 import { errorMessage, isAbortError, getApproxTokens } from "../helpers/utils";
 import { renderTextResult } from "../helpers/renderTextResult";
+import { getToolFailureStatus } from "../helpers/getToolFailureStatus";
+import { type ToolStatus } from "../types/tool";
+
+interface ExtractToolDetails {
+  url: string;
+  status: ToolStatus;
+  charCount?: number;
+  error?: string;
+}
 
 export function registerExtractTool(pi: ExtensionAPI) {
   pi.registerTool({
@@ -18,7 +30,11 @@ export function registerExtractTool(pi: ExtensionAPI) {
       url: Type.String(),
     }),
 
-    async execute(_id, params, signal) {
+    async execute(
+      _id,
+      params,
+      signal,
+    ): Promise<AgentToolResult<ExtractToolDetails>> {
       const config = getConfig();
 
       if (signal?.aborted) {
@@ -26,34 +42,50 @@ export function registerExtractTool(pi: ExtensionAPI) {
           content: [{ type: "text", text: "Extract aborted" }],
           details: {
             url: params.url,
+            status: "aborted",
           },
         };
       }
 
       try {
-        const content = await webExtract(params.url, {
+        const result = await webExtract(params.url, {
           timeoutMs: config.timeoutMs,
           signal,
         });
 
         return {
-          content: [{ type: "text", text: content }],
+          content: [{ type: "text", text: result.content }],
           details: {
-            url: params.url,
+            url: result.sourceUrl,
+            status: "success",
+            charCount: result.content.length,
           },
         };
       } catch (err) {
-        const text = isAbortError(err)
-          ? "Extract aborted"
-          : `Error: ${errorMessage(err)}`;
+        if (isAbortError(err)) {
+          return {
+            content: [{ type: "text", text: "Extract aborted" }],
+            details: {
+              url: params.url,
+              status: "aborted",
+            },
+          };
+        }
+
+        const message = errorMessage(err);
+
         return {
           content: [
             {
               type: "text",
-              text,
+              text: `Error: ${message}`,
             },
           ],
-          details: { url: params.url },
+          details: {
+            url: params.url,
+            status: "error",
+            error: message,
+          },
         };
       }
     },
@@ -68,11 +100,19 @@ export function registerExtractTool(pi: ExtensionAPI) {
       );
     },
     renderResult(result, options, theme) {
+      const details = result.details as ExtractToolDetails;
+
+      const failureStatus = getToolFailureStatus(details, theme);
+
+      if (failureStatus) {
+        return new Text(failureStatus, 0, 0);
+      }
+
       const verbose = getConfig().verbose;
 
       if (!verbose) {
-        const charCount =
-          result.content.find((c) => c.type === "text")?.text.length ?? 0;
+        const charCount = details.charCount ?? 0;
+
         return new Text(
           theme.fg(
             "dim",

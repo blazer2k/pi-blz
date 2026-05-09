@@ -8,9 +8,14 @@ const turndown = new TurndownService({
   codeBlockStyle: "fenced",
 });
 
-export interface ExtractContentOptions {
+export interface ExtractOptions {
   timeoutMs: number;
   signal?: AbortSignal;
+}
+
+export interface ExtractResponse {
+  sourceUrl: string;
+  content: string;
 }
 
 const headers: Record<string, string> = {
@@ -76,7 +81,34 @@ function absolutizeUrls(body: Element, url: string) {
   });
 }
 
-function getMarkdownFromHTML(html: Element["innerHTML"]) {
+function buildMetaString(document: Document): string {
+  const meta = (name: string): string =>
+    document
+      .querySelector(`meta[name="${name}"], meta[property="${name}"]`)
+      ?.getAttribute("content") ?? "";
+
+  const title = document.title || meta("og:title") || "Untitled";
+  const author = meta("author") || meta("article:author") || "";
+  const date =
+    meta("article:published_time") ||
+    meta("og:published_time") ||
+    meta("date") ||
+    "";
+  const description = meta("description") || meta("og:description") || "";
+
+  const metaString = [
+    `Title: ${title}`,
+    author ? `Author: ${author}` : null,
+    date ? `Published: ${date}` : null,
+    description ? `Description: ${description}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return metaString;
+}
+
+function getMarkdownFromHTML(html: Element["innerHTML"]): string {
   let markdown = turndown
     .turndown(html ?? "")
     .replace(/^(?:\d+\s*)+/, "")
@@ -87,8 +119,8 @@ function getMarkdownFromHTML(html: Element["innerHTML"]) {
 
 export async function webExtract(
   url: string,
-  options: ExtractContentOptions,
-): Promise<string> {
+  options: ExtractOptions,
+): Promise<ExtractResponse> {
   const validatedUrl = getValidUrl(url);
 
   if (!validatedUrl) {
@@ -117,36 +149,17 @@ export async function webExtract(
 
     if (!body) throw new Error("Fetch returned empty body");
 
-    const meta = (name: string): string =>
-      document
-        .querySelector(`meta[name="${name}"], meta[property="${name}"]`)
-        ?.getAttribute("content") ?? "";
-
-    const title = document.title || meta("og:title") || "";
-    const author = meta("author") || meta("article:author") || "";
-    const date =
-      meta("article:published_time") ||
-      meta("og:published_time") ||
-      meta("date") ||
-      "";
-    const description = meta("description") || meta("og:description") || "";
-
-    const metadata = [
-      `Title: ${title}`,
-      `URL Source: ${validatedUrl}`,
-      author ? `Author: ${author}` : null,
-      date ? `Published: ${date}` : null,
-      description ? `Description: ${description}` : null,
-    ]
-      .filter(Boolean)
-      .join("\n");
+    const metaString = buildMetaString(document);
 
     denoiseBody(body);
     absolutizeUrls(body, validatedUrl);
 
     const markdown = getMarkdownFromHTML(body.innerHTML ?? "");
 
-    return `${metadata}\n\n---\n\n${markdown}`;
+    return {
+      sourceUrl: validatedUrl,
+      content: `${metaString}\n\n---\n\n${markdown}`,
+    };
   } finally {
     clearTimeout(timer);
   }

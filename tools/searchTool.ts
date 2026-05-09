@@ -1,10 +1,22 @@
-import { type ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  AgentToolResult,
+} from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
 import { Type } from "typebox";
 import { getConfig } from "../helpers/config";
 import { webSearch, formatSearchResults } from "../api/webSearch";
 import { errorMessage, isAbortError } from "../helpers/utils";
 import { renderTextResult } from "../helpers/renderTextResult";
+import { type ToolStatus } from "../types/tool";
+import { getToolFailureStatus } from "../helpers/getToolFailureStatus";
+
+interface SearchToolDetails {
+  query: string;
+  status: ToolStatus;
+  resultCount?: number;
+  error?: string;
+}
 
 export function registerSearchTool(pi: ExtensionAPI) {
   pi.registerTool({
@@ -18,13 +30,17 @@ export function registerSearchTool(pi: ExtensionAPI) {
       query: Type.String({ description: "Search query" }),
     }),
 
-    async execute(_id, params, signal) {
+    async execute(
+      _id,
+      params,
+      signal,
+    ): Promise<AgentToolResult<SearchToolDetails>> {
       const config = getConfig();
 
       if (signal?.aborted) {
         return {
           content: [{ type: "text", text: "Search aborted" }],
-          details: { query: params.query, resultCount: 0 },
+          details: { query: params.query, status: "aborted" },
         };
       }
 
@@ -42,22 +58,35 @@ export function registerSearchTool(pi: ExtensionAPI) {
           ],
           details: {
             query: params.query,
+            status: "success",
             resultCount: searchResponse.results.length,
           },
         };
       } catch (err) {
-        const text = isAbortError(err)
-          ? "Search aborted"
-          : `Error: ${errorMessage(err)}`;
+        if (isAbortError(err)) {
+          return {
+            content: [{ type: "text", text: "Search aborted" }],
+            details: {
+              query: params.query,
+              status: "aborted",
+            },
+          };
+        }
+
+        const message = errorMessage(err);
 
         return {
           content: [
             {
               type: "text",
-              text,
+              text: `Error: ${message}`,
             },
           ],
-          details: { query: params.query, resultCount: 0 },
+          details: {
+            query: params.query,
+            status: "error",
+            error: message,
+          },
         };
       }
     },
@@ -72,9 +101,17 @@ export function registerSearchTool(pi: ExtensionAPI) {
       );
     },
     renderResult(result, options, theme) {
+      const details = result.details;
+
+      const failureStatus = getToolFailureStatus(details, theme);
+
+      if (failureStatus) {
+        return new Text(failureStatus, 0, 0);
+      }
+
       const verbose = getConfig().verbose;
       if (!verbose) {
-        const resultCount = result.details.resultCount || 0;
+        const resultCount = result.details.resultCount ?? 0;
         return new Text(
           theme.fg(
             "dim",
