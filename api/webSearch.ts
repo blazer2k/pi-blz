@@ -21,9 +21,9 @@ export interface SearchResponse {
 }
 
 const SearchResultSchema = Type.Object({
-  title: Type.String(),
-  url: Type.String(),
-  content: Type.String(),
+  title: Type.Optional(Type.String()),
+  url: Type.Optional(Type.String()),
+  content: Type.Optional(Type.String()),
   engine: Type.Optional(Type.String()),
 });
 
@@ -48,12 +48,14 @@ function normalizeSearchResponse(raw: unknown): SearchResponse {
   const response = raw as RawSearchResponse;
 
   return {
-    results: response.results.map((result) => ({
-      title: truncate(result.title, 200),
-      url: truncate(result.url, 500),
-      content: truncate(result.content, 1000),
-      engine: truncate(result.engine ?? "unknown", 50),
-    })),
+    results: response.results
+      .filter((result) => result.url)
+      .map((result) => ({
+        title: truncate(result.title ?? "Untitled", 200),
+        url: result.url!,
+        content: truncate(result.content ?? "", 1000),
+        engine: truncate(result.engine ?? "unknown", 50),
+      })),
   };
 }
 

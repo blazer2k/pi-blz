@@ -104,17 +104,14 @@ function denoiseBody(body: Element) {
     .forEach((el) => el.remove());
 }
 
-function absolutizeUrls(body: Element, url: string) {
+function absolutizeUrls(body: Element, baseUrl: string) {
   body.querySelectorAll("a[href], img[src]").forEach((el) => {
     for (const attr of ["href", "src"] as const) {
-      const val = el.getAttribute(attr);
-      if (
-        val &&
-        !val.startsWith("http") &&
-        !val.startsWith("//") &&
-        !val.startsWith("data:")
-      ) {
-        el.setAttribute(attr, new URL(val, url).toString());
+      const value = el.getAttribute(attr);
+      if (value && !value.startsWith("http") && !value.startsWith("data:")) {
+        el.setAttribute(attr, new URL(value, baseUrl).toString());
+      } else {
+        el.removeAttribute(attr);
       }
     }
   });
@@ -148,12 +145,7 @@ function buildMetaString(document: Document): string {
 }
 
 function getMarkdownFromHTML(html: Element["innerHTML"]): string {
-  let markdown = turndown
-    .turndown(html ?? "")
-    .replace(/^(?:\d+\s*)+/, "")
-    .trimStart();
-
-  return markdown;
+  return turndown.turndown(html).trimStart();
 }
 
 function truncateContent(content: string, maxChars: number): string {
