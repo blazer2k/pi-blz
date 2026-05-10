@@ -1,6 +1,7 @@
 import { Type, type Static } from "typebox";
 import { Compile } from "typebox/compile";
-import { createTimeoutSignal } from "../helpers/abort";
+import { createTimeoutSignal } from "../helpers/request";
+import { truncateContent } from "../extractors/shared";
 
 export interface SearchOptions {
   limit: number;
@@ -35,11 +36,6 @@ type RawSearchResponse = Static<typeof SearchResponseSchema>;
 
 const searchResponseValidator = Compile(SearchResponseSchema);
 
-function truncate(value: string, maxChars: number): string {
-  if (value.length <= maxChars) return value;
-  return `${value.slice(0, maxChars)}...`;
-}
-
 function normalizeSearchResponse(raw: unknown): SearchResponse {
   if (!searchResponseValidator.Check(raw)) {
     throw new Error("Invalid SearxNG response shape");
@@ -51,10 +47,10 @@ function normalizeSearchResponse(raw: unknown): SearchResponse {
     results: response.results
       .filter((result) => result.url)
       .map((result) => ({
-        title: truncate(result.title ?? "Untitled", 200),
+        title: truncateContent(result.title ?? "Untitled", 200),
         url: result.url!,
-        content: truncate(result.content ?? "", 1000),
-        engine: truncate(result.engine ?? "unknown", 50),
+        content: truncateContent(result.content ?? "", 1000),
+        engine: truncateContent(result.engine ?? "unknown", 50),
       })),
   };
 }

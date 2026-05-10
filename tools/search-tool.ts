@@ -7,9 +7,11 @@ import { Type } from "typebox";
 import { getConfig } from "../helpers/config";
 import { webSearch, formatSearchResults } from "../api/web-search";
 import { errorMessage, isAbortError, isTimeoutError } from "../helpers/error";
-import { renderTextResult } from "../helpers/render-text-result";
-import { type ToolStatus } from "../types/tool";
-import { getToolFailureStatus } from "../helpers/tool-status";
+import {
+  type ToolStatus,
+  getToolFailureStatus,
+  renderTextResult,
+} from "../ui/tool-rendering";
 
 interface SearchToolDetails {
   query: string;

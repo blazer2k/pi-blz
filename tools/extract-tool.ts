@@ -7,10 +7,12 @@ import { getConfig } from "../helpers/config";
 import { webExtract } from "../api/web-extract";
 import { Text } from "@mariozechner/pi-tui";
 import { errorMessage, isAbortError, isTimeoutError } from "../helpers/error";
-import { getApproxTokens } from "../helpers/tokens";
-import { renderTextResult } from "../helpers/render-text-result";
-import { getToolFailureStatus } from "../helpers/tool-status";
-import { type ToolStatus } from "../types/tool";
+import {
+  type ToolStatus,
+  getToolFailureStatus,
+  getApproxTokens,
+  renderTextResult,
+} from "../ui/tool-rendering";
 
 interface ExtractToolDetails {
   url: string;

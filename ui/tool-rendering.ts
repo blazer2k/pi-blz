@@ -5,6 +5,37 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 import { keyHint } from "@mariozechner/pi-coding-agent";
 
+export type ToolStatus = "success" | "aborted" | "error";
+
+interface ToolStatusDetails {
+  status: ToolStatus;
+  error?: string;
+}
+
+export function getToolFailureStatus(
+  details: ToolStatusDetails,
+  theme: Theme,
+): string | null {
+  if (details.status === "error") {
+    return theme.fg("error", `${details.error || "Unknown error"}`);
+  }
+
+  if (details.status === "aborted") {
+    return theme.fg("muted", "Aborted");
+  }
+
+  return null;
+}
+
+export function getApproxTokens(charCount: number): string {
+  const rawTokenCount = Math.ceil(charCount / 4);
+
+  const tokenCount =
+    rawTokenCount < 1000 ? rawTokenCount : Math.ceil(rawTokenCount / 100) * 100;
+
+  return tokenCount < 1000 ? tokenCount.toString() : `${tokenCount / 1000}k`;
+}
+
 export function renderTextResult(
   result: AgentToolResult<unknown>,
   options: ToolRenderResultOptions,
