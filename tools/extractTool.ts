@@ -6,7 +6,8 @@ import { Type } from "typebox";
 import { getConfig } from "../helpers/config";
 import { webExtract } from "../api/webExtract";
 import { Text } from "@mariozechner/pi-tui";
-import { errorMessage, isAbortError, getApproxTokens } from "../helpers/utils";
+import { errorMessage, isAbortError, isTimeoutError } from "../helpers/error";
+import { getApproxTokens } from "../helpers/utils";
 import { renderTextResult } from "../helpers/renderTextResult";
 import { getToolFailureStatus } from "../helpers/getToolFailureStatus";
 import { type ToolStatus } from "../types/tool";
@@ -69,6 +70,17 @@ export function registerExtractTool(pi: ExtensionAPI) {
             details: {
               url: params.url,
               status: "aborted",
+            },
+          };
+        }
+
+        if (isTimeoutError(err)) {
+          return {
+            content: [{ type: "text", text: "Extract timed out" }],
+            details: {
+              url: params.url,
+              status: "error",
+              error: errorMessage(err),
             },
           };
         }

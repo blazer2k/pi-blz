@@ -6,7 +6,7 @@ import { Text } from "@mariozechner/pi-tui";
 import { Type } from "typebox";
 import { getConfig } from "../helpers/config";
 import { webSearch, formatSearchResults } from "../api/webSearch";
-import { errorMessage, isAbortError } from "../helpers/utils";
+import { errorMessage, isAbortError, isTimeoutError } from "../helpers/error";
 import { renderTextResult } from "../helpers/renderTextResult";
 import { type ToolStatus } from "../types/tool";
 import { getToolFailureStatus } from "../helpers/getToolFailureStatus";
@@ -69,6 +69,17 @@ export function registerSearchTool(pi: ExtensionAPI) {
             details: {
               query: params.query,
               status: "aborted",
+            },
+          };
+        }
+
+        if (isTimeoutError(err)) {
+          return {
+            content: [{ type: "text", text: "Search timed out" }],
+            details: {
+              query: params.query,
+              status: "error",
+              error: errorMessage(err),
             },
           };
         }

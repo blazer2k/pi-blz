@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { Type } from "typebox";
 import { Compile } from "typebox/compile";
 
-const configPath = join(homedir(), ".pi", "agent", "search.json");
+const configPath = join(homedir(), ".pi", "agent", "pi-searxng-suite.json");
 
 export interface Config {
   limit: number;

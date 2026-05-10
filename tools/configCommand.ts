@@ -10,7 +10,7 @@ import {
   Text,
 } from "@mariozechner/pi-tui";
 import { type ConfigKey, getConfig, saveConfig } from "../helpers/config";
-import { errorMessage } from "../helpers/utils";
+import { errorMessage } from "../helpers/error";
 
 export function registerConfigCommand(pi: ExtensionAPI) {
   pi.registerCommand("search-config", {

@@ -3,7 +3,7 @@ import { loadConfig } from "./helpers/config";
 import { registerSearchTool } from "./tools/searchTool";
 import { registerExtractTool } from "./tools/extractTool";
 import { registerConfigCommand } from "./tools/configCommand";
-import { errorMessage } from "./helpers/utils";
+import { errorMessage } from "./helpers/error";
 
 export default function (pi: ExtensionAPI) {
   loadConfig();
