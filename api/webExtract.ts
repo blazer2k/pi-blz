@@ -2,6 +2,9 @@ import { parseHTML } from "linkedom";
 import TurndownService from "turndown";
 import { createTimeoutSignal } from "../helpers/abort";
 
+const MAX_HTML_CHARS = 1_000_000;
+const MAX_MARKDOWN_CHARS = 100_000;
+
 const turndown = new TurndownService({
   headingStyle: "atx",
   hr: "---",
@@ -44,6 +47,22 @@ function getValidUrl(value: string): string | null {
     return url.toString();
   } catch {
     return null;
+  }
+}
+
+function assertHtmlResponse(res: Response): void {
+  const contentType = res.headers.get("content-type") ?? "";
+
+  if (
+    !contentType.includes("text/html") &&
+    !contentType.includes("application/xhtml+xml")
+  ) {
+    throw new Error(`Unsupported content type: ${contentType || "unknown"}`);
+  }
+
+  const contentLength = Number(res.headers.get("content-length") ?? "0");
+  if (contentLength > MAX_HTML_CHARS) {
+    throw new Error(`Response too large: ${contentLength} bytes`);
   }
 }
 
@@ -118,6 +137,12 @@ function getMarkdownFromHTML(html: Element["innerHTML"]): string {
   return markdown;
 }
 
+function truncateContent(content: string, maxChars: number): string {
+  if (content.length <= maxChars) return content;
+
+  return `${content.slice(0, maxChars)}\n\n[Content truncated at ${maxChars} characters]`;
+}
+
 export async function webExtract(
   url: string,
   options: ExtractOptions,
@@ -137,7 +162,16 @@ export async function webExtract(
       throw new Error(`Fetch returned ${res.status} ${res.statusText}`);
     }
 
+    assertHtmlResponse(res);
+
     const raw = await res.text();
+
+    if (raw.length > MAX_HTML_CHARS) {
+      throw new Error(
+        `Content too large after download: ${raw.length} characters`,
+      );
+    }
+
     const { document } = parseHTML(raw);
     const body = document.body;
 
@@ -152,7 +186,7 @@ export async function webExtract(
 
     return {
       sourceUrl: validatedUrl,
-      content: `${metaString}\n\n---\n\n${markdown}`,
+      content: `${metaString}\n\n---\n\n${truncateContent(markdown, MAX_MARKDOWN_CHARS)}`,
     };
   } finally {
     timeout.cleanup();
