@@ -41,6 +41,13 @@ export function registerConfigCommand(pi: ExtensionAPI) {
           values: ["0", "1", "2"],
         },
         {
+          id: "allowPrivateUrls",
+          label: "Allow private URLs",
+          description: "Allow requests to local and private IP ranges",
+          currentValue: String(config.allowPrivateUrls),
+          values: ["false", "true"],
+        },
+        {
           id: "verbose",
           label: "Verbose",
           description: "Render results in tool output",

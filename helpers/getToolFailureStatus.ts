@@ -11,7 +11,7 @@ export function getToolFailureStatus(
   theme: Theme,
 ): string | null {
   if (details.status === "error") {
-    return theme.fg("error", `Failed: ${details.error || "unknown"}`);
+    return theme.fg("error", `${details.error || "Unknown error"}`);
   }
 
   if (details.status === "aborted") {

@@ -10,6 +10,7 @@ export interface Config {
   limit: number;
   timeoutMs: number;
   safesearch: 0 | 1 | 2;
+  allowPrivateUrls: boolean;
   verbose: boolean;
 }
 
@@ -17,7 +18,8 @@ const defaultConfig: Config = {
   limit: 10,
   timeoutMs: 15000,
   safesearch: 0,
-  verbose: true,
+  allowPrivateUrls: false,
+  verbose: false,
 };
 
 const ConfigSchema = Type.Object(
@@ -25,6 +27,7 @@ const ConfigSchema = Type.Object(
     limit: Type.Number({ minimum: 1, maximum: 50 }),
     timeoutMs: Type.Number({ minimum: 1000, maximum: 120000 }),
     safesearch: Type.Union([Type.Literal(0), Type.Literal(1), Type.Literal(2)]),
+    allowPrivateUrls: Type.Boolean(),
     verbose: Type.Boolean(),
   },
   { additionalProperties: false },
@@ -75,6 +78,8 @@ function parseConfigValue(id: ConfigKey, value: string): Config[ConfigKey] {
         throw new Error(`Invalid safesearch value: ${value}`);
       }
       return num;
+    case "allowPrivateUrls":
+      return value === "true";
     case "verbose":
       return value === "true";
   }

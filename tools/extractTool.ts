@@ -51,6 +51,7 @@ export function registerExtractTool(pi: ExtensionAPI) {
         const result = await webExtract(params.url, {
           timeoutMs: config.timeoutMs,
           signal,
+          allowPrivateUrls: config.allowPrivateUrls,
         });
 
         return {

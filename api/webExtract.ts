@@ -15,6 +15,7 @@ const turndown = new TurndownService({
 export interface ExtractOptions {
   timeoutMs: number;
   signal?: AbortSignal;
+  allowPrivateUrls: boolean;
 }
 
 export interface ExtractResponse {
@@ -36,11 +37,29 @@ const headers: Record<string, string> = {
   "Upgrade-Insecure-Requests": "1",
 };
 
-function getValidUrl(value: string): string | null {
+function isPrivateHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+
+  return (
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "::1" ||
+    host.startsWith("10.") ||
+    host.startsWith("192.168.") ||
+    /^172\.(1[6-9]|2\d|3[0-1])\./.test(host) ||
+    host.startsWith("169.254")
+  );
+}
+
+function getValidUrl(value: string, allowPrivateUrls: boolean): string | null {
   try {
     const url = new URL(value.trim());
 
     if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return null;
+    }
+
+    if (!allowPrivateUrls && isPrivateHostname(url.hostname)) {
       return null;
     }
 
@@ -147,7 +166,7 @@ export async function webExtract(
   url: string,
   options: ExtractOptions,
 ): Promise<ExtractResponse> {
-  const validatedUrl = getValidUrl(url);
+  const validatedUrl = getValidUrl(url, options.allowPrivateUrls);
 
   if (!validatedUrl) {
     throw new Error(`Invalid URL: ${url}`);
