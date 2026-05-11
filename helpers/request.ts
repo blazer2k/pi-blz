@@ -1,4 +1,4 @@
-export type ExtractKind = "html" | "text" | "image";
+export type ExtractKind = "html" | "text" | "pdf" | "image";
 
 export function createTimeoutSignal(
   timeoutMs: number,
@@ -39,6 +39,10 @@ export function getExtractKind(contentType: string): ExtractKind | null {
 
   if (contentType.startsWith("image/")) {
     return "image";
+  }
+
+  if (contentType === "application/pdf") {
+    return "pdf";
   }
 
   return null;

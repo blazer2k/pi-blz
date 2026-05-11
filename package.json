@@ -19,7 +19,8 @@
   "private": true,
   "dependencies": {
     "linkedom": "^0.18.12",
-    "turndown": "^7.2.4"
+    "turndown": "^7.2.4",
+    "unpdf": "^1.6.2"
   },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "^0.72.1",

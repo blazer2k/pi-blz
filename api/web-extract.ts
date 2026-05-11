@@ -5,8 +5,9 @@ import {
 } from "../helpers/request";
 import { getValidUrl } from "../helpers/url";
 import { type ExtractResponse } from "../extractors/shared";
-import { extractPlainText } from "../extractors/text";
 import { extractHtml } from "../extractors/html";
+import { extractPlainText } from "../extractors/text";
+import { extractPdf } from "../extractors/pdf";
 import { extractImage } from "../extractors/image";
 
 export interface ExtractOptions {
@@ -57,6 +58,9 @@ export async function webExtract(
 
       case "text":
         return extractPlainText(validatedUrl, contentType, res);
+
+      case "pdf":
+        return extractPdf(validatedUrl, contentType, res);
 
       case "image":
         return extractImage(validatedUrl, contentType, res);
