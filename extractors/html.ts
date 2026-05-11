@@ -2,6 +2,7 @@ import { parseHTML } from "linkedom";
 import TurndownService from "turndown";
 import {
   type ExtractResponse,
+  MAX_HTML_BYTES,
   MAX_HTML_CHARS,
   MAX_MARKDOWN_CHARS,
   truncateContent,
@@ -71,8 +72,8 @@ export async function extractHtml(
   res: Response,
 ): Promise<ExtractResponse> {
   const contentLength = Number(res.headers.get("content-length") ?? "0");
-  if (contentLength > MAX_HTML_CHARS) {
-    throw new Error(`Response too large: ${contentLength} bytes`);
+  if (contentLength > MAX_HTML_BYTES) {
+    throw new Error(`Content too large: ${contentLength} bytes`);
   }
 
   const raw = await res.text();

@@ -1,4 +1,6 @@
+export const MAX_TEXT_BYTES = 1_000_000;
 export const MAX_TEXT_CHARS = 500_000;
+export const MAX_HTML_BYTES = 2_000_000;
 export const MAX_HTML_CHARS = 1_000_000;
 export const MAX_MARKDOWN_CHARS = 100_000;
 export const MAX_PDF_BYTES = 50 * 1024 * 1024;

@@ -1,5 +1,6 @@
 import {
   type ExtractResponse,
+  MAX_TEXT_BYTES,
   MAX_TEXT_CHARS,
   MAX_MARKDOWN_CHARS,
   truncateContent,
@@ -10,10 +11,18 @@ export async function extractPlainText(
   contentType: string,
   res: Response,
 ): Promise<ExtractResponse> {
+  const contentLength = Number(res.headers.get("content-length") ?? "0");
+
+  if (contentLength > MAX_TEXT_BYTES) {
+    throw new Error(`Text content too large: ${contentLength} bytes`);
+  }
+
   const raw = await res.text();
 
   if (raw.length > MAX_TEXT_CHARS) {
-    throw new Error(`Text content too large: ${raw.length} characters`);
+    throw new Error(
+      `Text content too large after download: ${raw.length} characters`,
+    );
   }
 
   const content = [
