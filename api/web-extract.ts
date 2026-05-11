@@ -1,10 +1,6 @@
-import {
-  createTimeoutSignal,
-  getContentType,
-  getExtractKind,
-} from "../helpers/request";
+import { createTimeoutSignal, getContentType } from "../helpers/request";
 import { getValidUrl } from "../helpers/url";
-import { type ExtractResponse } from "../extractors/shared";
+import { type ExtractResponse, getExtractKind } from "../extractors/shared";
 import { extractHtml } from "../extractors/html";
 import { extractPlainText } from "../extractors/text";
 import { extractPdf } from "../extractors/pdf";

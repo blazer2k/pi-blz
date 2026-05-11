@@ -6,6 +6,8 @@ export const MAX_MARKDOWN_CHARS = 100_000;
 export const MAX_PDF_BYTES = 50 * 1024 * 1024;
 export const MAX_IMAGE_BYTES = 50 * 1024 * 1024;
 
+export type ExtractKind = "html" | "text" | "pdf" | "image";
+
 export type ExtractContent =
   | { type: "text"; text: string }
   | { type: "image"; data: string; mimeType: string };
@@ -15,6 +17,26 @@ export interface ExtractResponse {
   contentType: string;
   byteLength?: number;
   content: ExtractContent[];
+}
+
+export function getExtractKind(contentType: string): ExtractKind | null {
+  if (contentType === "text/html" || contentType === "application/xhtml+xml") {
+    return "html";
+  }
+
+  if (contentType.startsWith("text/")) {
+    return "text";
+  }
+
+  if (contentType.startsWith("image/")) {
+    return "image";
+  }
+
+  if (contentType === "application/pdf") {
+    return "pdf";
+  }
+
+  return null;
 }
 
 export function truncateContent(
