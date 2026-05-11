@@ -20,14 +20,14 @@ export async function extractImage(
   const contentLength = Number(res.headers.get("content-length") ?? "0");
 
   if (contentLength > MAX_IMAGE_BYTES) {
-    throw new Error(`Image too large: ${contentLength} bytes`);
+    throw new Error(`Image too large: ${formatBytes(contentLength)}`);
   }
 
   const buffer = await res.arrayBuffer();
 
   if (buffer.byteLength > MAX_IMAGE_BYTES) {
     throw new Error(
-      `Image too large after download: ${buffer.byteLength} bytes`,
+      `Image too large after download: ${formatBytes(buffer.byteLength)}`,
     );
   }
 

@@ -3,6 +3,7 @@ import {
   MAX_TEXT_BYTES,
   MAX_TEXT_CHARS,
   MAX_MARKDOWN_CHARS,
+  formatBytes,
   truncateContent,
 } from "./shared";
 
@@ -14,7 +15,7 @@ export async function extractPlainText(
   const contentLength = Number(res.headers.get("content-length") ?? "0");
 
   if (contentLength > MAX_TEXT_BYTES) {
-    throw new Error(`Text content too large: ${contentLength} bytes`);
+    throw new Error(`Text content too large: ${formatBytes(contentLength)}`);
   }
 
   const raw = await res.text();

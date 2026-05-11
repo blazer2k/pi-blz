@@ -5,6 +5,7 @@ import {
   MAX_HTML_BYTES,
   MAX_HTML_CHARS,
   MAX_MARKDOWN_CHARS,
+  formatBytes,
   truncateContent,
 } from "./shared";
 import { absolutizeUrls } from "../helpers/url";
@@ -73,7 +74,7 @@ export async function extractHtml(
 ): Promise<ExtractResponse> {
   const contentLength = Number(res.headers.get("content-length") ?? "0");
   if (contentLength > MAX_HTML_BYTES) {
-    throw new Error(`Content too large: ${contentLength} bytes`);
+    throw new Error(`Content too large: ${formatBytes(contentLength)}`);
   }
 
   const raw = await res.text();
