@@ -1,8 +1,8 @@
 # pi-searxng-suite
 
-SearxNG-powered web search and extraction tools for [pi](https://pi.dev).
+SearxNG-based web search with category filtering and multi-format URL extraction for [pi](https://pi.dev).
 
-**Current version:** 0.2.1 · [Changelog](CHANGELOG.md)
+**Current version:** 0.2.2 · [Changelog](CHANGELOG.md)
 
 ## Overview
 
@@ -18,7 +18,7 @@ This extension provides two LLM-callable tools:
 | PDF        | Text extracted per page with headers and separators (text-native PDFs only, no OCR) |
 | Images     | Attached with metadata (format, size)                                               |
 
-![Example: searching and extracting university admission info](images/example.png)
+![Example: searching and extracting university admission info](images/example.webp)
 
 ## Requirements
 
@@ -69,7 +69,7 @@ Settings persist to `~/.pi/agent/pi-searxng-suite.json`.
 
 > **Note:** Changes to **LLM can override limit** and **LLM can pick category** require `/reload` to take effect, as they alter the tool schema presented to the LLM. Other settings (limit, timeout, SafeSearch, etc.) apply immediately.
 
-![Example: configuring the extension via pi command](images/settings.png)
+![Example: configuring the extension via pi command](images/settings.webp)
 
 ## Search Categories
 
