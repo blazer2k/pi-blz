@@ -2,7 +2,7 @@
 
 SearxNG-based web search with category filtering and multi-format URL extraction for [pi](https://pi.dev).
 
-**Current version:** 0.2.2 · [Changelog](CHANGELOG.md)
+**Current version:** 0.2.3 · [Changelog](CHANGELOG.md)
 
 ## Overview
 

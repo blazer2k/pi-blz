@@ -51,7 +51,7 @@ export function buildToolCallText(
       ? ` ${theme.fg("dim", `(${searchCategory})`)}`
       : "";
 
-  return `${theme.fg("toolTitle", toolName)} ${query}${category}`;
+  return `${theme.fg("toolTitle", toolName)} ${query ?? ""}${category}`;
 }
 
 function isImageResult(result: AgentToolResult<ExtractToolDetails>): boolean {

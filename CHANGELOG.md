@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Guard against `null`/`undefined` `query` in `buildToolCallText` — prevents rendering the literal string `"undefined"` in tool call text
+
 ## [0.2.2] – 2026-05-17
 
 ### Changed
