@@ -2,6 +2,8 @@
 
 SearxNG-powered web search and extraction tools for [pi](https://pi.dev).
 
+**Current version:** 0.2.0 · [Changelog](CHANGELOG.md)
+
 ## Overview
 
 This extension provides two LLM-callable tools:
