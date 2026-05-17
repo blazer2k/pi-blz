@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.2.1] – 2026-05-17
+
+### Fixed
+
+- Accept `null` values in SearxNG response fields (`content`, `title`, `url`, `engine`) — image search results with null fields no longer throw "Invalid SearxNG response shape"
+
 ## [0.2.0] – 2026-05-17
 
 ### Added
