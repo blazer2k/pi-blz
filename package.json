@@ -12,6 +12,7 @@
     "publish:dry": "npm publish --workspaces --access public --dry-run"
   },
   "devDependencies": {
+    "prettier": "^3.8.4",
     "typescript": "^5"
   },
   "engines": {
