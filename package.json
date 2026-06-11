@@ -12,7 +12,6 @@
     "publish:dry": "npm publish --workspaces --access public --dry-run"
   },
   "devDependencies": {
-    "@types/bun": "latest",
     "typescript": "^5"
   },
   "engines": {
