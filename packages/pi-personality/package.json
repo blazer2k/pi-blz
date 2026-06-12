@@ -1,0 +1,40 @@
+{
+  "name": "@blazer2k/pi-personality",
+  "version": "0.1.0",
+  "description": "Codex-style /personality command for pi.",
+  "type": "module",
+  "keywords": [
+    "pi",
+    "pi-package"
+  ],
+  "author": "Fedor Vasilev",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blazer2k/pi-blz.git",
+    "directory": "packages/pi-personality"
+  },
+  "bugs": {
+    "url": "https://github.com/blazer2k/pi-blz/issues"
+  },
+  "homepage": "https://github.com/blazer2k/pi-blz/tree/main/packages/pi-personality#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "src",
+    "builtin",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  }
+}
