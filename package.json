@@ -12,13 +12,15 @@
     "publish:dry": "npm publish --workspaces --access public --dry-run"
   },
   "devDependencies": {
+    "@earendil-works/pi-ai": "*",
     "prettier": "^3.8.4",
     "typescript": "^5"
   },
   "pi": {
     "extensions": [
       "packages/searxng-suite/src/index.ts",
-      "packages/pi-personality/src/index.ts"
+      "packages/pi-personality/src/index.ts",
+      "packages/pi-ui-enhancements/src/index.ts"
     ]
   },
   "engines": {

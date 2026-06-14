@@ -1,0 +1,38 @@
+{
+  "name": "@blazer2k/pi-ui-enhancements",
+  "version": "0.0.1",
+  "description": "",
+  "type": "module",
+  "keywords": [
+    "pi",
+    "pi-package"
+  ],
+  "author": "Fedor Vasilev",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blazer2k/pi-blz.git",
+    "directory": "packages/pi-ui-enhancements"
+  },
+  "bugs": {
+    "url": "https://github.com/blazer2k/pi-blz/issues"
+  },
+  "homepage": "https://github.com/blazer2k/pi-blz/tree/main/packages/pi-ui-enhancements#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  }
+}
