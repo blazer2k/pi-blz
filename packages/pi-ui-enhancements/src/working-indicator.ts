@@ -1,50 +1,14 @@
-import type { AssistantMessageEvent } from "@earendil-works/pi-ai";
 import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { RESET_FG, type Color, rgbFg, blend, resolveTheme } from "./colors";
 
-export type WorkingPhase = "idle" | "processing" | "thinking" | "working";
+const LABEL = "Working";
+const INTERRUPT_MSG = "esc to interrupt";
 
 // 20 FPS
 const ANIM_INTERVAL_MS = 50;
-
-function getMessageForPhase(phase: WorkingPhase): string {
-  switch (phase) {
-    case "processing":
-      return "Processing";
-    case "thinking":
-      return "Thinking";
-    case "working":
-      return "Working";
-    default:
-      return "";
-  }
-}
-
-function getPhaseFromEvent(event: AssistantMessageEvent): WorkingPhase {
-  switch (event.type) {
-    case "start":
-      return "processing";
-    case "thinking_start":
-    case "thinking_delta":
-    case "thinking_end":
-      return "thinking";
-    case "text_start":
-    case "text_delta":
-    case "text_end":
-    case "toolcall_start":
-    case "toolcall_delta":
-    case "toolcall_end":
-      return "working";
-    case "done":
-    case "error":
-      return "idle";
-    default:
-      return "idle";
-  }
-}
 
 function shimmerText(
   text: string,
@@ -79,7 +43,7 @@ function shimmerText(
 
 function assembleRunDuration(start: number): string {
   const duration = Date.now() - start;
-  const totalSeconds = Math.floor(duration / 1000);
+  const totalSeconds = Math.round(duration / 1000);
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
@@ -87,57 +51,47 @@ function assembleRunDuration(start: number): string {
   const parts: string[] = [];
   if (hours > 0) parts.push(`${hours}h`);
   if (minutes > 0) parts.push(`${minutes}m`);
-  if (hours === 0 && minutes === 0) {
-    parts.push(`${(duration / 1000).toFixed(1)}s`);
-  } else {
-    parts.push(`${seconds}s`);
-  }
+  parts.push(`${seconds}s`);
 
   return parts.join(" ");
 }
 
 export function setupWorkingIndicator(pi: ExtensionAPI) {
-  let currentPhase: WorkingPhase = "idle";
-
+  let active = false;
   let runStartTime = 0;
   let animTimer: ReturnType<typeof setInterval> | null = null;
 
-  let baseRgb: Color | undefined;
-  let hiRgb: Color | undefined;
+  function setActive(ctx: ExtensionContext, value: boolean): void {
+    if (active === value) return;
+    active = value;
 
-  function applyPhase(ctx: ExtensionContext): void {
-    const theme = resolveTheme(ctx);
-    baseRgb = theme.baseRgb;
-    hiRgb = theme.highlightRgb;
-    const message = getMessageForPhase(currentPhase);
-
-    if (!message) {
+    if (!active) {
       ctx.ui.setWorkingIndicator({ frames: [] });
       ctx.ui.setWorkingMessage("");
       stopAnimation();
       return;
     }
 
+    const theme = resolveTheme(ctx);
+
     stopAnimation();
     ctx.ui.setWorkingMessage("");
 
     function renderFrame(): void {
-      const shimmered = shimmerText(message, baseRgb, hiRgb);
+      const shimmered = shimmerText(LABEL, theme.baseRgb, theme.highlightRgb);
+      const suffix =
+        runStartTime > 0
+          ? ` (${assembleRunDuration(runStartTime)} • ${INTERRUPT_MSG})`
+          : ` (${INTERRUPT_MSG})`;
+
       ctx.ui.setWorkingIndicator({
-        frames: [shimmered],
+        frames: [shimmered + ctx.ui.theme.fg("dim", suffix)],
         intervalMs: ANIM_INTERVAL_MS,
       });
     }
 
     renderFrame();
     animTimer = setInterval(renderFrame, ANIM_INTERVAL_MS);
-  }
-
-  function setPhase(ctx: ExtensionContext, phase: WorkingPhase): void {
-    if (currentPhase !== phase) {
-      currentPhase = phase;
-      applyPhase(ctx);
-    }
   }
 
   function stopAnimation(): void {
@@ -148,27 +102,16 @@ export function setupWorkingIndicator(pi: ExtensionAPI) {
   }
 
   pi.on("session_start", async (_event, ctx) => {
-    currentPhase = "idle";
-    ctx.ui.setWorkingIndicator({ frames: [] });
-    ctx.ui.setWorkingMessage("");
-    stopAnimation();
+    setActive(ctx, false);
   });
 
   pi.on("agent_start", async (_event, ctx) => {
     runStartTime = Date.now();
-    setPhase(ctx, "processing");
-  });
-
-  pi.on("turn_start", async (_event, ctx) => {
-    setPhase(ctx, "processing");
-  });
-
-  pi.on("message_update", async (event, ctx) => {
-    setPhase(ctx, getPhaseFromEvent(event.assistantMessageEvent));
+    setActive(ctx, true);
   });
 
   pi.on("agent_end", async (_event, ctx) => {
-    setPhase(ctx, "idle");
+    setActive(ctx, false);
 
     if (runStartTime > 0) {
       ctx.ui.notify(`Took ${assembleRunDuration(runStartTime)}`);
