@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.1] – 2026-06-14
+
+### Fixed
+
+- **Teacher personality** – narrowed teaching skip conditions to simple facts and explicit answers only, with positive guidance on when to teach during implementation work
+
 ## [0.1.0] – 2026-06-12
 
 ### Added

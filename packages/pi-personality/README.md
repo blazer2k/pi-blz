@@ -2,7 +2,7 @@
 
 Switchable communication styles for [pi](https://pi.dev), inspired by Codex CLI's `/personality` command.
 
-**Current version:** 0.1.0
+**Current version:** 0.1.1
 
 ## Why This Matters
 
