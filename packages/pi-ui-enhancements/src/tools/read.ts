@@ -1,14 +1,48 @@
 import type {
   ExtensionAPI,
   ExtensionContext,
+  ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
 import {
   createReadTool,
   type ReadToolDetails,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
-import { Text, truncateToWidth } from "@earendil-works/pi-tui";
+import { homedir } from "node:os";
+import { isAbsolute, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import {
+  getCapabilities,
+  hyperlink,
+  Text,
+  truncateToWidth,
+} from "@earendil-works/pi-tui";
 import type { Handle } from "../types";
+
+type ReadRenderArgs = {
+  path?: string;
+  file_path?: string;
+  offset?: number;
+  limit?: number;
+};
+
+function shortenPath(filePath: string): string {
+  const home = homedir();
+  return filePath.startsWith(home)
+    ? `~${filePath.slice(home.length)}`
+    : filePath;
+}
+
+function renderReadPath(rawPath: unknown, theme: Theme, cwd: string): string {
+  if (rawPath == null || rawPath === "") return theme.fg("toolOutput", "...");
+  if (typeof rawPath !== "string") return theme.fg("error", "[invalid arg]");
+
+  const styled = theme.fg("accent", shortenPath(rawPath));
+  if (!getCapabilities().hyperlinks) return styled;
+
+  const absolutePath = isAbsolute(rawPath) ? rawPath : resolve(cwd, rawPath);
+  return hyperlink(styled, pathToFileURL(absolutePath).href);
+}
 
 type Status = "done" | "not_started" | "running";
 
@@ -42,13 +76,6 @@ function getStatusColor(
   // Running blink and normal done are both success-colored.
   return "success";
 }
-
-type ReadRenderArgs = {
-  path?: string;
-  file_path?: string;
-  offset?: number;
-  limit?: number;
-};
 
 function formatReadLineRange(
   args: ReadRenderArgs | undefined,
@@ -104,6 +131,7 @@ function formatReadResultSummary(
     details?: unknown;
   },
   state: ReadRenderState,
+  options: ToolRenderResultOptions,
   theme: Theme,
 ): string {
   const details = result.details as ReadToolDetails | undefined;
@@ -125,7 +153,14 @@ function formatReadResultSummary(
     parts.push("truncated");
   }
 
-  const summary = parts.length > 0 ? parts.join(", ") : "no content";
+  let summary = parts.length > 0 ? parts.join(", ") : "no content";
+  const shouldShowHint =
+    !options.expanded && (state.truncated || state.isError || imageCount > 0);
+
+  if (summary && shouldShowHint) {
+    summary += " (ctrl+o to expand)";
+  }
+
   return (
     theme.fg(getResultSymbolColor(state), "└─ ") +
     theme.fg("toolOutput", summary)
@@ -160,22 +195,25 @@ export function patchReadTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
 
       updateBlinkTimer(state, status === "running", toolCtx.invalidate);
 
-      const path = args.path || "...";
-
       let content = theme.fg(
         getStatusColor(status, state),
         `${getStatusSymbol(status)} `,
       );
-      content += theme.fg("toolTitle", theme.bold("Read "));
-      content += theme.fg(
-        "accent",
-        `${path}${formatReadLineRange(args, theme)}`,
+      const renderArgs = args as ReadRenderArgs;
+      const pathDisplay = renderReadPath(
+        renderArgs.path ?? renderArgs.file_path,
+        theme,
+        toolCtx.cwd,
       );
+
+      content += theme.fg("toolTitle", theme.bold("Read "));
+      content += pathDisplay;
+      content += formatReadLineRange(renderArgs, theme);
 
       text.setText(truncateToWidth(content, MAX_CALL_WIDTH));
       return text;
     },
-    renderResult(result, _options, theme, toolCtx) {
+    renderResult(result, options, theme, toolCtx) {
       const text =
         (toolCtx.lastComponent as Text | undefined) ?? new Text("", 1, 0);
 
@@ -195,7 +233,7 @@ export function patchReadTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
       state.truncated = nextTruncated;
       state.isError = nextIsError;
 
-      text.setText(formatReadResultSummary(result, state, theme));
+      text.setText(formatReadResultSummary(result, state, options, theme));
 
       if (changed) {
         queueMicrotask(() => toolCtx.invalidate());
