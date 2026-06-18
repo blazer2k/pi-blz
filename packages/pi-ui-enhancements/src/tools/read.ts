@@ -5,6 +5,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import {
   createReadTool,
+  keyHint,
   type ReadToolDetails,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
@@ -16,6 +17,7 @@ import {
   hyperlink,
   Text,
   truncateToWidth,
+  visibleWidth,
 } from "@earendil-works/pi-tui";
 import type { Handle } from "../types";
 
@@ -125,7 +127,7 @@ function countLines(text: string): number {
   return trimmed.length === 0 ? 0 : trimmed.split("\n").length;
 }
 
-function formatReadResultSummary(
+function formatReadResult(
   result: {
     content: Array<{ type: string; text?: string }>;
     details?: unknown;
@@ -141,6 +143,43 @@ function formatReadResultSummary(
     .map((c) => c.text ?? "")
     .join("\n");
 
+  if (state.isError) {
+    const output = textContent.endsWith("\n")
+      ? textContent.slice(0, -1)
+      : textContent;
+    const lines = output.split("\n");
+    let end = lines.length;
+    while (end > 0 && lines[end - 1] === "") {
+      end--;
+    }
+    const trimmed = lines.slice(0, end);
+
+    if (options.expanded) {
+      return (
+        theme.fg(getResultSymbolColor(state), "│\n") +
+        theme.fg("error", trimmed.join("\n"))
+      );
+    }
+
+    const maxLineWidth = Math.floor(MAX_CALL_WIDTH / 2);
+
+    // Single line that fits: show as-is
+    if (trimmed.length === 1 && visibleWidth(trimmed[0]!) <= maxLineWidth) {
+      return (
+        theme.fg(getResultSymbolColor(state), "└─ ") +
+        theme.fg("error", trimmed[0]!)
+      );
+    }
+
+    // Truncated or multi-line: show with expand hint
+    const display = truncateToWidth(trimmed.join("\n"), maxLineWidth);
+    return (
+      theme.fg(getResultSymbolColor(state), "└─ ") +
+      theme.fg("error", display) +
+      ` (${keyHint("app.tools.expand", "to expand")})`
+    );
+  }
+
   const parts: string[] = [];
   if (textContent) {
     const lines = countLines(textContent);
@@ -153,13 +192,7 @@ function formatReadResultSummary(
     parts.push("truncated");
   }
 
-  let summary = parts.length > 0 ? parts.join(", ") : "no content";
-  const shouldShowHint =
-    !options.expanded && (state.truncated || state.isError || imageCount > 0);
-
-  if (summary && shouldShowHint) {
-    summary += " (ctrl+o to expand)";
-  }
+  const summary = parts.length > 0 ? parts.join(", ") : "no content";
 
   return (
     theme.fg(getResultSymbolColor(state), "└─ ") +
@@ -233,7 +266,7 @@ export function patchReadTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
       state.truncated = nextTruncated;
       state.isError = nextIsError;
 
-      text.setText(formatReadResultSummary(result, state, options, theme));
+      text.setText(formatReadResult(result, state, options, theme));
 
       if (changed) {
         queueMicrotask(() => toolCtx.invalidate());
