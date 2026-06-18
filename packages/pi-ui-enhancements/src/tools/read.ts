@@ -53,6 +53,7 @@ type ReadRenderState = {
   hasResult?: boolean;
   truncated?: boolean;
   isError?: boolean;
+  expanded?: boolean;
 };
 
 const BLINK_INTERVAL_MS = 500;
@@ -137,7 +138,7 @@ function formatReadResult(
   theme: Theme,
 ): string {
   const details = result.details as ReadToolDetails | undefined;
-  const imageCount = result.content.filter((c) => c.type === "image").length;
+  const hasImage = result.content.some((c) => c.type === "image");
   const textContent = result.content
     .filter((c) => c.type === "text" && typeof c.text === "string")
     .map((c) => c.text ?? "")
@@ -155,38 +156,44 @@ function formatReadResult(
     const trimmed = lines.slice(0, end);
 
     if (options.expanded) {
+      return theme.fg("error", trimmed.join("\n"));
+    }
+
+    const maxLineWidth = Math.floor(
+      (process.stdout.columns ??
+        Number(process.env.COLUMNS) ??
+        MAX_CALL_WIDTH) / 2,
+    );
+    const joined = trimmed.join("\n");
+
+    if (trimmed.length === 1 && visibleWidth(joined) <= maxLineWidth) {
       return (
-        theme.fg(getResultSymbolColor(state), "│\n") +
-        theme.fg("error", trimmed.join("\n"))
+        theme.fg(getResultSymbolColor(state), "└─ ") + theme.fg("error", joined)
       );
     }
 
-    const maxLineWidth = Math.floor(MAX_CALL_WIDTH / 2);
-
-    // Single line that fits: show as-is
-    if (trimmed.length === 1 && visibleWidth(trimmed[0]!) <= maxLineWidth) {
-      return (
-        theme.fg(getResultSymbolColor(state), "└─ ") +
-        theme.fg("error", trimmed[0]!)
-      );
-    }
-
-    // Truncated or multi-line: show with expand hint
-    const display = truncateToWidth(trimmed.join("\n"), maxLineWidth);
+    const truncated = joined.slice(0, maxLineWidth - 3);
     return (
       theme.fg(getResultSymbolColor(state), "└─ ") +
-      theme.fg("error", display) +
-      ` (${keyHint("app.tools.expand", "to expand")})`
+      theme.fg("error", truncated + "...") +
+      theme.fg("muted", " (") +
+      keyHint("app.tools.expand", "to expand") +
+      theme.fg("muted", ")")
     );
   }
 
   const parts: string[] = [];
-  if (textContent) {
+  if (textContent && !hasImage) {
     const lines = countLines(textContent);
     parts.push(`${lines} ${lines === 1 ? "line" : "lines"}`);
   }
-  if (imageCount > 0) {
-    parts.push(`${imageCount} ${imageCount === 1 ? "image" : "images"}`);
+  if (hasImage) {
+    const match = textContent.match(/original\s+(\d+)x(\d+)/);
+    if (match) {
+      parts.push(`Image (${match[1]}x${match[2]})`);
+    } else {
+      parts.push("Image");
+    }
   }
   if (details?.truncation?.truncated) {
     parts.push("truncated");
@@ -247,10 +254,15 @@ export function patchReadTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
       return text;
     },
     renderResult(result, options, theme, toolCtx) {
-      const text =
-        (toolCtx.lastComponent as Text | undefined) ?? new Text("", 1, 0);
-
       const state = toolCtx.state as ReadRenderState;
+      const paddingX = options.expanded ? 3 : 1;
+      const text =
+        state.expanded !== options.expanded
+          ? new Text("", paddingX, 0)
+          : ((toolCtx.lastComponent as Text | undefined) ??
+            new Text("", paddingX, 0));
+      state.expanded = options.expanded;
+
       const details = result.details as ReadToolDetails | undefined;
 
       const nextHasResult = true;
