@@ -6,13 +6,13 @@ import type {
   Theme,
   ReadToolInput,
 } from "@earendil-works/pi-coding-agent";
-import { createReadTool, keyHint } from "@earendil-works/pi-coding-agent";
+import { createReadTool } from "@earendil-works/pi-coding-agent";
 import { Text, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { Handle } from "../types";
 import {
   type BaseRenderState,
-  type ToolStatus,
   MAX_CALL_WIDTH,
+  buildHint,
   clearBlinkTimers,
   countLines,
   getResultSymbolColor,
@@ -48,6 +48,8 @@ function formatReadResult(
     .map((c) => c.text ?? "")
     .join("\n");
 
+  const hint = buildHint(theme);
+
   if (state.isError) {
     const output = textContent.endsWith("\n")
       ? textContent.slice(0, -1)
@@ -80,9 +82,7 @@ function formatReadResult(
     return (
       theme.fg(getResultSymbolColor(state), "└─ ") +
       theme.fg("error", truncated + "...") +
-      theme.fg("muted", " (") +
-      keyHint("app.tools.expand", "to expand") +
-      theme.fg("muted", ")")
+      hint
     );
   }
 
@@ -116,7 +116,7 @@ export function patchReadTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
 
   pi.registerTool({
     name: "read",
-    label: "Read",
+    label: "read",
     description: tool.description,
     promptSnippet: "Read file contents",
     promptGuidelines: ["Use read to examine files instead of cat or sed."],
@@ -129,20 +129,16 @@ export function patchReadTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
       const text =
         (toolCtx.lastComponent as Text | undefined) ?? new Text("", 1, 0);
       const state = toolCtx.state as BaseRenderState;
-      const status: ToolStatus = state.hasResult
-        ? "done"
-        : !toolCtx.executionStarted
-          ? "not_started"
-          : toolCtx.isPartial
-            ? "running"
-            : "done";
+      const isDone =
+        state.hasResult || (!toolCtx.executionStarted && !toolCtx.isPartial);
 
-      updateBlinkTimer(state, status === "running", toolCtx.invalidate);
+      updateBlinkTimer(state, !isDone, toolCtx.invalidate);
 
       let content = theme.fg(
-        getStatusColor(status, state),
-        `${getStatusSymbol(status)} `,
+        getStatusColor(isDone, state),
+        `${getStatusSymbol(isDone)} `,
       );
+
       const renderArgs = args as ReadToolInput;
       const pathDisplay = renderPath(renderArgs.path, theme, toolCtx.cwd);
 

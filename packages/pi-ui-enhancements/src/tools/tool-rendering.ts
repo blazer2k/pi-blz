@@ -1,10 +1,8 @@
 import { homedir } from "node:os";
 import { isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { Theme } from "@earendil-works/pi-coding-agent";
+import { keyHint, Theme } from "@earendil-works/pi-coding-agent";
 import { getCapabilities, hyperlink } from "@earendil-works/pi-tui";
-
-export type ToolStatus = "done" | "not_started" | "running";
 
 export type BaseRenderState = {
   blinkTimer?: ReturnType<typeof setInterval>;
@@ -19,11 +17,13 @@ export const MAX_CALL_WIDTH = 120;
 const BLINK_INTERVAL_MS = 500;
 const activeBlinkTimers = new Set<ReturnType<typeof setInterval>>();
 
-export function getStatusSymbol(status: ToolStatus): string {
-  if (status === "done") return "●";
-  if (status === "not_started") return "○";
+export function isBlinkOn(): boolean {
+  return Math.floor(Date.now() / BLINK_INTERVAL_MS) % 2 === 0;
+}
 
-  return Math.floor(Date.now() / BLINK_INTERVAL_MS) % 2 === 0 ? "●" : "○";
+export function getStatusSymbol(isDone: boolean): string {
+  if (isDone) return "●";
+  return isBlinkOn() ? "●" : "○";
 }
 
 export function getResultSymbolColor(
@@ -35,15 +35,13 @@ export function getResultSymbolColor(
 }
 
 export function getStatusColor(
-  status: ToolStatus,
+  isDone: boolean,
   state: BaseRenderState,
-): "muted" | "success" | "warning" | "error" {
+): "success" | "warning" | "error" | "dim" {
   if (state.isError) return "error";
   if (state.truncated) return "warning";
 
-  if (status === "not_started") return "muted";
-
-  // Running blink and normal done are both success-colored.
+  if (!isDone) return isBlinkOn() ? "success" : "dim";
   return "success";
 }
 
@@ -71,16 +69,16 @@ export function renderPath(
 
 export function updateBlinkTimer(
   state: BaseRenderState,
-  running: boolean,
+  shouldBlink: boolean,
   invalidate: () => void,
 ): void {
-  if (running && !state.blinkTimer) {
+  if (shouldBlink && !state.blinkTimer) {
     state.blinkTimer = setInterval(invalidate, BLINK_INTERVAL_MS);
     activeBlinkTimers.add(state.blinkTimer);
     return;
   }
 
-  if (!running && state.blinkTimer) {
+  if (!shouldBlink && state.blinkTimer) {
     clearInterval(state.blinkTimer);
     activeBlinkTimers.delete(state.blinkTimer);
     state.blinkTimer = undefined;
@@ -97,4 +95,12 @@ export function clearBlinkTimers(): void {
 export function countLines(text: string): number {
   const trimmed = text.endsWith("\n") ? text.slice(0, -1) : text;
   return trimmed.length === 0 ? 0 : trimmed.split("\n").length;
+}
+
+export function buildHint(theme: Theme): string {
+  return (
+    theme.fg("muted", " (") +
+    keyHint("app.tools.expand", "to expand") +
+    theme.fg("muted", ")")
+  );
 }

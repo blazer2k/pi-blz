@@ -11,6 +11,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Text, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import {
+  buildHint,
   clearBlinkTimers,
   countLines,
   getResultSymbolColor,
@@ -20,7 +21,6 @@ import {
   renderPath,
   updateBlinkTimer,
   type BaseRenderState,
-  type ToolStatus,
 } from "./tool-rendering";
 import type { Handle } from "../types";
 
@@ -35,6 +35,8 @@ function formatWriteResult(
     .filter((c) => c.type === "text" && typeof c.text === "string")
     .map((c) => c.text ?? "")
     .join("\n");
+
+  const hint = buildHint(theme);
 
   if (state.isError) {
     const output = textContent.endsWith("\n")
@@ -89,9 +91,7 @@ function formatWriteResult(
   return (
     theme.fg(getResultSymbolColor(state), "└─ ") +
     theme.fg("toolOutput", summary) +
-    theme.fg("muted", " (") +
-    keyHint("app.tools.expand", "to expand") +
-    theme.fg("muted", ")")
+    hint
   );
 }
 
@@ -103,7 +103,7 @@ export function patchWriteTool(
 
   pi.registerTool({
     name: "write",
-    label: "Write",
+    label: "write",
     description: tool.description,
     promptSnippet: "Create or overwrite files",
     promptGuidelines: ["Use write only for new files or complete rewrites."],
@@ -116,21 +116,17 @@ export function patchWriteTool(
       const text =
         (toolCtx.lastComponent as Text | undefined) ?? new Text("", 1, 0);
       const state = toolCtx.state as BaseRenderState;
-      const status: ToolStatus = state.hasResult
-        ? "done"
-        : !toolCtx.argsComplete ||
-            (toolCtx.executionStarted && toolCtx.isPartial)
-          ? "running"
-          : !toolCtx.executionStarted
-            ? "not_started"
-            : "done";
 
-      updateBlinkTimer(state, status === "running", toolCtx.invalidate);
+      const isDone =
+        state.hasResult || (!toolCtx.executionStarted && !toolCtx.isPartial);
+
+      updateBlinkTimer(state, !isDone, toolCtx.invalidate);
 
       let callLine = theme.fg(
-        getStatusColor(status, state),
-        `${getStatusSymbol(status)} `,
+        getStatusColor(isDone, state),
+        `${getStatusSymbol(isDone)} `,
       );
+
       callLine += theme.fg("toolTitle", theme.bold("Write "));
       callLine += renderPath(args.path, theme, toolCtx.cwd);
 
@@ -144,7 +140,10 @@ export function patchWriteTool(
             { expanded: toolCtx.expanded, isPartial: toolCtx.isPartial },
             theme,
             args,
-          );
+          )
+            .split("\n")
+            .map((l) => `  ${l}`)
+            .join("\n");
       }
 
       text.setText(content);
