@@ -2,6 +2,9 @@ export const TOOL_PROMPTS = {
   bash: {
     promptSnippet: "Execute bash commands (ls, grep, find, etc.)",
   },
+  ls: {
+    promptSnippet: "List directory contents",
+  },
   read: {
     promptSnippet: "Read file contents",
     promptGuidelines: ["Use read to examine files instead of cat or sed."],
