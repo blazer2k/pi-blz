@@ -8,6 +8,9 @@ export const TOOL_PROMPTS = {
   find: {
     promptSnippet: "Find files by glob pattern (respects .gitignore)",
   },
+  grep: {
+    promptSnippet: "Search file contents for patterns (respects .gitignore)",
+  },
   read: {
     promptSnippet: "Read file contents",
     promptGuidelines: ["Use read to examine files instead of cat or sed."],

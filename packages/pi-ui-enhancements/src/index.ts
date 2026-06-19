@@ -10,7 +10,7 @@ let handles: Handle[] = [];
 export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
     handles = patchTools(pi, ctx);
-    pi.setActiveTools(["read", "write", "edit", "bash", "ls", "find"]);
+    pi.setActiveTools(["read", "write", "edit", "bash", "ls", "find", "grep"]);
 
     if (ctx.hasUI) {
       handles.push(
