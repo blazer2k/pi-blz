@@ -111,7 +111,7 @@ export function patchEditTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
     renderCall(args, theme, toolCtx) {
       const state = toolCtx.state as BaseRenderState;
       const renderArgs = args as EditToolInput;
-      const { text, prefix } = getCallRenderParts(state, theme, toolCtx, 0);
+      const { text, prefix } = getCallRenderParts(state, theme, toolCtx, 1);
 
       let content = prefix;
 
@@ -131,7 +131,7 @@ export function patchEditTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
     renderResult(result, options, theme, toolCtx) {
       const state = toolCtx.state as BaseRenderState;
       const text = getResultText(state, options, toolCtx.lastComponent, {
-        paddingX: 0,
+        paddingX: 1,
       });
 
       const details = result.details as EditToolDetails | undefined;

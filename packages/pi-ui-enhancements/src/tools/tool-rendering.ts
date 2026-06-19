@@ -229,9 +229,24 @@ export function formatSimpleErrorResult(
     options,
     theme.fg("error", "..."),
   );
+  const lines = errorBody.text.split("\n");
+
+  const formatted = lines
+    .map((line, index) => {
+      const prefix = index === lines.length - 1 ? "└─ " : "│  ";
+      return formatTreeLine(line, {
+        theme,
+        state,
+        prefix,
+        width: MAX_CALL_WIDTH - 1,
+        mode: "preserve",
+        color: "error",
+      }).text;
+    })
+    .join("\n");
 
   if (options.expanded) {
-    return theme.fg("error", errorBody.text);
+    return formatted;
   }
 
   const suffix = errorBody.truncated ? buildHint(theme) : "";
