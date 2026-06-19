@@ -6,7 +6,7 @@ import type {
   BashToolDetails,
 } from "@earendil-works/pi-coding-agent";
 import { createBashTool } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth } from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { Handle } from "../types";
 import { TOOL_PROMPTS } from "./tool-prompts";
 import { registerPatchedTool } from "./tool-registration";
@@ -17,20 +17,26 @@ import {
   countLines,
   extractTextContent,
   formatErrorBody,
+  formatTreeLine,
   getCallRenderParts,
   getResultSymbolColor,
   getResultText,
   invalidateIfChanged,
   normalizeOutput,
+  registerToolTimer,
+  unregisterToolTimer,
   updateResultState,
 } from "./tool-rendering";
 
-type BashToolInput = Parameters<ReturnType<typeof createBashTool>["execute"]>[1];
+type BashToolInput = Parameters<
+  ReturnType<typeof createBashTool>["execute"]
+>[1];
 
 type BashRenderState = BaseRenderState & {
   startedAt?: number;
   endedAt?: number;
   durationTimer?: ReturnType<typeof setInterval>;
+  callTruncated?: boolean;
 };
 
 type BashDetailsWithTiming = BashToolDetails & {
@@ -42,12 +48,48 @@ function formatDuration(ms: number): string {
 }
 
 function getOutputWidth(): number {
-  // Account for tree prefixes/padding around rendered output lines.
-  return Math.max(
-    1,
-    (process.stdout.columns ?? Number(process.env.COLUMNS) ?? MAX_CALL_WIDTH) -
-      6,
-  );
+  // Keep rendered output within the same fixed-width budget as call headers.
+  return Math.max(1, MAX_CALL_WIDTH - 6);
+}
+
+function buildBashMetadataParts(
+  args: {
+    durationSummary?: string;
+    remainingLines?: number;
+    callTruncated?: boolean;
+    lineTruncated?: boolean;
+    toolTruncated?: boolean;
+    expanded?: boolean;
+  },
+  theme: Theme,
+): { parts: string[]; needsHint: boolean } {
+  const parts: string[] = [];
+  let needsHint = false;
+
+  if (args.durationSummary) {
+    parts.push(theme.fg("muted", args.durationSummary));
+  }
+  if ((args.remainingLines ?? 0) > 0) {
+    const remainingLines = args.remainingLines ?? 0;
+    parts.push(
+      theme.fg(
+        "muted",
+        `${remainingLines} more ${remainingLines === 1 ? "line" : "lines"}`,
+      ),
+    );
+    needsHint = true;
+  }
+  if (args.callTruncated && !args.expanded) {
+    needsHint = true;
+  }
+  if (args.lineTruncated) {
+    needsHint = true;
+  }
+  if (args.toolTruncated) {
+    parts.push(theme.fg("warning", "truncated"));
+  }
+
+  return { parts, needsHint };
 }
 
 function formatOutputLines(
@@ -57,25 +99,27 @@ function formatOutputLines(
   color: "toolOutput" | "error" = "toolOutput",
   maxLineWidth?: number,
   closeLastLine = false,
-): string {
+): { text: string; truncated: boolean } {
   const output = normalizeOutput(text);
-  if (!output) return "";
+  if (!output) return { text: "", truncated: false };
 
+  let truncated = false;
   const lines = output.split("\n");
-  return lines
-    .map((line, index) => {
-      const renderedLine =
-        maxLineWidth === undefined
-          ? line
-          : truncateToWidth(line, maxLineWidth, "...");
-      const prefix =
-        closeLastLine && index === lines.length - 1 ? "└─ " : "│  ";
-      return (
-        theme.fg(getResultSymbolColor(state), prefix) +
-        theme.fg(color, renderedLine)
-      );
-    })
-    .join("\n");
+  const renderedLines = lines.map((line, index) => {
+    const prefix = closeLastLine && index === lines.length - 1 ? "└─ " : "│  ";
+    const rendered = formatTreeLine(line, {
+      theme,
+      state,
+      prefix,
+      width: (maxLineWidth ?? getOutputWidth()) + 3,
+      mode: maxLineWidth === undefined ? "preserve" : "truncate",
+      color,
+    });
+    truncated ||= rendered.truncated;
+    return rendered.text;
+  });
+
+  return { text: renderedLines.join("\n"), truncated };
 }
 
 function formatBashResult(
@@ -102,7 +146,11 @@ function formatBashResult(
       : `${options.isPartial ? "elapsed" : "took"} ${formatDuration(elapsedMs)}`;
 
   if (state.isError) {
-    const errorBody = formatErrorBody(textContent, options);
+    const errorBody = formatErrorBody(
+      textContent,
+      options,
+      theme.fg("error", "..."),
+    );
 
     if (options.expanded) {
       const summary = durationSummary ? `${durationSummary}, error` : "error";
@@ -115,9 +163,11 @@ function formatBashResult(
         true,
       );
       return [
-        theme.fg(getResultSymbolColor(state), outputLines ? "├─ " : "└─ ") +
-          theme.fg("error", summary),
-        outputLines,
+        theme.fg(
+          getResultSymbolColor(state),
+          outputLines.text ? "├─ " : "└─ ",
+        ) + theme.fg("error", summary),
+        outputLines.text,
       ]
         .filter((line): line is string => Boolean(line))
         .join("\n");
@@ -137,26 +187,6 @@ function formatBashResult(
   const visibleLineCount = showExpanded ? lineCount : Math.min(lineCount, 5);
   const remainingLines = Math.max(0, lineCount - visibleLineCount);
 
-  const parts: string[] = [];
-  if (durationSummary) {
-    parts.push(theme.fg("muted", durationSummary));
-  }
-  if (remainingLines > 0) {
-    parts.push(
-      theme.fg(
-        "muted",
-        `${remainingLines} more ${remainingLines === 1 ? "line" : "lines"}`,
-      ) + hint,
-    );
-  }
-  if (details?.truncation?.truncated) {
-    parts.push(theme.fg("warning", "truncated"));
-  }
-
-  const summary =
-    parts.length > 0
-      ? parts.join(theme.fg("muted", ", "))
-      : theme.fg("muted", "output");
   const output = showExpanded
     ? normalizeOutput(textContent)
     : normalizeOutput(textContent).split("\n").slice(-5).join("\n");
@@ -169,22 +199,83 @@ function formatBashResult(
     true,
   );
 
+  const { parts, needsHint } = buildBashMetadataParts(
+    {
+      durationSummary,
+      remainingLines,
+      callTruncated: state.callTruncated,
+      lineTruncated: outputLines.truncated,
+      toolTruncated: details?.truncation?.truncated === true,
+      expanded: options.expanded,
+    },
+    theme,
+  );
+
+  const summary =
+    parts.length > 0
+      ? parts.join(theme.fg("muted", ", ")) + (needsHint ? hint : "")
+      : theme.fg("muted", "output");
+
   if (lineCount <= 1) {
     const inlineOutput = normalizeOutput(textContent);
-    const inlineSummary = [durationSummary, inlineOutput]
-      .filter((part): part is string => Boolean(part))
-      .join(", ");
+    const maxLineWidth = getOutputWidth();
+    const shouldTruncate =
+      !options.expanded && visibleWidth(inlineOutput) > maxLineWidth;
+    const renderedOutput = shouldTruncate
+      ? truncateToWidth(
+          inlineOutput,
+          maxLineWidth,
+          theme.fg("toolOutput", "..."),
+        )
+      : inlineOutput;
+    const { parts: metadataParts, needsHint: metadataNeedsHint } =
+      buildBashMetadataParts(
+        {
+          durationSummary,
+          callTruncated: state.callTruncated,
+          lineTruncated: shouldTruncate,
+          toolTruncated: details?.truncation?.truncated === true,
+          expanded: options.expanded,
+        },
+        theme,
+      );
 
-    return (
-      theme.fg(getResultSymbolColor(state), "└─ ") +
-      theme.fg("toolOutput", inlineSummary || summary)
-    );
+    const metadataSummary =
+      metadataParts.length > 0
+        ? metadataParts.join(theme.fg("muted", ", ")) +
+          (metadataNeedsHint ? hint : "")
+        : "";
+
+    if (metadataNeedsHint || (options.expanded && renderedOutput && shouldTruncate)) {
+      const outputLine = formatTreeLine(renderedOutput, {
+        theme,
+        state,
+        prefix: metadataSummary ? "└─ " : "└─ ",
+        width: getOutputWidth() + 3,
+        mode: options.expanded ? "preserve" : "truncate",
+        color: "toolOutput",
+      });
+      return [
+        metadataSummary
+          ? theme.fg(getResultSymbolColor(state), "├─ ") + metadataSummary
+          : undefined,
+        outputLine.text,
+      ]
+        .filter((line): line is string => Boolean(line))
+        .join("\n");
+    }
+
+    const inlineParts = [metadataSummary, theme.fg("toolOutput", renderedOutput)]
+      .filter(Boolean)
+      .join(theme.fg("muted", ", "));
+
+    return theme.fg(getResultSymbolColor(state), "└─ ") + (inlineParts || summary);
   }
 
   return [
-    theme.fg(getResultSymbolColor(state), outputLines ? "├─ " : "└─ ") +
+    theme.fg(getResultSymbolColor(state), outputLines.text ? "├─ " : "└─ ") +
       summary,
-    outputLines,
+    outputLines.text,
   ]
     .filter((line): line is string => Boolean(line))
     .join("\n");
@@ -229,9 +320,12 @@ export function patchBashTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
 
       let content = prefix;
 
+      const commandPreview = toolCtx.expanded
+        ? renderArgs.command
+        : renderArgs.command.replace(/\s+/g, " ").trim();
       const commandDisplay =
         theme.fg("dim", "$ ") +
-        theme.bold(theme.fg("accent", renderArgs.command));
+        theme.bold(theme.fg("accent", commandPreview));
 
       const timeoutSuffix = renderArgs.timeout
         ? theme.fg("muted", ` (timeout ${renderArgs.timeout}s)`)
@@ -241,7 +335,14 @@ export function patchBashTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
       content += commandDisplay;
       content += timeoutSuffix;
 
-      text.setText(content);
+      const shouldTruncate =
+        !toolCtx.expanded && visibleWidth(content) > MAX_CALL_WIDTH;
+      state.callTruncated = shouldTruncate;
+      text.setText(
+        shouldTruncate
+          ? truncateToWidth(content, MAX_CALL_WIDTH, theme.fg("accent", "..."))
+          : content,
+      );
       return text;
     },
     renderResult(result, options, theme, toolCtx) {
@@ -256,12 +357,14 @@ export function patchBashTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
         !state.durationTimer
       ) {
         state.durationTimer = setInterval(() => toolCtx.invalidate(), 1000);
+        registerToolTimer(state.durationTimer);
       }
 
       if (!options.isPartial || toolCtx.isError) {
         state.endedAt ??= Date.now();
         if (state.durationTimer) {
           clearInterval(state.durationTimer);
+          unregisterToolTimer(state.durationTimer);
           state.durationTimer = undefined;
         }
       }

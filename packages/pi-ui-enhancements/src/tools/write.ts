@@ -8,12 +8,13 @@ import {
   type ToolRenderResultOptions,
   type WriteToolInput,
 } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth } from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import {
   buildHint,
   countLines,
   extractTextContent,
   formatSimpleErrorResult,
+  formatTreeLine,
   getCallRenderParts,
   getResultSymbolColor,
   getResultText,
@@ -47,15 +48,33 @@ function formatWriteResult(
 
   if (options.expanded) {
     const lang = getLanguageFromPath(args.path);
+    const previewText = args.content.split("\n").slice(0, 20).join("\n");
+    const highlightedLines = highlightCode(
+      previewText.endsWith("\n") ? previewText.slice(0, -1) : previewText,
+      lang,
+    );
+    const remainingLines = Math.max(0, lines - 20);
 
-    let expanded = "";
+    const renderedLines = highlightedLines.map((line, index) => {
+      const isLastLine = index === highlightedLines.length - 1;
+      const prefix = remainingLines === 0 && isLastLine ? "└─ " : "│  ";
+      return formatTreeLine(line, {
+        theme,
+        state,
+        prefix,
+        width: MAX_CALL_WIDTH - 1,
+        mode: "preserve",
+      }).text;
+    });
 
-    const previewLines = args.content.split("\n").slice(0, 20);
-    expanded += highlightCode(previewLines.join("\n"), lang).join("\n");
-    if (lines > 20) {
-      expanded += "\n" + theme.fg("muted", `${lines - 20} more lines`);
+    if (remainingLines > 0) {
+      renderedLines.push(
+        theme.fg(getResultSymbolColor(state), "└─ ") +
+          theme.fg("muted", `${remainingLines} more lines`),
+      );
     }
-    return expanded;
+
+    return renderedLines.join("\n");
   }
 
   return (
@@ -81,14 +100,23 @@ export function patchWriteTool(
     renderCall(args, theme, toolCtx) {
       const state = toolCtx.state as BaseRenderState;
       const renderArgs = args as WriteToolInput;
-      const { text, prefix } = getCallRenderParts(state, theme, toolCtx);
+      const { text, prefix } = getCallRenderParts(state, theme, toolCtx, 0);
 
-      let callLine = prefix;
+      let callLine = ` ${prefix}`;
 
-      callLine += theme.fg("toolTitle", theme.bold("Write "));
-      callLine += renderPath(renderArgs.path, theme, toolCtx.cwd);
+      const title = theme.fg("toolTitle", theme.bold("Write "));
+      const pathWidth = Math.max(
+        1,
+        MAX_CALL_WIDTH - visibleWidth(callLine + title),
+      );
+      callLine += title;
+      callLine += renderPath(renderArgs.path, theme, toolCtx.cwd, pathWidth);
 
-      let content = truncateToWidth(callLine, MAX_CALL_WIDTH);
+      let content = truncateToWidth(
+        callLine,
+        MAX_CALL_WIDTH,
+        theme.fg("accent", "..."),
+      );
       if (toolCtx.isPartial && typeof renderArgs.content === "string") {
         content +=
           "\n" +
@@ -100,7 +128,7 @@ export function patchWriteTool(
             renderArgs,
           )
             .split("\n")
-            .map((l) => `  ${l}`)
+            .map((line) => ` ${line}`)
             .join("\n");
       }
 
@@ -122,7 +150,14 @@ export function patchWriteTool(
       invalidateIfChanged(changed, toolCtx.invalidate);
 
       const writeArgs = toolCtx.args as WriteToolInput;
-      text.setText(formatWriteResult(result, state, options, theme, writeArgs));
+      const resultText = formatWriteResult(
+        result,
+        state,
+        options,
+        theme,
+        writeArgs,
+      );
+      text.setText(resultText);
 
       return text;
     },

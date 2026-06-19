@@ -7,7 +7,7 @@ import type {
   ReadToolInput,
 } from "@earendil-works/pi-coding-agent";
 import { createReadTool } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth } from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { Handle } from "../types";
 import { TOOL_PROMPTS } from "./tool-prompts";
 import { registerPatchedTool } from "./tool-registration";
@@ -65,16 +65,15 @@ function formatReadResult(
       parts.push("Image");
     }
   }
-  if (details?.truncation?.truncated) {
-    parts.push("truncated");
-  }
-
   const summary = parts.length > 0 ? parts.join(", ") : "no content";
+  const truncation = details?.truncation?.truncated
+    ? theme.fg("warning", "truncated")
+    : undefined;
+  const output = truncation
+    ? theme.fg("toolOutput", summary) + theme.fg("toolOutput", ", ") + truncation
+    : theme.fg("toolOutput", summary);
 
-  return (
-    theme.fg(getResultSymbolColor(state), "└─ ") +
-    theme.fg("toolOutput", summary)
-  );
+  return theme.fg(getResultSymbolColor(state), "└─ ") + output;
 }
 
 export function patchReadTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
@@ -94,13 +93,26 @@ export function patchReadTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
       let content = prefix;
 
       const renderArgs = args as ReadToolInput;
-      const pathDisplay = renderPath(renderArgs.path, theme, toolCtx.cwd);
+      const title = theme.fg("toolTitle", theme.bold("Read "));
+      const lineRange = formatReadLineRange(renderArgs, theme);
+      const pathWidth = Math.max(
+        1,
+        MAX_CALL_WIDTH - visibleWidth(content + title + lineRange),
+      );
+      const pathDisplay = renderPath(
+        renderArgs.path,
+        theme,
+        toolCtx.cwd,
+        pathWidth,
+      );
 
-      content += theme.fg("toolTitle", theme.bold("Read "));
+      content += title;
       content += pathDisplay;
-      content += formatReadLineRange(renderArgs, theme);
+      content += lineRange;
 
-      text.setText(truncateToWidth(content, MAX_CALL_WIDTH));
+      text.setText(
+        truncateToWidth(content, MAX_CALL_WIDTH, theme.fg("accent", "...")),
+      );
       return text;
     },
     renderResult(result, options, theme, toolCtx) {

@@ -8,5 +8,9 @@ import { patchReadTool } from "./read";
 import { patchWriteTool } from "./write";
 
 export function patchTools(pi: ExtensionAPI, ctx: ExtensionContext): Handle[] {
-  return [patchReadTool(pi, ctx), patchWriteTool(pi, ctx), patchBashTool(pi, ctx)];
+  return [
+    patchReadTool(pi, ctx),
+    patchWriteTool(pi, ctx),
+    patchBashTool(pi, ctx),
+  ];
 }

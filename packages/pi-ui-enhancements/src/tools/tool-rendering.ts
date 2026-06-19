@@ -2,7 +2,7 @@ import { homedir } from "node:os";
 import { isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
-  keyHint,
+  keyText,
   Theme,
   type ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
@@ -11,6 +11,7 @@ import {
   hyperlink,
   visibleWidth,
   Text,
+  truncateToWidth,
 } from "@earendil-works/pi-tui";
 
 export type BaseRenderState = {
@@ -21,10 +22,11 @@ export type BaseRenderState = {
   expanded?: boolean;
 };
 
-export const MAX_CALL_WIDTH = 120;
+export const MAX_CALL_WIDTH = 80;
 
 const BLINK_INTERVAL_MS = 500;
 const activeBlinkTimers = new Set<ReturnType<typeof setInterval>>();
+const activeToolTimers = new Set<ReturnType<typeof setInterval>>();
 
 export function isBlinkOn(): boolean {
   return Math.floor(Date.now() / BLINK_INTERVAL_MS) % 2 === 0;
@@ -61,15 +63,52 @@ function shortenPath(filePath: string): string {
     : filePath;
 }
 
+function truncatePathMiddle(filePath: string, maxWidth: number): string {
+  if (maxWidth <= 0) return "";
+  if (visibleWidth(filePath) <= maxWidth) return filePath;
+
+  const parts = filePath.split("/");
+  const filename = parts.pop() ?? "";
+  if (!filename || parts.length === 0) {
+    return truncateToWidth(filePath, maxWidth, "...");
+  }
+
+  const maxHeadCount = Math.min(parts.length, 6);
+  for (let headCount = maxHeadCount; headCount >= 0; headCount--) {
+    for (
+      let tailCount = parts.length - headCount - 1;
+      tailCount >= 0;
+      tailCount--
+    ) {
+      const head = parts.slice(0, headCount);
+      const tail = tailCount === 0 ? [] : parts.slice(-tailCount);
+      const candidate = [...head, "...", ...tail, filename].join("/");
+      if (visibleWidth(candidate) <= maxWidth) {
+        return candidate;
+      }
+    }
+  }
+
+  const prefix = ".../";
+  const filenameWidth = Math.max(1, maxWidth - visibleWidth(prefix));
+  return prefix + truncateToWidth(filename, filenameWidth, "...");
+}
+
 export function renderPath(
   rawPath: unknown,
   theme: Theme,
   cwd: string,
+  maxWidth?: number,
 ): string {
   if (rawPath == null || rawPath === "") return theme.fg("toolOutput", "...");
   if (typeof rawPath !== "string") return theme.fg("error", "[invalid arg]");
 
-  const styled = theme.fg("accent", shortenPath(rawPath));
+  const displayPath = shortenPath(rawPath);
+  const visiblePath =
+    maxWidth === undefined
+      ? displayPath
+      : truncatePathMiddle(displayPath, maxWidth);
+  const styled = theme.fg("accent", visiblePath);
   if (!getCapabilities().hyperlinks) return styled;
 
   const absolutePath = isAbsolute(rawPath) ? rawPath : resolve(cwd, rawPath);
@@ -94,18 +133,33 @@ export function updateBlinkTimer(
   }
 }
 
+export function registerToolTimer(timer: ReturnType<typeof setInterval>): void {
+  activeToolTimers.add(timer);
+}
+
+export function unregisterToolTimer(
+  timer: ReturnType<typeof setInterval>,
+): void {
+  activeToolTimers.delete(timer);
+}
+
 export function clearBlinkTimers(): void {
   for (const timer of activeBlinkTimers) {
     clearInterval(timer);
   }
   activeBlinkTimers.clear();
+
+  for (const timer of activeToolTimers) {
+    clearInterval(timer);
+  }
+  activeToolTimers.clear();
 }
 
 export function buildHint(theme: Theme): string {
   return (
-    theme.fg("muted", " (") +
-    keyHint("app.tools.expand", "to expand") +
-    theme.fg("muted", ")")
+    theme.fg("dim", " (") +
+    theme.fg("dim", keyText("app.tools.expand")) +
+    theme.fg("dim", " to expand)")
   );
 }
 
@@ -128,16 +182,14 @@ export function extractTextContent(result: {
 }
 
 export function getMaxErrorLineWidth(): number {
-  return Math.floor(
-    (process.stdout.columns ?? Number(process.env.COLUMNS) ?? MAX_CALL_WIDTH) /
-      2,
-  );
+  return Math.floor(MAX_CALL_WIDTH / 2);
 }
 
 export function formatErrorBody(
   textContent: string,
   options: ToolRenderResultOptions,
-): { text: string; isSingleLine: boolean; truncated: boolean } {
+  ellipsis = "...",
+): { text: string; truncated: boolean } {
   const output = normalizeOutput(textContent);
   const lines = output.split("\n");
   let end = lines.length;
@@ -149,7 +201,6 @@ export function formatErrorBody(
   if (options.expanded) {
     return {
       text: trimmed.join("\n"),
-      isSingleLine: trimmed.length <= 1,
       truncated: false,
     };
   }
@@ -158,11 +209,13 @@ export function formatErrorBody(
   const joined = trimmed.join("\n");
 
   if (trimmed.length === 1 && visibleWidth(joined) <= maxLineWidth) {
-    return { text: joined, isSingleLine: true, truncated: false };
+    return { text: joined, truncated: false };
   }
 
-  const truncated = joined.slice(0, maxLineWidth - 3);
-  return { text: `${truncated}...`, isSingleLine: true, truncated: true };
+  return {
+    text: truncateToWidth(joined, maxLineWidth, ellipsis),
+    truncated: true,
+  };
 }
 
 export function formatSimpleErrorResult(
@@ -171,7 +224,11 @@ export function formatSimpleErrorResult(
   options: ToolRenderResultOptions,
   theme: Theme,
 ): string {
-  const errorBody = formatErrorBody(textContent, options);
+  const errorBody = formatErrorBody(
+    textContent,
+    options,
+    theme.fg("error", "..."),
+  );
 
   if (options.expanded) {
     return theme.fg("error", errorBody.text);
@@ -185,18 +242,43 @@ export function formatSimpleErrorResult(
   );
 }
 
+export function formatTreeLine(
+  line: string,
+  options: {
+    theme: Theme;
+    state: BaseRenderState;
+    prefix: "│  " | "├─ " | "└─ ";
+    width: number;
+    mode: "truncate" | "preserve";
+    color?: "toolOutput" | "error" | "muted";
+  },
+): { text: string; truncated: boolean } {
+  const { theme, state, prefix, width, mode, color } = options;
+  const contentWidth = Math.max(1, width - visibleWidth(prefix));
+  const truncated = mode === "truncate" && visibleWidth(line) > contentWidth;
+  const renderedLine = truncated
+    ? truncateToWidth(line, contentWidth, theme.fg(color ?? "muted", "..."))
+    : line;
+  const styledLine =
+    color === undefined ? renderedLine : theme.fg(color, renderedLine);
+
+  return {
+    text: theme.fg(getResultSymbolColor(state), prefix) + styledLine,
+    truncated,
+  };
+}
+
 export function getCallRenderParts(
   state: BaseRenderState,
   theme: Theme,
   toolCtx: {
-    lastComponent?: unknown;
     executionStarted?: boolean;
     isPartial?: boolean;
     invalidate: () => void;
   },
+  paddingX = 1,
 ): { text: Text; prefix: string; isDone: boolean } {
-  const text =
-    (toolCtx.lastComponent as Text | undefined) ?? new Text("", 1, 0);
+  const text = new Text("", paddingX, 0);
 
   const isDone =
     state.hasResult || (!toolCtx.executionStarted && !toolCtx.isPartial);
@@ -215,8 +297,9 @@ export function getResultText(
   state: BaseRenderState,
   options: ToolRenderResultOptions,
   lastComponent: unknown,
+  renderOptions?: { paddingX?: number },
 ): Text {
-  const paddingX = options.expanded ? 3 : 1;
+  const paddingX = renderOptions?.paddingX ?? 1;
   const text =
     state.expanded !== options.expanded
       ? new Text("", paddingX, 0)
