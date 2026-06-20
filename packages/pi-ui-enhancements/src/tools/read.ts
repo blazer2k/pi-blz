@@ -1,3 +1,12 @@
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  relative,
+  resolve,
+  sep,
+} from "node:path";
+import { getPackageDir } from "@earendil-works/pi-coding-agent";
 import type {
   ExtensionAPI,
   ExtensionContext,
@@ -22,6 +31,113 @@ import {
   getResultSymbolColor,
   renderPath,
 } from "./tool-rendering";
+
+const COMPACT_RESOURCE_FILE_NAMES = new Set([
+  "AGENTS.md",
+  "AGENTS.MD",
+  "CLAUDE.md",
+  "CLAUDE.MD",
+]);
+
+type CompactReadClassification =
+  | { kind: "docs"; label: string }
+  | { kind: "skill"; label: string }
+  | { kind: "resource"; label: string };
+
+function toPosixPath(filePath: string): string {
+  return filePath.split(sep).join("/");
+}
+
+function resolveToCwd(filePath: string, cwd: string): string {
+  return isAbsolute(filePath) ? filePath : resolve(cwd, filePath);
+}
+
+function isInside(parent: string, child: string): boolean {
+  const rel = relative(resolve(parent), resolve(child));
+  return rel !== "" && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
+}
+
+function getPiDocsClassification(
+  absolutePath: string,
+): CompactReadClassification | undefined {
+  const packageRoot = getPackageDir();
+
+  if (!isInside(packageRoot, absolutePath)) return undefined;
+
+  const label = toPosixPath(relative(packageRoot, absolutePath));
+
+  if (
+    label === "README.md" ||
+    label.startsWith("docs/") ||
+    label.startsWith("examples/")
+  ) {
+    return { kind: "docs", label };
+  }
+
+  return undefined;
+}
+
+function getCompactReadClassification(
+  args: ReadToolInput | undefined,
+  cwd: string,
+): CompactReadClassification | undefined {
+  const rawPath = args?.path;
+  if (!rawPath) return undefined;
+
+  const absolutePath = resolveToCwd(rawPath, cwd);
+  const fileName = basename(absolutePath);
+
+  if (fileName === "SKILL.md") {
+    return {
+      kind: "skill",
+      label: basename(dirname(absolutePath)) || fileName,
+    };
+  }
+
+  const docsClassification = getPiDocsClassification(absolutePath);
+  if (docsClassification) return docsClassification;
+
+  if (COMPACT_RESOURCE_FILE_NAMES.has(fileName)) {
+    return {
+      kind: "resource",
+      label: toPosixPath(relative(cwd, absolutePath)),
+    };
+  }
+
+  return undefined;
+}
+
+function formatCompactReadCall(
+  classification: CompactReadClassification,
+  args: ReadToolInput,
+  theme: Theme,
+  maxWidth: number,
+): string {
+  const lineRange = formatReadLineRange(args, theme);
+
+  if (classification.kind === "skill") {
+    const title = theme.fg("customMessageLabel", theme.bold("[skill] "));
+    const label = truncateToWidth(
+      classification.label,
+      Math.max(1, maxWidth - visibleWidth(title + lineRange)),
+      "...",
+    );
+
+    return title + theme.fg("customMessageText", label) + lineRange;
+  }
+
+  const title = theme.fg(
+    "toolTitle",
+    theme.bold(`Read ${classification.kind} `),
+  );
+  const label = truncateToWidth(
+    classification.label,
+    Math.max(1, maxWidth - visibleWidth(title + lineRange)),
+    "...",
+  );
+
+  return title + theme.fg("accent", label) + lineRange;
+}
 
 function formatReadLineRange(
   args: ReadToolInput | undefined,
@@ -93,22 +209,37 @@ export function patchReadTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
       let content = prefix;
 
       const renderArgs = args as ReadToolInput;
-      const title = theme.fg("toolTitle", theme.bold("Read "));
-      const lineRange = formatReadLineRange(renderArgs, theme);
-      const pathWidth = Math.max(
-        1,
-        MAX_CALL_WIDTH - visibleWidth(content + title + lineRange),
-      );
-      const pathDisplay = renderPath(
-        renderArgs.path,
-        theme,
+
+      const classification = getCompactReadClassification(
+        renderArgs,
         toolCtx.cwd,
-        pathWidth,
       );
 
-      content += title;
-      content += pathDisplay;
-      content += lineRange;
+      if (classification) {
+        content += formatCompactReadCall(
+          classification,
+          renderArgs,
+          theme,
+          Math.max(1, MAX_CALL_WIDTH - visibleWidth(content)),
+        );
+      } else {
+        const title = theme.fg("toolTitle", theme.bold("Read "));
+        const lineRange = formatReadLineRange(renderArgs, theme);
+        const pathWidth = Math.max(
+          1,
+          MAX_CALL_WIDTH - visibleWidth(content + title + lineRange),
+        );
+        const pathDisplay = renderPath(
+          renderArgs.path,
+          theme,
+          toolCtx.cwd,
+          pathWidth,
+        );
+
+        content += title;
+        content += pathDisplay;
+        content += lineRange;
+      }
 
       text.setText(
         truncateToWidth(content, MAX_CALL_WIDTH, theme.fg("accent", "...")),
