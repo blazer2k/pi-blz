@@ -14,16 +14,14 @@ import type { Handle } from "../types";
 import { TOOL_PROMPTS } from "./tool-prompts";
 import {
   buildHint,
+  buildRenderResult,
   extractTextContent,
   formatSimpleErrorResult,
   formatTreeLine,
   getCallRenderParts,
   getResultSymbolColor,
-  getResultText,
-  invalidateIfChanged,
   MAX_CALL_WIDTH,
   renderPath,
-  updateResultState,
   type BaseRenderState,
 } from "./tool-rendering";
 
@@ -111,7 +109,7 @@ export function patchEditTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
     renderCall(args, theme, toolCtx) {
       const state = toolCtx.state as BaseRenderState;
       const renderArgs = args as EditToolInput;
-      const { text, prefix } = getCallRenderParts(state, theme, toolCtx, 1);
+      const { text, prefix } = getCallRenderParts(state, theme, toolCtx);
 
       let content = prefix;
 
@@ -128,20 +126,6 @@ export function patchEditTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
       );
       return text;
     },
-    renderResult(result, options, theme, toolCtx) {
-      const state = toolCtx.state as BaseRenderState;
-      const text = getResultText(state, options, toolCtx.lastComponent, {
-        paddingX: 1,
-      });
-
-      const details = result.details as EditToolDetails | undefined;
-      const changed = updateResultState(state, {
-        isError: toolCtx.isError,
-      });
-
-      invalidateIfChanged(changed, toolCtx.invalidate);
-      text.setText(formatEditResult(result, state, options, theme));
-      return text;
-    },
+    renderResult: buildRenderResult(formatEditResult),
   });
 }

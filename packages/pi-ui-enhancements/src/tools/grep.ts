@@ -1,9 +1,7 @@
 import type {
   ExtensionAPI,
   ExtensionContext,
-  ToolRenderResultOptions,
   GrepToolDetails,
-  Theme,
   GrepToolInput,
 } from "@earendil-works/pi-coding-agent";
 import { createGrepTool } from "@earendil-works/pi-coding-agent";
@@ -13,114 +11,33 @@ import { TOOL_PROMPTS } from "./tool-prompts";
 import { registerPatchedTool } from "./tool-registration";
 import {
   type BaseRenderState,
+  type ListResultConfig,
   MAX_CALL_WIDTH,
-  MAX_EXPANDED_ENTRIES,
-  buildHint,
-  extractTextContent,
-  formatSimpleErrorResult,
-  formatTreeLine,
+  buildRenderResult,
+  formatListResult,
   getCallRenderParts,
-  getResultSymbolColor,
   getResultText,
   invalidateIfChanged,
-  normalizeOutput,
   renderPath,
   updateResultState,
 } from "./tool-rendering";
 
-function formatGrepResult(
-  result: {
-    content: Array<{ type: string; text?: string }>;
-    details?: unknown;
+const GREP_CONFIG: ListResultConfig = {
+  emptyMessage: "(no matches found)",
+  singularLabel: "line",
+  pluralLabel: "lines",
+  moreLabel: "more lines",
+  details: {
+    limitKey: "matchLimitReached",
+    extraTruncated: (d: GrepToolDetails) => d.linesTruncated === true,
   },
-  state: BaseRenderState,
-  options: ToolRenderResultOptions,
-  theme: Theme,
-): string {
-  const details = result.details as GrepToolDetails | undefined;
-  const textContent = extractTextContent(result);
-
-  if (state.isError) {
-    return formatSimpleErrorResult(textContent, state, options, theme);
-  }
-
-  const hint = buildHint(theme);
-
-  const normalized = normalizeOutput(textContent);
-  if (normalized === "" || normalized === "No matches found") {
-    return (
-      theme.fg(getResultSymbolColor(state), "└─ ") +
-      theme.fg("muted", "(no matches found)")
-    );
-  }
-
-  // Strip trailing notice block appended by the grep tool, e.g.
-  // "\n\n[100 matches limit reached. Use limit=200 for more, or refine pattern]"
-  const body = normalized.includes("\n\n[")
-    ? normalized.slice(0, normalized.lastIndexOf("\n\n["))
-    : normalized;
-
-  const lines = body.split("\n").filter((f) => f.length > 0);
-  const totalLines = lines.length;
-
-  const summaryParts: string[] = [];
-  summaryParts.push(
-    `${totalLines} ${totalLines === 1 ? "line" : "lines"}`,
-  );
-
-  if (details?.matchLimitReached !== undefined) {
-    summaryParts.push(
-      theme.fg("warning", `${details.matchLimitReached} limit`),
-    );
-  }
-  if (details?.truncation?.truncated || details?.linesTruncated) {
-    summaryParts.push(theme.fg("warning", "truncated"));
-  }
-
-  const summary = summaryParts.join(theme.fg("toolOutput", ", "));
-
-  if (!options.expanded) {
-    return (
-      theme.fg(getResultSymbolColor(state), "└─ ") +
-      theme.fg("toolOutput", summary) +
-      hint
-    );
-  }
-
-  const visibleLines = lines.slice(0, MAX_EXPANDED_ENTRIES);
-  const remaining = Math.max(0, totalLines - MAX_EXPANDED_ENTRIES);
-
-  const rendered: string[] = [];
-
-  rendered.push(
-    theme.fg(getResultSymbolColor(state), "├─ ") +
-      theme.fg("toolOutput", summary),
-  );
-
-  visibleLines.forEach((line, index) => {
-    const isLastVisible =
-      index === visibleLines.length - 1 && remaining === 0;
-    const prefix: "│  " | "└─ " = isLastVisible ? "└─ " : "│  ";
-
-    const treeLine = formatTreeLine(line, {
-      theme,
-      state,
-      prefix,
-      width: MAX_CALL_WIDTH - 1,
-      mode: "preserve",
-    });
-    rendered.push(treeLine.text);
-  });
-
-  if (remaining > 0) {
-    rendered.push(
-      theme.fg(getResultSymbolColor(state), "└─ ") +
-        theme.fg("muted", `${remaining} more lines`),
-    );
-  }
-
-  return rendered.join("\n");
-}
+  preprocess: (text) => {
+    const body = text.includes("\n\n[")
+      ? text.slice(0, text.lastIndexOf("\n\n["))
+      : text;
+    return body.split("\n").filter((f) => f.length > 0);
+  },
+};
 
 export function patchGrepTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
   const tool = createGrepTool(ctx.cwd);
@@ -183,21 +100,13 @@ export function patchGrepTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
       );
       return text;
     },
-    renderResult(result, options, theme, toolCtx) {
-      const state = toolCtx.state as BaseRenderState;
-      const text = getResultText(state, options, toolCtx.lastComponent);
-
-      const details = result.details as GrepToolDetails | undefined;
-
-      const changed = updateResultState(state, {
-        truncated: details?.truncation?.truncated === true || details?.linesTruncated === true,
-        isError: toolCtx.isError,
-      });
-
-      invalidateIfChanged(changed, toolCtx.invalidate);
-
-      text.setText(formatGrepResult(result, state, options, theme));
-      return text;
-    },
+    renderResult: buildRenderResult(
+      (result, state, options, theme) =>
+        formatListResult(result, state, options, theme, GREP_CONFIG),
+      (details) => {
+        const d = details as GrepToolDetails | undefined;
+        return d?.truncation?.truncated === true || d?.linesTruncated === true;
+      },
+    ),
   });
 }

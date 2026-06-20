@@ -34,15 +34,9 @@ const BUILTIN_TOOLS = new Set([
   "grep",
 ]);
 
-const PROTOTYPE_PATCHED = Symbol.for(
-  "pi-ui-enhancements.customToolRendering.prototypePatched",
-);
-const ORIGINAL_GET_ALL_TOOLS = Symbol.for(
-  "pi-ui-enhancements.customToolRendering.originalGetAllRegisteredTools",
-);
-const WRAPPED_TOOL = Symbol.for(
-  "pi-ui-enhancements.customToolRendering.wrappedTool",
-);
+const PROTOTYPE_PATCHED = Symbol();
+const ORIGINAL_GET_ALL_TOOLS = Symbol();
+const WRAPPED_TOOL = Symbol();
 
 type PatchedRunnerPrototype = ExtensionRunner & {
   [PROTOTYPE_PATCHED]?: boolean;

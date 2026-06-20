@@ -14,15 +14,13 @@ import { registerPatchedTool } from "./tool-registration";
 import {
   type BaseRenderState,
   MAX_CALL_WIDTH,
+  buildRenderResult,
   countLines,
   extractTextContent,
   formatSimpleErrorResult,
   getCallRenderParts,
   getResultSymbolColor,
-  getResultText,
-  invalidateIfChanged,
   renderPath,
-  updateResultState,
 } from "./tool-rendering";
 
 function formatReadLineRange(
@@ -70,7 +68,9 @@ function formatReadResult(
     ? theme.fg("warning", "truncated")
     : undefined;
   const output = truncation
-    ? theme.fg("toolOutput", summary) + theme.fg("toolOutput", ", ") + truncation
+    ? theme.fg("toolOutput", summary) +
+      theme.fg("toolOutput", ", ") +
+      truncation
     : theme.fg("toolOutput", summary);
 
   return theme.fg(getResultSymbolColor(state), "└─ ") + output;
@@ -115,21 +115,6 @@ export function patchReadTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
       );
       return text;
     },
-    renderResult(result, options, theme, toolCtx) {
-      const state = toolCtx.state as BaseRenderState;
-      const text = getResultText(state, options, toolCtx.lastComponent);
-
-      const details = result.details as ReadToolDetails | undefined;
-
-      const changed = updateResultState(state, {
-        truncated: details?.truncation?.truncated === true,
-        isError: toolCtx.isError,
-      });
-
-      invalidateIfChanged(changed, toolCtx.invalidate);
-
-      text.setText(formatReadResult(result, state, options, theme));
-      return text;
-    },
+    renderResult: buildRenderResult(formatReadResult),
   });
 }

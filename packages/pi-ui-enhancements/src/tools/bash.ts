@@ -47,9 +47,12 @@ function formatDuration(ms: number): string {
   return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
 }
 
+// Reserved width for the tree-drawing prefix chain:
+// "● " (status symbol + space) + "├─ " (tree connector) + 1 buffer
+const TREE_PREFIX_WIDTH = 6;
+
 function getOutputWidth(): number {
-  // Keep rendered output within the same fixed-width budget as call headers.
-  return Math.max(1, MAX_CALL_WIDTH - 6);
+  return Math.max(1, MAX_CALL_WIDTH - TREE_PREFIX_WIDTH);
 }
 
 function buildBashMetadataParts(
@@ -246,7 +249,10 @@ function formatBashResult(
           (metadataNeedsHint ? hint : "")
         : "";
 
-    if (metadataNeedsHint || (options.expanded && renderedOutput && shouldTruncate)) {
+    if (
+      metadataNeedsHint ||
+      (options.expanded && renderedOutput && shouldTruncate)
+    ) {
       const outputLine = formatTreeLine(renderedOutput, {
         theme,
         state,
@@ -265,11 +271,16 @@ function formatBashResult(
         .join("\n");
     }
 
-    const inlineParts = [metadataSummary, theme.fg("toolOutput", renderedOutput)]
+    const inlineParts = [
+      metadataSummary,
+      theme.fg("toolOutput", renderedOutput),
+    ]
       .filter(Boolean)
       .join(theme.fg("muted", ", "));
 
-    return theme.fg(getResultSymbolColor(state), "└─ ") + (inlineParts || summary);
+    return (
+      theme.fg(getResultSymbolColor(state), "└─ ") + (inlineParts || summary)
+    );
   }
 
   return [
@@ -324,8 +335,7 @@ export function patchBashTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
         ? renderArgs.command
         : renderArgs.command.replace(/\s+/g, " ").trim();
       const commandDisplay =
-        theme.fg("dim", "$ ") +
-        theme.bold(theme.fg("accent", commandPreview));
+        theme.fg("dim", "$ ") + theme.bold(theme.fg("accent", commandPreview));
 
       const timeoutSuffix = renderArgs.timeout
         ? theme.fg("muted", ` (timeout ${renderArgs.timeout}s)`)

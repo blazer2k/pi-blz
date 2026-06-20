@@ -100,7 +100,7 @@ export function patchWriteTool(
     renderCall(args, theme, toolCtx) {
       const state = toolCtx.state as BaseRenderState;
       const renderArgs = args as WriteToolInput;
-      const { text, prefix } = getCallRenderParts(state, theme, toolCtx, 0);
+      const { text, prefix } = getCallRenderParts(state, theme, toolCtx);
 
       let callLine = ` ${prefix}`;
 
