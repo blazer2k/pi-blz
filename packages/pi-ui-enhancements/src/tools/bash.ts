@@ -219,8 +219,7 @@ function formatBashResult(
     }
 
     const prefix = durationSummary ? `${durationSummary}, ` : "";
-    const suffix =
-      errorBody.truncated || state.callTruncated ? hint : "";
+    const suffix = errorBody.truncated || state.callTruncated ? hint : "";
     return (
       theme.fg(getResultSymbolColor(state), "└─ ") +
       theme.fg("error", `${prefix}${errorBody.text}`) +

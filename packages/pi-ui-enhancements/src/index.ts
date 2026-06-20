@@ -17,7 +17,15 @@ export default function (pi: ExtensionAPI) {
     const prePatchActive = new Set(pi.getActiveTools());
 
     handles = patchTools(pi, ctx);
-    const builtInTools = ["read", "write", "edit", "bash", "ls", "find", "grep"];
+    const builtInTools = [
+      "read",
+      "write",
+      "edit",
+      "bash",
+      "ls",
+      "find",
+      "grep",
+    ];
     const allActive = [...new Set([...builtInTools, ...prePatchActive])];
     pi.setActiveTools(allActive);
 

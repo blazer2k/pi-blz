@@ -81,10 +81,7 @@ export function buildToolTextOutput(
         .split("\n")
         .map((line) => theme.fg("toolOutput", line))
         .join("\n")}` +
-      `${theme.fg("muted", `\n... (${hiddenChars} more chars,`)} ${keyHint(
-        "app.tools.expand",
-        "to expand",
-      )})`
+      `${theme.fg("muted", `\n... (${hiddenChars} more chars,`)} ${keyHint("app.tools.expand", "to expand")})`
     );
   }
   const lines = output.split("\n");

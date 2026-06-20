@@ -63,7 +63,9 @@ export function patchGrepTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
       const pathPrefix = renderArgs.path ? " in " : "";
 
       // Overhead = everything except pattern and the raw path string
-      const overhead = visibleWidth(prefix + title + pathPrefix + glob + context + limit);
+      const overhead = visibleWidth(
+        prefix + title + pathPrefix + glob + context + limit,
+      );
 
       const MIN_PATTERN = 4; // "..." + 1
       const MIN_PATH = 4;
@@ -73,7 +75,10 @@ export function patchGrepTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
       let pathBudget = 0;
 
       if (renderArgs.path) {
-        pathBudget = Math.max(MIN_PATH, Math.floor((remaining - MIN_PATTERN) / 2));
+        pathBudget = Math.max(
+          MIN_PATH,
+          Math.floor((remaining - MIN_PATTERN) / 2),
+        );
         patternBudget = Math.max(MIN_PATTERN, remaining - pathBudget);
       }
 
@@ -88,7 +93,8 @@ export function patchGrepTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
         ? `${pathPrefix}${renderPath(renderArgs.path, theme, toolCtx.cwd, pathBudget)}`
         : "";
 
-      const content = prefix + title + pattern + pathDisplay + glob + context + limit;
+      const content =
+        prefix + title + pattern + pathDisplay + glob + context + limit;
       text.setText(content);
       return text;
     },

@@ -39,7 +39,9 @@ const ORIGINAL_GET_ALL_TOOLS = Symbol.for(
   "pi-ui-enhancements.originalGetAllTools",
 );
 const PATCH_REF_COUNT = Symbol.for("pi-ui-enhancements.patchRefCount");
-const PATCHED_GET_ALL_TOOLS = Symbol.for("pi-ui-enhancements.patchedGetAllTools");
+const PATCHED_GET_ALL_TOOLS = Symbol.for(
+  "pi-ui-enhancements.patchedGetAllTools",
+);
 const WRAPPED_TOOL = Symbol.for("pi-ui-enhancements.wrappedTool");
 const WRAPPED_DEFINITION_CACHE = Symbol.for(
   "pi-ui-enhancements.wrappedDefinitionCache",
@@ -317,11 +319,10 @@ export function patchCustomToolRendering(): Handle {
   proto[ORIGINAL_GET_ALL_TOOLS] = original;
   proto[WRAPPED_DEFINITION_CACHE] = new WeakMap();
 
-  const patchedGetAllRegisteredTools = function getAllRegisteredToolsWithUiPatch(
-    this: ExtensionRunner,
-  ) {
-    return original.call(this).map(wrapRegisteredTool);
-  };
+  const patchedGetAllRegisteredTools =
+    function getAllRegisteredToolsWithUiPatch(this: ExtensionRunner) {
+      return original.call(this).map(wrapRegisteredTool);
+    };
   proto[PATCHED_GET_ALL_TOOLS] = patchedGetAllRegisteredTools;
   proto.getAllRegisteredTools = patchedGetAllRegisteredTools;
 

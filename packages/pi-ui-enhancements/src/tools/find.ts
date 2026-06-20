@@ -63,7 +63,10 @@ export function patchFindTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
       let pathBudget = 0;
 
       if (renderArgs.path) {
-        pathBudget = Math.max(MIN_PATH, Math.floor((remaining - MIN_PATTERN) / 2));
+        pathBudget = Math.max(
+          MIN_PATH,
+          Math.floor((remaining - MIN_PATTERN) / 2),
+        );
         patternBudget = Math.max(MIN_PATTERN, remaining - pathBudget);
       }
 

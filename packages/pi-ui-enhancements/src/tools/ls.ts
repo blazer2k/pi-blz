@@ -74,9 +74,8 @@ export function patchLsTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
       );
       return text;
     },
-    renderResult: buildRenderResult(
-      (result, state, options, theme) =>
-        formatListResult(result, state, options, theme, LS_CONFIG),
+    renderResult: buildRenderResult((result, state, options, theme) =>
+      formatListResult(result, state, options, theme, LS_CONFIG),
     ),
   });
 }
