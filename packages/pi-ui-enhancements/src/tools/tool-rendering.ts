@@ -193,6 +193,49 @@ export function buildHint(theme: Theme): string {
   );
 }
 
+function getOpenOsc8Terminator(
+  text: string,
+): "\u0007" | "\u001B\\" | undefined {
+  let active: "\u0007" | "\u001B\\" | undefined;
+  let index = 0;
+
+  while (index < text.length) {
+    const start = text.indexOf("\u001B]8;", index);
+    if (start === -1) break;
+
+    const belEnd = text.indexOf("\u0007", start + 4);
+    const stEnd = text.indexOf("\u001B\\", start + 4);
+    const usesBel = belEnd !== -1 && (stEnd === -1 || belEnd < stEnd);
+    const end = usesBel ? belEnd : stEnd;
+    if (end === -1) break;
+
+    const body = text.slice(start + 4, end);
+    const separator = body.indexOf(";");
+    if (separator !== -1) {
+      const url = body.slice(separator + 1);
+      active = url ? (usesBel ? "\u0007" : "\u001B\\") : undefined;
+    }
+
+    index = end + (usesBel ? 1 : 2);
+  }
+
+  return active;
+}
+
+export function closeOpenHyperlink(text: string): string {
+  const terminator = getOpenOsc8Terminator(text);
+  return terminator ? `${text}\u001B]8;;${terminator}` : text;
+}
+
+export function safeTruncateToWidth(
+  text: string,
+  maxWidth: number,
+  ellipsis = "...",
+  pad = false,
+): string {
+  return closeOpenHyperlink(truncateToWidth(text, maxWidth, ellipsis, pad));
+}
+
 export function normalizeOutput(text: string): string {
   return text.endsWith("\n") ? text.slice(0, -1) : text;
 }

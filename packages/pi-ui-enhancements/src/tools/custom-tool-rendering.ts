@@ -1,3 +1,6 @@
+import { homedir } from "node:os";
+import { isAbsolute, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   ExtensionRunner,
   type RegisteredTool,
@@ -5,8 +8,11 @@ import {
   type ToolDefinition,
   type ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
-import type { Component } from "@earendil-works/pi-tui";
-import { truncateToWidth } from "@earendil-works/pi-tui";
+import {
+  getCapabilities,
+  hyperlink,
+  type Component,
+} from "@earendil-works/pi-tui";
 import type { Handle } from "../types";
 import {
   type BaseRenderState,
@@ -21,6 +27,7 @@ import {
   getResultText,
   invalidateIfChanged,
   normalizeOutput,
+  safeTruncateToWidth,
   updateResultState,
 } from "./tool-rendering";
 
@@ -46,6 +53,7 @@ const WRAPPED_TOOL = Symbol.for("pi-ui-enhancements.wrappedTool");
 const WRAPPED_DEFINITION_CACHE = Symbol.for(
   "pi-ui-enhancements.wrappedDefinitionCache",
 );
+const MIN_LINK_PREFIX_LENGTH = 24;
 
 type PatchedRunnerPrototype = ExtensionRunner & {
   [PROTOTYPE_PATCHED]?: boolean;
@@ -98,7 +106,147 @@ function buildGenericCallHeader(
     theme.fg("toolTitle", theme.bold(label)) +
     (preview ? ` ${theme.fg("accent", preview)}` : "");
 
-  return truncateToWidth(raw, MAX_CALL_WIDTH, theme.fg("accent", "..."));
+  return safeTruncateToWidth(raw, MAX_CALL_WIDTH, theme.fg("accent", "..."));
+}
+
+type LinkTarget = {
+  display: string;
+  url: string;
+};
+
+function collectStringValues(
+  value: unknown,
+  output: Set<string>,
+  depth = 0,
+): void {
+  if (depth > 5 || value == null) return;
+
+  if (typeof value === "string") {
+    output.add(value);
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) collectStringValues(item, output, depth + 1);
+    return;
+  }
+
+  if (typeof value === "object") {
+    for (const item of Object.values(value)) {
+      collectStringValues(item, output, depth + 1);
+    }
+  }
+}
+
+function getUrlTarget(value: string): string | undefined {
+  try {
+    const url = new URL(value);
+    return ["http:", "https:", "file:"].includes(url.protocol)
+      ? url.href
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function getPathTarget(value: string, cwd: string): string | undefined {
+  if (/\s/.test(value)) return undefined;
+
+  const expanded = value.startsWith("~/")
+    ? resolve(homedir(), value.slice(2))
+    : value;
+
+  if (isAbsolute(expanded)) return pathToFileURL(expanded).href;
+  if (value.startsWith("./") || value.startsWith("../")) {
+    return pathToFileURL(resolve(cwd, value)).href;
+  }
+
+  return undefined;
+}
+
+function getLinkTargets(args: unknown, cwd: string): LinkTarget[] {
+  const values = new Set<string>();
+  collectStringValues(args, values);
+
+  return [...values]
+    .map((display) => {
+      const url = getUrlTarget(display) ?? getPathTarget(display, cwd);
+      return url ? { display, url } : undefined;
+    })
+    .filter((target): target is LinkTarget => target !== undefined)
+    .sort((a, b) => b.display.length - a.display.length);
+}
+
+function getLongestVisibleTargetPrefix(
+  text: string,
+  target: LinkTarget,
+): string | undefined {
+  const maxLength = Math.min(target.display.length, text.length);
+
+  for (let length = maxLength; length >= MIN_LINK_PREFIX_LENGTH; length--) {
+    const prefix = target.display.slice(0, length);
+    if (text.includes(prefix)) return prefix;
+  }
+
+  return undefined;
+}
+
+type LinkReplacement = {
+  start: number;
+  end: number;
+  display: string;
+  url: string;
+};
+
+function overlapsExistingReplacement(
+  replacements: LinkReplacement[],
+  start: number,
+  end: number,
+): boolean {
+  return replacements.some(
+    (replacement) => start < replacement.end && end > replacement.start,
+  );
+}
+
+function applyArgumentHyperlinks(
+  text: string,
+  args: unknown,
+  cwd: string,
+): string {
+  if (!getCapabilities().hyperlinks || text.includes("\u001B]8;")) return text;
+
+  const replacements: LinkReplacement[] = [];
+
+  for (const target of getLinkTargets(args, cwd)) {
+    const display = text.includes(target.display)
+      ? target.display
+      : getLongestVisibleTargetPrefix(text, target);
+
+    if (!display) continue;
+
+    const start = text.indexOf(display);
+    const end = start + display.length;
+    if (start === -1 || overlapsExistingReplacement(replacements, start, end)) {
+      continue;
+    }
+
+    replacements.push({ start, end, display, url: target.url });
+  }
+
+  if (replacements.length === 0) return text;
+
+  replacements.sort((a, b) => a.start - b.start);
+
+  let linked = "";
+  let cursor = 0;
+  for (const replacement of replacements) {
+    linked += text.slice(cursor, replacement.start);
+    linked += hyperlink(replacement.display, replacement.url);
+    cursor = replacement.end;
+  }
+  linked += text.slice(cursor);
+
+  return linked;
 }
 
 function buildGenericResult(
@@ -198,9 +346,14 @@ function wrapDefinition<T extends ToolDefinition>(definition: T): T {
           .map((line) => line.trimEnd())
           .filter((line) => line.length > 0)
           .join(" ");
+        const linkedInnerText = applyArgumentHyperlinks(
+          innerText,
+          args,
+          toolCtx.cwd,
+        );
         text.setText(
-          truncateToWidth(
-            prefix + innerText,
+          safeTruncateToWidth(
+            prefix + linkedInnerText,
             MAX_CALL_WIDTH,
             theme.fg("accent", "..."),
           ),
