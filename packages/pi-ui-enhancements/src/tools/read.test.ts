@@ -1,27 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { patchReadTool } from "./read";
-import { mkTheme, setupTool } from "../test-helpers";
+import { mkTheme, mkToolCtx, setupTool } from "../test-helpers";
 
 function setupReadTool() {
   return setupTool(patchReadTool);
-}
-
-function mkToolCtx(overrides = {}) {
-  return {
-    args: { path: "test.ts" },
-    toolCallId: "call-1",
-    invalidate: () => {},
-    lastComponent: undefined,
-    state: {},
-    cwd: process.cwd(),
-    executionStarted: true,
-    isPartial: false,
-    isError: false,
-    expanded: false,
-    argsComplete: true,
-    showImages: false,
-    ...overrides,
-  };
 }
 
 describe("read renderCall", () => {

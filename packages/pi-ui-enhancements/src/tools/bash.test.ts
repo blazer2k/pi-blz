@@ -1,28 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { patchBashTool } from "./bash";
 import { clearBlinkTimers } from "./tool-rendering";
-import { mkTheme, setupTool } from "../test-helpers";
+import { mkTheme, mkToolCtx, setupTool } from "../test-helpers";
 
 function setupBashTool() {
   return setupTool(patchBashTool);
-}
-
-function mkToolCtx(overrides = {}) {
-  return {
-    args: { command: "test" },
-    toolCallId: "call-1",
-    invalidate: () => {},
-    lastComponent: undefined,
-    state: {},
-    cwd: process.cwd(),
-    executionStarted: true,
-    isPartial: false,
-    isError: false,
-    expanded: false,
-    argsComplete: true,
-    showImages: false,
-    ...overrides,
-  };
 }
 
 describe("bash renderCall", () => {

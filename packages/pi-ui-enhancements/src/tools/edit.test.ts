@@ -1,28 +1,10 @@
 import { describe, expect, it, beforeAll, afterAll } from "bun:test";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { patchEditTool, parseDiffStats } from "./edit";
-import { mkTheme, setupTool } from "../test-helpers";
+import { mkTheme, mkToolCtx, setupTool } from "../test-helpers";
 
 function setupEditTool() {
   return setupTool(patchEditTool);
-}
-
-function mkToolCtx(overrides = {}) {
-  return {
-    args: { path: "test.ts", edits: [] },
-    toolCallId: "call-1",
-    invalidate: () => {},
-    lastComponent: undefined,
-    state: {},
-    cwd: process.cwd(),
-    executionStarted: true,
-    isPartial: false,
-    isError: false,
-    expanded: false,
-    argsComplete: true,
-    showImages: false,
-    ...overrides,
-  };
 }
 
 // Initialize a minimal theme so renderDiff works in expanded mode
