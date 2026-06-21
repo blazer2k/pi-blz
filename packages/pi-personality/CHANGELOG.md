@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.1] – 2026-06-21
+
+### Fixed
+
+- **Communication style scoping** – Personality prompts are now wrapped in an explicit framing instruction that restricts them to tone, phrasing, and conversational manner only. They no longer influence task execution, code quality, or technical decisions.
+
 ## [0.2.0] – 2026-06-20
 
 ### Added

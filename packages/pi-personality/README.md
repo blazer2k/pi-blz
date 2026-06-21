@@ -2,7 +2,7 @@
 
 Switchable communication styles for [pi](https://pi.dev), inspired by Codex CLI's `/personality` command.
 
-**Current version:** 0.2.0
+**Current version:** 0.2.1
 
 ## Why This Matters
 
@@ -14,7 +14,7 @@ Personality does not change tool-calling behavior, code quality, or reasoning de
 
 ## Overview
 
-This extension adds a `/personality` command that lets you pick a communication style for pi. The chosen personality is appended to the system prompt, steering the model's tone, escalation style, and collaboration posture.
+This extension adds a `/personality` command that lets you pick a communication style for pi. The chosen personality is appended to the system prompt under an explicit scoping instruction, ensuring it steers only the model's tone, escalation style, and collaboration posture — never task execution, code quality, or technical decisions.
 
 ### Included Personalities
 

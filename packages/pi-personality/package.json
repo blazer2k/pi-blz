@@ -1,6 +1,6 @@
 {
   "name": "@blazer2k/pi-personality",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Codex-style /personality command for pi.",
   "type": "module",
   "keywords": [
