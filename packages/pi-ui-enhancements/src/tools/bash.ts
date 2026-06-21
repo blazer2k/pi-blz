@@ -486,6 +486,7 @@ export function patchBashTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
       }
 
       const changed = updateResultState(state, {
+        hasResult: !options.isPartial,
         truncated: details?.truncation?.truncated === true,
         isError: toolCtx.isError,
       });

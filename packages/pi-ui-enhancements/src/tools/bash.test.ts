@@ -215,4 +215,50 @@ describe("bash partial duration timer", () => {
 
     clearBlinkTimers();
   });
+
+  it("keeps status blinking for partial results until final result", () => {
+    const def = setupBashTool();
+    const renderCall = def.renderCall!;
+    const renderResult = def.renderResult!;
+    const theme = mkTheme();
+    const state: Record<string, unknown> = {};
+    const ctx = mkToolCtx({ executionStarted: true, isPartial: true, state });
+
+    renderCall({ command: "sleep 10" }, theme, ctx);
+    expect(state.blinkTimer).toBeDefined();
+
+    renderResult(
+      {
+        content: [{ type: "text", text: "still running" }],
+        details: {},
+      },
+      { expanded: false, isPartial: true },
+      theme,
+      ctx,
+    );
+    expect(state.hasResult).toBe(false);
+
+    renderCall({ command: "sleep 10" }, theme, ctx);
+    expect(state.blinkTimer).toBeDefined();
+
+    renderResult(
+      {
+        content: [{ type: "text", text: "done" }],
+        details: { durationMs: 100 },
+      },
+      { expanded: false, isPartial: false },
+      theme,
+      ctx,
+    );
+    expect(state.hasResult).toBe(true);
+
+    renderCall(
+      { command: "sleep 10" },
+      theme,
+      { ...ctx, isPartial: false },
+    );
+    expect(state.blinkTimer).toBeUndefined();
+
+    clearBlinkTimers();
+  });
 });
