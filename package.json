@@ -11,11 +11,13 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "publish:pkgs": "npm publish --workspaces --access public",
-    "publish:dry": "npm publish --workspaces --access public --dry-run"
+    "publish:dry": "npm publish --workspaces --access public --dry-run",
+    "test": "bun test packages/pi-ui-enhancements"
   },
   "devDependencies": {
     "@earendil-works/pi-ai": "*",
     "@types/bun": "^1.3.14",
+    "bun": "^1.3.14",
     "prettier": "^3.8.4",
     "typescript": "^5"
   },
