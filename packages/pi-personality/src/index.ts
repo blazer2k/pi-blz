@@ -36,7 +36,7 @@ export default function (pi: ExtensionAPI) {
     const prompt = personalities?.get(active)?.prompt ?? "";
     if (!prompt) return;
     return {
-      systemPrompt: `${event.systemPrompt ?? ""}\n\n---\n\n${prompt}`,
+      systemPrompt: `${event.systemPrompt ?? ""}\n\n---\n\n## Communication Style\n\nThe following instructions govern only how you communicate with the user — tone, phrasing, and conversational manner. They do not affect task execution, code quality, technical decisions, or the substance of your work. Apply these style guidelines to all user-facing text while keeping your technical work unchanged.\n\n${prompt}`,
     };
   });
 }
