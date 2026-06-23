@@ -38,7 +38,18 @@ export function registerRoundedEditor(
   pi: ExtensionAPI,
   ctx: ExtensionContext,
 ): Handle {
-  ctx.ui.setFooter(() => ({ render: () => [], invalidate() {} }));
+  // Render only extension statuses
+  ctx.ui.setFooter((_tui, _theme, footerData) => {
+    const statuses = footerData.getExtensionStatuses();
+    return {
+      render(width: number): string[] {
+        if (statuses.size === 0) return [];
+        const line = [...statuses.values()].join(" ");
+        return ["", line];
+      },
+      invalidate() {},
+    };
+  });
 
   ctx.ui.setEditorComponent((tui, theme, kb) => {
     return new RoundedEditor(tui, theme, kb, ctx, pi);
