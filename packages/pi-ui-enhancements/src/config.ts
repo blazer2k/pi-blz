@@ -1,16 +1,40 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import figlet from "figlet";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { Compile } from "typebox/compile";
 
 const CONFIG_PATH = join(getAgentDir(), "ui-settings.json");
 
+export const ALLOWED_FONTS = [
+  "Alligator",
+  "ANSI Compact",
+  "Classy",
+  "Coder Mini",
+  "Crazy",
+  "Delta Corps Priest 1",
+  "Future",
+  "Future Smooth",
+  "Georgia11",
+  "Italic",
+  "Jazmine",
+  "Larry 3D",
+  "NV Script",
+  "Nancyj",
+  "Poison",
+  "Rebel",
+  "Roman",
+  "Speed",
+  "Tmplr",
+  "Trek",
+  "Univers",
+  "Varsity",
+  "Whimsy",
+];
+
 export interface Config {
   // ASCII header
   asciiHeaderEnabled: boolean;
-  asciiHeaderText: string;
   asciiHeaderFont: string;
   asciiHeaderAlign: "left" | "center" | "right";
   asciiHeaderShowVersion: boolean;
@@ -30,20 +54,17 @@ export interface Config {
   roundedEditorShowCacheTokens: boolean;
   roundedEditorShowCost: boolean;
   roundedEditorShowBranch: boolean;
-  hiddenThinkingLabel: string;
 }
 
 const defaultConfig: Config = {
   asciiHeaderEnabled: true,
-  asciiHeaderText: "pi",
-  asciiHeaderFont: "Larry 3D 2",
+  asciiHeaderFont: "Larry 3D",
   asciiHeaderAlign: "center",
   asciiHeaderShowVersion: true,
   workingIndicatorShowInterruptMsg: true,
   workingIndicatorShowDuration: true,
   patchCustomTools: true,
   maxCallWidth: 80,
-  hiddenThinkingLabel: "(think)",
   roundedEditorColorizeThinking: true,
   roundedEditorShowThinkingLevel: true,
   roundedEditorShowCacheTokens: false,
@@ -55,7 +76,6 @@ const defaultConfig: Config = {
 const ConfigSchema = Type.Object(
   {
     asciiHeaderEnabled: Type.Boolean(),
-    asciiHeaderText: Type.String({ minLength: 1, maxLength: 20 }),
     asciiHeaderFont: Type.String({ minLength: 1 }),
     asciiHeaderAlign: Type.Union([
       Type.Literal("left"),
@@ -73,7 +93,6 @@ const ConfigSchema = Type.Object(
     roundedEditorShowCacheTokens: Type.Boolean(),
     roundedEditorShowCost: Type.Boolean(),
     roundedEditorShowBranch: Type.Boolean(),
-    hiddenThinkingLabel: Type.String({ minLength: 1 }),
   },
   { additionalProperties: false },
 );
@@ -94,15 +113,12 @@ function validateConfig(raw: unknown): Config {
 
   const typed = merged as Config;
 
-  if (typed.asciiHeaderFont) {
-    const availableFonts = figlet.fontsSync();
-    if (!availableFonts.includes(typed.asciiHeaderFont)) {
-      console.error(
-        `Invalid figlet font "${typed.asciiHeaderFont}", ` +
-          `falling back to "${defaultConfig.asciiHeaderFont}"`,
-      );
-      typed.asciiHeaderFont = defaultConfig.asciiHeaderFont;
-    }
+  if (typed.asciiHeaderFont && !ALLOWED_FONTS.includes(typed.asciiHeaderFont)) {
+    console.error(
+      `Invalid figlet font "${typed.asciiHeaderFont}", ` +
+        `falling back to "${defaultConfig.asciiHeaderFont}"`,
+    );
+    typed.asciiHeaderFont = defaultConfig.asciiHeaderFont;
   }
 
   return typed;
@@ -153,8 +169,6 @@ function parseConfigValue(id: ConfigKey, value: string): Config[ConfigKey] {
   switch (id) {
     case "asciiHeaderEnabled":
       return value === "true";
-    case "asciiHeaderText":
-      return value;
     case "asciiHeaderFont":
       return value;
     case "asciiHeaderAlign":
@@ -181,8 +195,6 @@ function parseConfigValue(id: ConfigKey, value: string): Config[ConfigKey] {
       return value === "true";
     case "roundedEditorShowBranch":
       return value === "true";
-    case "hiddenThinkingLabel":
-      return value;
   }
 }
 

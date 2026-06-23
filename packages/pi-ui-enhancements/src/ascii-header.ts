@@ -21,7 +21,7 @@ export function loadAsciiHeaderConfig(): AsciiHeaderConfig {
   const cfg = getConfig();
   return {
     enabled: cfg.asciiHeaderEnabled,
-    text: cfg.asciiHeaderText,
+    text: "pi",
     font: cfg.asciiHeaderFont,
     align: cfg.asciiHeaderAlign,
     showVersion: cfg.asciiHeaderShowVersion,
@@ -52,9 +52,14 @@ function stripEmptyEdgeLines(lines: string[]): string[] {
 export function buildAsciiHeaderData(
   config: AsciiHeaderConfig,
 ): AsciiHeaderData {
-  const rawLines = stripEmptyEdgeLines(
-    figlet.textSync(config.text, { font: config.font }).split("\n"),
-  );
+  let rawLines: string[];
+  try {
+    rawLines = stripEmptyEdgeLines(
+      figlet.textSync(config.text, { font: config.font }).split("\n"),
+    );
+  } catch {
+    rawLines = [config.text];
+  }
   return {
     rawLines,
     rawLineWidths: rawLines.map((line) => visibleWidth(line)),

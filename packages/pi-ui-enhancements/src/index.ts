@@ -56,7 +56,7 @@ export default function (pi: ExtensionAPI) {
         registerRoundedEditor(pi, ctx),
         registerWorkingIndicator(pi, ctx),
       );
-      ctx.ui.setHiddenThinkingLabel(getConfig().hiddenThinkingLabel);
+      ctx.ui.setHiddenThinkingLabel("(think)");
     }
   });
 
