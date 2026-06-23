@@ -6,19 +6,25 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import figlet from "figlet";
+import { getConfig } from "./config";
 import type { Handle } from "./types";
 
 export interface AsciiHeaderConfig {
+  enabled: boolean;
   text: string;
   font: string;
   align: "left" | "center" | "right";
+  showVersion: boolean;
 }
 
 export function loadAsciiHeaderConfig(): AsciiHeaderConfig {
+  const cfg = getConfig();
   return {
-    text: "pi",
-    font: "Larry 3D 2",
-    align: "center",
+    enabled: cfg.asciiHeaderEnabled,
+    text: cfg.asciiHeaderText,
+    font: cfg.asciiHeaderFont,
+    align: cfg.asciiHeaderAlign,
+    showVersion: cfg.asciiHeaderShowVersion,
   };
 }
 
@@ -28,12 +34,27 @@ export interface AsciiHeaderData {
   versionWidth: number;
 }
 
+function stripEmptyEdgeLines(lines: string[]): string[] {
+  let start = 0;
+  let end = lines.length;
+
+  while (start < end && lines[start]!.trim().length === 0) {
+    start++;
+  }
+
+  while (end > start && lines[end - 1]!.trim().length === 0) {
+    end--;
+  }
+
+  return lines.slice(start, end);
+}
+
 export function buildAsciiHeaderData(
   config: AsciiHeaderConfig,
 ): AsciiHeaderData {
-  const rawLines = figlet
-    .textSync(config.text, { font: config.font })
-    .split("\n");
+  const rawLines = stripEmptyEdgeLines(
+    figlet.textSync(config.text, { font: config.font }).split("\n"),
+  );
   return {
     rawLines,
     rawLineWidths: rawLines.map((line) => visibleWidth(line)),
@@ -61,7 +82,7 @@ export function buildAsciiHeader(
   config: AsciiHeaderConfig,
   data: AsciiHeaderData,
 ): string[] {
-  return [
+  const lines: string[] = [
     "",
     ...data.rawLines.map((line, i) =>
       padLine(
@@ -72,14 +93,21 @@ export function buildAsciiHeader(
       ),
     ),
     "",
-    padLine(
-      theme.fg("dim", `v${VERSION}`),
-      data.versionWidth,
-      width,
-      config.align,
-    ),
-    "",
   ];
+
+  if (config.showVersion) {
+    lines.push(
+      padLine(
+        theme.fg("dim", `v${VERSION}`),
+        data.versionWidth,
+        width,
+        config.align,
+      ),
+    );
+  }
+
+  lines.push("");
+  return lines;
 }
 
 export function registerAsciiHeader(
@@ -87,6 +115,11 @@ export function registerAsciiHeader(
   ctx: ExtensionContext,
 ): Handle {
   const config = loadAsciiHeaderConfig();
+
+  if (!config.enabled) {
+    return { dispose() {} };
+  }
+
   const data = buildAsciiHeaderData(config);
 
   ctx.ui.setHeader((_tui, theme) => ({

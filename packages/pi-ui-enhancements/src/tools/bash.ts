@@ -55,7 +55,7 @@ function formatDuration(ms: number): string {
 const TREE_PREFIX_WIDTH = 6;
 
 function getOutputWidth(): number {
-  return Math.max(1, MAX_CALL_WIDTH - TREE_PREFIX_WIDTH);
+  return Math.max(1, MAX_CALL_WIDTH() - TREE_PREFIX_WIDTH);
 }
 
 function buildBashMetadataParts(
@@ -436,7 +436,7 @@ export function patchBashTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
         visibleWidth("Bash ") +
         visibleWidth("$ ") +
         visibleWidth(timeoutSuffix);
-      const commandBudget = Math.max(1, MAX_CALL_WIDTH - staticWidth);
+      const commandBudget = Math.max(1, MAX_CALL_WIDTH() - staticWidth);
       const commandTruncated = visibleWidth(commandPreview) > commandBudget;
       const commandDisplay =
         theme.fg("dim", "$ ") +

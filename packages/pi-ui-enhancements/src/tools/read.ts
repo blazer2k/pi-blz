@@ -220,14 +220,14 @@ export function patchReadTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
           classification,
           renderArgs,
           theme,
-          Math.max(1, MAX_CALL_WIDTH - visibleWidth(content)),
+          Math.max(1, MAX_CALL_WIDTH() - visibleWidth(content)),
         );
       } else {
         const title = theme.fg("toolTitle", theme.bold("Read "));
         const lineRange = formatReadLineRange(renderArgs, theme);
         const pathWidth = Math.max(
           1,
-          MAX_CALL_WIDTH - visibleWidth(content + title + lineRange),
+          MAX_CALL_WIDTH() - visibleWidth(content + title + lineRange),
         );
         const pathDisplay = renderPath(
           renderArgs.path,
@@ -242,7 +242,7 @@ export function patchReadTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
       }
 
       text.setText(
-        truncateToWidth(content, MAX_CALL_WIDTH, theme.fg("accent", "...")),
+        truncateToWidth(content, MAX_CALL_WIDTH(), theme.fg("accent", "...")),
       );
       return text;
     },

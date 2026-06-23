@@ -234,11 +234,7 @@ describe("bash partial duration timer", () => {
     );
     expect(state.hasResult).toBe(true);
 
-    renderCall(
-      { command: "sleep 10" },
-      theme,
-      { ...ctx, isPartial: false },
-    );
+    renderCall({ command: "sleep 10" }, theme, { ...ctx, isPartial: false });
     expect(state.blinkTimer).toBeUndefined();
 
     clearBlinkTimers();

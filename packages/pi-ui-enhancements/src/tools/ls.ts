@@ -56,7 +56,7 @@ export function patchLsTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
         : "";
       const pathWidth = Math.max(
         1,
-        MAX_CALL_WIDTH - visibleWidth(content + title + limit),
+        MAX_CALL_WIDTH() - visibleWidth(content + title + limit),
       );
       const pathDisplay = renderPath(
         renderArgs.path || ".",
@@ -70,7 +70,7 @@ export function patchLsTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
       content += limit;
 
       text.setText(
-        truncateToWidth(content, MAX_CALL_WIDTH, theme.fg("accent", "...")),
+        truncateToWidth(content, MAX_CALL_WIDTH(), theme.fg("accent", "...")),
       );
       return text;
     },

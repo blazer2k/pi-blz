@@ -92,7 +92,7 @@ function formatEditResult(
         theme,
         state,
         prefix,
-        width: MAX_CALL_WIDTH - 1,
+        width: MAX_CALL_WIDTH() - 1,
         mode: "preserve",
       }).text;
     })
@@ -119,13 +119,13 @@ export function patchEditTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
       const title = theme.fg("toolTitle", theme.bold("Edit "));
       const pathWidth = Math.max(
         1,
-        MAX_CALL_WIDTH - visibleWidth(content + title),
+        MAX_CALL_WIDTH() - visibleWidth(content + title),
       );
       content += title;
       content += renderPath(renderArgs.path, theme, toolCtx.cwd, pathWidth);
 
       text.setText(
-        truncateToWidth(content, MAX_CALL_WIDTH, theme.fg("accent", "...")),
+        truncateToWidth(content, MAX_CALL_WIDTH(), theme.fg("accent", "...")),
       );
       return text;
     },

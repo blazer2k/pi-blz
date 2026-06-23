@@ -6,6 +6,7 @@ import { patchTools } from "./tools";
 import { patchCustomToolRendering } from "./tools/custom-tool-rendering";
 import type { Handle } from "./types";
 import { registerWorkingIndicator } from "./working-indicator";
+import { getConfig, loadConfig } from "./config";
 
 let handles: Handle[] = [];
 
@@ -13,6 +14,13 @@ export default function (pi: ExtensionAPI) {
   const customToolRenderingHandle = patchCustomToolRendering();
 
   pi.on("session_start", async (_event, ctx) => {
+    loadConfig((err) => {
+      ctx.ui.notify(
+        `Config load failed: ${err instanceof Error ? err.message : String(err)}`,
+        "error",
+      );
+    });
+
     // Capture tools that were already active (e.g. from other extensions)
     // before we override the list with our built-in set
     const prePatchActive = new Set(pi.getActiveTools());
@@ -36,7 +44,7 @@ export default function (pi: ExtensionAPI) {
         registerRoundedEditor(pi, ctx),
         registerWorkingIndicator(pi, ctx),
       );
-      ctx.ui.setHiddenThinkingLabel("(think)");
+      ctx.ui.setHiddenThinkingLabel(getConfig().hiddenThinkingLabel);
     }
   });
 

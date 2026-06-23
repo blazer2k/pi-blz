@@ -57,7 +57,7 @@ export function patchFindTool(pi: ExtensionAPI, ctx: ExtensionContext): Handle {
 
       const MIN_PATTERN = 4; // "..." + 1
       const MIN_PATH = 4;
-      const remaining = Math.max(0, MAX_CALL_WIDTH - overhead);
+      const remaining = Math.max(0, MAX_CALL_WIDTH() - overhead);
 
       let patternBudget = remaining;
       let pathBudget = 0;

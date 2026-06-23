@@ -14,6 +14,7 @@ import {
   Text,
   truncateToWidth,
 } from "@earendil-works/pi-tui";
+import { getConfig } from "../config";
 
 export type BaseRenderState = {
   blinkTimer?: ReturnType<typeof setInterval>;
@@ -46,10 +47,16 @@ export type FormatResultFn = (
   theme: Theme,
 ) => string;
 
-export const MAX_CALL_WIDTH = 80;
+export function MAX_CALL_WIDTH(): number {
+  return getConfig().maxCallWidth;
+}
 
-// Maximum number of entries to display in expanded list views (ls, find)
-export const MAX_EXPANDED_ENTRIES = 20;
+// Maximum number of entries to display in expanded list views (ls, find).
+// -1 means unbounded.
+export function MAX_EXPANDED_ENTRIES(): number {
+  const val = getConfig().maxExpandedEntries;
+  return val === -1 ? Infinity : val;
+}
 
 const BLINK_INTERVAL_MS = 500;
 const activeBlinkTimers = new Set<ReturnType<typeof setInterval>>();
@@ -282,7 +289,7 @@ export function extractTextContent(result: {
 }
 
 export function getMaxErrorLineWidth(): number {
-  return Math.floor(MAX_CALL_WIDTH / 2);
+  return Math.floor(MAX_CALL_WIDTH() / 2);
 }
 
 export function formatErrorBody(
@@ -338,7 +345,7 @@ export function formatSimpleErrorResult(
         theme,
         state,
         prefix,
-        width: MAX_CALL_WIDTH - 1,
+        width: MAX_CALL_WIDTH() - 1,
         mode: "preserve",
         color: "error",
       }).text;
@@ -515,8 +522,8 @@ export function formatListResult(
     );
   }
 
-  const visible = items.slice(0, MAX_EXPANDED_ENTRIES);
-  const remaining = Math.max(0, total - MAX_EXPANDED_ENTRIES);
+  const visible = items.slice(0, MAX_EXPANDED_ENTRIES());
+  const remaining = Math.max(0, total - MAX_EXPANDED_ENTRIES());
   const lines: string[] = [
     theme.fg(getResultSymbolColor(state), "├─ ") +
       theme.fg("toolOutput", summary),
@@ -531,7 +538,7 @@ export function formatListResult(
         theme,
         state,
         prefix,
-        width: MAX_CALL_WIDTH - 1,
+        width: MAX_CALL_WIDTH() - 1,
         mode: "preserve",
       }).text,
     );

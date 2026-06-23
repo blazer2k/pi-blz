@@ -62,7 +62,7 @@ function formatWriteResult(
         theme,
         state,
         prefix,
-        width: MAX_CALL_WIDTH - 1,
+        width: MAX_CALL_WIDTH() - 1,
         mode: "preserve",
       }).text;
     });
@@ -107,14 +107,14 @@ export function patchWriteTool(
       const title = theme.fg("toolTitle", theme.bold("Write "));
       const pathWidth = Math.max(
         1,
-        MAX_CALL_WIDTH - visibleWidth(callLine + title),
+        MAX_CALL_WIDTH() - visibleWidth(callLine + title),
       );
       callLine += title;
       callLine += renderPath(renderArgs.path, theme, toolCtx.cwd, pathWidth);
 
       let content = truncateToWidth(
         callLine,
-        MAX_CALL_WIDTH,
+        MAX_CALL_WIDTH(),
         theme.fg("accent", "..."),
       );
       if (toolCtx.isPartial && typeof renderArgs.content === "string") {

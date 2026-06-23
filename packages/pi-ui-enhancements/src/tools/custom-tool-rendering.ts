@@ -106,7 +106,7 @@ function buildGenericCallHeader(
     theme.fg("toolTitle", theme.bold(label)) +
     (preview ? ` ${theme.fg("accent", preview)}` : "");
 
-  return safeTruncateToWidth(raw, MAX_CALL_WIDTH, theme.fg("accent", "..."));
+  return safeTruncateToWidth(raw, MAX_CALL_WIDTH(), theme.fg("accent", "..."));
 }
 
 type LinkTarget = {
@@ -285,8 +285,8 @@ function buildGenericResult(
     );
   }
 
-  const visible = lines.slice(0, MAX_EXPANDED_ENTRIES);
-  const remaining = Math.max(0, total - MAX_EXPANDED_ENTRIES);
+  const visible = lines.slice(0, MAX_EXPANDED_ENTRIES());
+  const remaining = Math.max(0, total - MAX_EXPANDED_ENTRIES());
   const rendered: string[] = [
     theme.fg(getResultSymbolColor(state), "├─ ") +
       theme.fg("toolOutput", summary),
@@ -299,7 +299,7 @@ function buildGenericResult(
         theme,
         state,
         prefix: isLast ? "└─ " : "│  ",
-        width: MAX_CALL_WIDTH - 1,
+        width: MAX_CALL_WIDTH() - 1,
         mode: "preserve",
       }).text,
     );
@@ -342,7 +342,7 @@ function wrapDefinition<T extends ToolDefinition>(definition: T): T {
         state.callComponent = inner;
 
         const innerText = inner
-          .render(MAX_CALL_WIDTH)
+          .render(MAX_CALL_WIDTH())
           .map((line) => line.trimEnd())
           .filter((line) => line.length > 0)
           .join(" ");
@@ -354,7 +354,7 @@ function wrapDefinition<T extends ToolDefinition>(definition: T): T {
         text.setText(
           safeTruncateToWidth(
             prefix + linkedInnerText,
-            MAX_CALL_WIDTH,
+            MAX_CALL_WIDTH(),
             theme.fg("accent", "..."),
           ),
         );
@@ -397,7 +397,7 @@ function wrapDefinition<T extends ToolDefinition>(definition: T): T {
       }
       state.resultComponent = inner;
 
-      const innerLines = inner.render(MAX_CALL_WIDTH);
+      const innerLines = inner.render(MAX_CALL_WIDTH());
       if (innerLines.length === 0) {
         text.setText(
           state.isError

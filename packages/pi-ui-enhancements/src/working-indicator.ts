@@ -4,6 +4,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { RESET_FG, type Color, rgbFg, blend, resolveTheme } from "./colors";
 import type { Handle } from "./types";
+import { getConfig } from "./config";
 
 const LABEL = "Working";
 const INTERRUPT_MSG = "esc to interrupt";
@@ -79,20 +80,31 @@ export function registerWorkingIndicator(
 
   function startAnimation(): void {
     if (animTimer) return;
-
-    stopAnimation();
     ctx.ui.setWorkingMessage("");
 
     function renderFrame(): void {
+      const cfg = getConfig();
       const theme = resolveTheme(ctx);
       const shimmered = shimmerText(LABEL, theme.baseRgb, theme.highlightRgb);
-      const suffix =
-        runStartTime > 0
-          ? ` (${assembleRunDuration(runStartTime)} • ${INTERRUPT_MSG})`
-          : ` (${INTERRUPT_MSG})`;
+      const suffixParts: string[] = [];
+
+      if (runStartTime > 0 && cfg.workingIndicatorShowDuration) {
+        suffixParts.push(assembleRunDuration(runStartTime));
+      }
+
+      if (cfg.workingIndicatorShowInterruptMsg) {
+        suffixParts.push(INTERRUPT_MSG);
+      }
+
+      const frames = [
+        shimmered +
+          (suffixParts.length > 0
+            ? ctx.ui.theme.fg("dim", ` (${suffixParts.join(" • ")})`)
+            : ""),
+      ];
 
       ctx.ui.setWorkingIndicator({
-        frames: [shimmered + ctx.ui.theme.fg("dim", suffix)],
+        frames,
         intervalMs: ANIM_INTERVAL_MS,
       });
     }
@@ -109,7 +121,7 @@ export function registerWorkingIndicator(
   pi.on("agent_end", async (event) => {
     stopIndicator();
 
-    if (runStartTime > 0) {
+    if (runStartTime > 0 && getConfig().workingIndicatorShowDuration) {
       const lastAssistant = [...event.messages]
         .reverse()
         .find((m) => m.role === "assistant");
