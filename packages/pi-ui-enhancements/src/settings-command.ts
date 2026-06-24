@@ -98,7 +98,7 @@ function getWorkingIndicatorSettings(config: Config): SettingItem[] {
       currentValue: String(config.workingIndicatorShowDuration),
       values: ["false", "true"],
     },
-  ];
+  ] satisfies SettingItem[];
 }
 
 function getToolRenderingSettings(config: Config): SettingItem[] {
@@ -115,16 +115,16 @@ function getToolRenderingSettings(config: Config): SettingItem[] {
       label: "Max call width",
       description: "Maximum width for tool call and output lines",
       currentValue: String(config.maxCallWidth),
-      values: ["false", "true"],
+      values: ["40", "60", "80", "100", "120", "160", "200"],
     },
     {
       id: "maxExpandedEntries",
       label: "Max expanded entries",
       description: "Maximum number of lines to show when expanding tool output",
       currentValue: String(config.maxExpandedEntries),
-      values: ["false", "true"],
+      values: ["-1", "10", "20", "50", "100"],
     },
-  ];
+  ] satisfies SettingItem[];
 }
 
 function getRoundedEditorSettings(config: Config): SettingItem[] {
@@ -164,7 +164,7 @@ function getRoundedEditorSettings(config: Config): SettingItem[] {
       currentValue: String(config.roundedEditorShowBranch),
       values: ["false", "true"],
     },
-  ];
+  ] satisfies SettingItem[];
 }
 
 export function registerConfigCommand(
@@ -173,56 +173,67 @@ export function registerConfigCommand(
   onClose: () => void,
 ) {
   pi.registerCommand("ui", {
-    description: "Configure UI enhancements",
+    description: "Open UI settings menu",
     handler: async (_args, ctx) => {
+      if (ctx.mode !== "tui") {
+        ctx.ui.notify("UI settings are only available in TUI mode", "error");
+        return;
+      }
+
       onOpen();
-      ctx.ui.custom((tui, theme, _kb, done) => {
-        const settingsListTheme = getSettingsListTheme();
+      try {
+        await ctx.ui.custom((tui, theme, _kb, done) => {
+          const settingsListTheme = getSettingsListTheme();
 
-        const container = new Container();
-        container.addChild(new DynamicBorder());
-        container.addChild(
-          new Text(theme.fg("accent", theme.bold("UI configuration")), 1, 1),
-        );
+          const container = new Container();
+          container.addChild(new DynamicBorder());
+          container.addChild(
+            new Text(theme.fg("accent", theme.bold("UI configuration")), 1, 1),
+          );
 
-        const config = getConfig();
+          const config = getConfig();
 
-        const items = [
-          ...getAsciiHeaderSettings(config),
-          ...getWorkingIndicatorSettings(config),
-          ...getToolRenderingSettings(config),
-          ...getRoundedEditorSettings(config),
-        ];
+          const items = [
+            ...getAsciiHeaderSettings(config),
+            ...getWorkingIndicatorSettings(config),
+            ...getToolRenderingSettings(config),
+            ...getRoundedEditorSettings(config),
+          ];
 
-        const settingsList = new SettingsList(
-          items,
-          5,
-          settingsListTheme,
-          (id, newValue) => {
-            try {
-              saveConfig(id as ConfigKey, newValue);
-            } catch (err) {
-              ctx.ui.notify(
-                err instanceof Error ? err.message : String(err),
-                "error",
-              );
-            }
-          },
-          () => {
-            onClose();
-            done(undefined);
-          },
-        );
+          const settingsList = new SettingsList(
+            items,
+            5,
+            settingsListTheme,
+            (id, newValue) => {
+              try {
+                saveConfig(id as ConfigKey, newValue);
+              } catch (err) {
+                ctx.ui.notify(
+                  err instanceof Error ? err.message : String(err),
+                  "error",
+                );
+              }
+            },
+            () => {
+              done(undefined);
+            },
+          );
 
-        container.addChild(settingsList);
-        container.addChild(new DynamicBorder());
+          container.addChild(settingsList);
+          container.addChild(new DynamicBorder());
 
-        return {
-          render: (w) => container.render(w),
-          handleInput: (data) => settingsList.handleInput?.(data),
-          invalidate: () => container.invalidate(),
-        };
-      });
+          return {
+            render: (w) => container.render(w),
+            handleInput: (data) => {
+              settingsList.handleInput?.(data);
+              tui.requestRender();
+            },
+            invalidate: () => container.invalidate(),
+          };
+        });
+      } finally {
+        onClose();
+      }
     },
   });
 }

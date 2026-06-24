@@ -1,10 +1,21 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { Compile } from "typebox/compile";
 
-const CONFIG_PATH = join(getAgentDir(), "ui-settings.json");
+function getConfigPath(): string {
+  if (process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH) {
+    return process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH;
+  }
+
+  if (process.env.NODE_ENV === "test") {
+    return join(tmpdir(), "pi-ui-enhancements-test", "ui-settings.json");
+  }
+
+  return join(getAgentDir(), "ui-settings.json");
+}
 
 export const ALLOWED_FONTS = [
   "Alligator",
@@ -117,69 +128,92 @@ export function setOnConfigChange(callback: (() => void) | null): void {
   onConfigChange = callback;
 }
 
+export function clearOnConfigChange(): void {
+  onConfigChange = null;
+}
+
 const validator = Compile(ConfigSchema);
 
 let config: Config = { ...defaultConfig };
 
-function validateConfig(raw: unknown): Config {
-  if (typeof raw !== "object" || raw === null) return defaultConfig;
+function isIntegerConfigValue(key: ConfigKey, value: unknown): boolean {
+  if (key !== "maxCallWidth" && key !== "maxExpandedEntries") return true;
+  return typeof value === "number" && Number.isInteger(value);
+}
 
-  const merged = { ...defaultConfig, ...raw };
-  if (!validator.Check(merged)) {
-    return { ...defaultConfig };
+function validateConfig(raw: unknown): Config {
+  if (typeof raw !== "object" || raw === null) return { ...defaultConfig };
+
+  const input = raw as Partial<Record<ConfigKey, unknown>>;
+  const validated: Config = { ...defaultConfig };
+
+  for (const key of Object.keys(defaultConfig) as ConfigKey[]) {
+    if (!(key in input)) continue;
+    if (!isIntegerConfigValue(key, input[key])) continue;
+
+    const candidate = { ...validated, [key]: input[key] };
+    if (validator.Check(candidate)) {
+      validated[key] = candidate[key] as never;
+    }
   }
 
-  const typed = merged as Config;
-
-  if (typed.asciiHeaderFont && !ALLOWED_FONTS.includes(typed.asciiHeaderFont)) {
+  if (!ALLOWED_FONTS.includes(validated.asciiHeaderFont)) {
     console.error(
-      `Invalid font "${typed.asciiHeaderFont}", ` +
+      `Invalid font "${validated.asciiHeaderFont}", ` +
         `falling back to "${defaultConfig.asciiHeaderFont}"`,
     );
-    typed.asciiHeaderFont = defaultConfig.asciiHeaderFont;
+    validated.asciiHeaderFont = defaultConfig.asciiHeaderFont;
   }
 
-  return typed;
+  return validated;
 }
 
 export function loadConfig(onError?: (error: unknown) => void): void {
+  const configPath = getConfigPath();
+
   try {
-    mkdirSync(dirname(CONFIG_PATH), { recursive: true });
-
-    if (!existsSync(CONFIG_PATH)) {
-      config = { ...defaultConfig };
-      writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
-      return;
-    }
-
-    const saved = JSON.parse(readFileSync(CONFIG_PATH, "utf-8"));
-    const validated = validateConfig(saved);
-    config = validated;
-
-    // Normalize config by adding missing default keys
-    writeFileSync(CONFIG_PATH, JSON.stringify(validated, null, 2));
+    mkdirSync(dirname(configPath), { recursive: true });
   } catch (error) {
     config = { ...defaultConfig };
+    if (onError) onError(error);
+    else
+      console.error(
+        `Failed to prepare config directory for ${configPath}:`,
+        error,
+      );
+    return;
+  }
 
+  if (!existsSync(configPath)) {
+    config = { ...defaultConfig };
     try {
-      mkdirSync(dirname(CONFIG_PATH), { recursive: true });
-      writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
-    } catch (repairError) {
-      if (onError) {
-        onError(repairError);
-        return;
-      }
-
-      console.error(`Failed to repair config at ${CONFIG_PATH}:`, repairError);
-      return;
+      writeFileSync(configPath, JSON.stringify(config, null, 2));
+    } catch (error) {
+      if (onError) onError(error);
+      else console.error(`Failed to create config at ${configPath}:`, error);
     }
+    return;
+  }
 
-    if (onError) {
-      onError(error);
-      return;
-    }
+  let saved: unknown;
+  try {
+    saved = JSON.parse(readFileSync(configPath, "utf-8"));
+  } catch (error) {
+    config = { ...defaultConfig };
+    if (onError) onError(error);
+    else console.error(`Failed to load config from ${configPath}:`, error);
+    return;
+  }
 
-    console.error(`Failed to load config from ${CONFIG_PATH}:`, error);
+  const validated = validateConfig(saved);
+  config = validated;
+
+  try {
+    // Normalize config by adding missing default keys
+    writeFileSync(configPath, JSON.stringify(validated, null, 2));
+  } catch (error) {
+    if (onError) onError(error);
+    else console.error(`Failed to normalize config at ${configPath}:`, error);
   }
 }
 
@@ -222,15 +256,22 @@ export function saveConfig(id: ConfigKey, value: string): void {
   const parsed = parseConfigValue(id, value);
 
   const updated = { ...config, [id]: parsed };
+  if (!isIntegerConfigValue(id, parsed)) {
+    throw new Error(`Invalid config update: ${id}=${value}`);
+  }
   if (!validator.Check(updated)) {
+    throw new Error(`Invalid config update: ${id}=${value}`);
+  }
+  if (id === "asciiHeaderFont" && !ALLOWED_FONTS.includes(String(parsed))) {
     throw new Error(`Invalid config update: ${id}=${value}`);
   }
 
   // Re-run domain-specific validation on the updated config
   const validated = validateConfig(updated);
 
-  mkdirSync(dirname(CONFIG_PATH), { recursive: true });
-  writeFileSync(CONFIG_PATH, JSON.stringify(validated, null, 2));
+  const configPath = getConfigPath();
+  mkdirSync(dirname(configPath), { recursive: true });
+  writeFileSync(configPath, JSON.stringify(validated, null, 2));
   config = validated;
 
   onConfigChange?.();

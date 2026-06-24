@@ -4,15 +4,25 @@ import { registerAsciiHeader } from "./ascii-header";
 import { registerRoundedEditor } from "./rounded-editor";
 import { patchTools } from "./tools";
 import { patchCustomToolRendering } from "./tools/custom-tool-rendering";
+import { clearBlinkTimers } from "./tools/tool-rendering";
 import type { Handle } from "./types";
 import { registerWorkingIndicator } from "./working-indicator";
-import { getConfig, loadConfig, setOnConfigChange } from "./config";
+import {
+  getConfig,
+  loadConfig,
+  setOnConfigChange,
+  clearOnConfigChange,
+} from "./config";
 import { registerConfigCommand } from "./settings-command";
 
 let handles: Handle[] = [];
 
+function hasTui(ctx: { hasUI: boolean; mode?: string }): boolean {
+  return ctx.mode === "tui" || (ctx.mode === undefined && ctx.hasUI);
+}
+
 export default function (pi: ExtensionAPI) {
-  handles = patchTools(pi);
+  patchTools(pi);
   loadConfig();
   let customToolRenderingHandle: Handle | null = getConfig().patchCustomTools
     ? patchCustomToolRendering()
@@ -22,12 +32,34 @@ export default function (pi: ExtensionAPI) {
   let editorReregister: (() => void) | null = null;
   let settingsUiActive = false;
 
-  setOnConfigChange(() => {
+  function syncCustomToolRenderingPatch() {
+    if (getConfig().patchCustomTools && !customToolRenderingHandle) {
+      customToolRenderingHandle = patchCustomToolRendering();
+    } else if (!getConfig().patchCustomTools && customToolRenderingHandle) {
+      customToolRenderingHandle.dispose();
+      customToolRenderingHandle = null;
+    }
+  }
+
+  function handleConfigChange() {
+    syncCustomToolRenderingPatch();
     headerReregister?.();
     if (!settingsUiActive) {
       editorReregister?.();
     }
-  });
+  }
+
+  setOnConfigChange(handleConfigChange);
+
+  registerConfigCommand(
+    pi,
+    () => {
+      settingsUiActive = true;
+    },
+    () => {
+      settingsUiActive = false;
+    },
+  );
 
   pi.on("session_start", async (_event, ctx) => {
     // Reset in case settings UI was force-closed last session
@@ -39,32 +71,14 @@ export default function (pi: ExtensionAPI) {
       );
     });
 
+    // Reinstall after the previous session_shutdown cleared the global callback.
+    setOnConfigChange(handleConfigChange);
+
     // Apply config changes made before session start while keeping the patch early
     // enough for history rendering after /reload
-    if (getConfig().patchCustomTools && !customToolRenderingHandle) {
-      customToolRenderingHandle = patchCustomToolRendering();
-    } else if (!getConfig().patchCustomTools && customToolRenderingHandle) {
-      customToolRenderingHandle.dispose();
-      customToolRenderingHandle = null;
-    }
+    syncCustomToolRenderingPatch();
 
-    // Capture tools that were already active (e.g. from other extensions)
-    // before we override the list with our built-in set
-    const prePatchActive = new Set(pi.getActiveTools());
-
-    const builtInTools = [
-      "read",
-      "write",
-      "edit",
-      "bash",
-      "ls",
-      "find",
-      "grep",
-    ];
-    const allActive = [...new Set([...builtInTools, ...prePatchActive])];
-    pi.setActiveTools(allActive);
-
-    if (ctx.hasUI) {
+    if (hasTui(ctx)) {
       handles.push(
         registerAsciiHeader(pi, ctx, (fn) => {
           headerReregister = fn;
@@ -74,21 +88,35 @@ export default function (pi: ExtensionAPI) {
         }),
         registerWorkingIndicator(pi, ctx),
       );
-      registerConfigCommand(
-        pi,
-        () => { settingsUiActive = true; },
-        () => { settingsUiActive = false; },
-      );
       ctx.ui.setHiddenThinkingLabel("(think)");
+      handles.push({
+        dispose() {
+          ctx.ui.setHiddenThinkingLabel();
+        },
+      });
     }
   });
 
   pi.on("session_shutdown", async () => {
+    clearBlinkTimers();
+
     for (const h of handles) {
-      h.dispose();
+      try {
+        h.dispose();
+      } catch (error) {
+        console.error("Failed to dispose UI enhancement handle:", error);
+      }
     }
     handles = [];
-    customToolRenderingHandle?.dispose();
+
+    try {
+      customToolRenderingHandle?.dispose();
+    } catch (error) {
+      console.error("Failed to dispose custom tool rendering patch:", error);
+    }
     customToolRenderingHandle = null;
+    headerReregister = null;
+    editorReregister = null;
+    clearOnConfigChange();
   });
 }

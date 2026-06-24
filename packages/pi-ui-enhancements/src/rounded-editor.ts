@@ -6,11 +6,29 @@ import {
   type KeybindingsManager,
 } from "@earendil-works/pi-coding-agent";
 import type { EditorTheme, TUI } from "@earendil-works/pi-tui";
-import { visibleWidth } from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { getConfig } from "./config";
 import type { Handle } from "./types";
 
 type BorderFn = (c: string) => string;
+
+type RoundedEditorRuntime = {
+  invalidateUsage: (() => void) | null;
+};
+
+const runtimes = new WeakMap<ExtensionAPI, RoundedEditorRuntime>();
+
+function getRuntime(pi: ExtensionAPI): RoundedEditorRuntime {
+  let runtime = runtimes.get(pi);
+  if (runtime) return runtime;
+
+  runtime = { invalidateUsage: null };
+  pi.on("agent_end", async () => {
+    runtime.invalidateUsage?.();
+  });
+  runtimes.set(pi, runtime);
+  return runtime;
+}
 
 export function formatTokens(count: number): string {
   if (count < 1000) return count.toString();
@@ -19,7 +37,7 @@ export function formatTokens(count: number): string {
   return `${(count / 1000000).toFixed(1)}M`;
 }
 
-function getTotalUsage(ctx: ExtensionContext): {
+export function getTotalUsage(ctx: ExtensionContext): {
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;
@@ -32,7 +50,7 @@ function getTotalUsage(ctx: ExtensionContext): {
   let cacheWriteTokens = 0;
   let totalCost = 0;
 
-  for (const entry of ctx.sessionManager.getEntries()) {
+  for (const entry of ctx.sessionManager.getBranch()) {
     if (entry.type === "message" && entry.message.role === "assistant") {
       const usage = entry.message.usage;
       inputTokens += usage.input;
@@ -57,34 +75,72 @@ export function registerRoundedEditor(
   ctx: ExtensionContext,
   onReregister: (fn: () => void) => void,
 ): Handle {
+  const runtime = getRuntime(pi);
   let gitBranchProvider: (() => string | null) | null = null;
+  let requestRender: (() => void) | null = null;
   const getGitBranch = (): string | null => gitBranchProvider?.() ?? null;
 
-  // Render only extension statuses
-  ctx.ui.setFooter((_tui, _theme, footerData) => {
+  function getCurrentUsage() {
+    return getTotalUsage(ctx);
+  }
+
+  const invalidateUsage = () => {
+    requestRender?.();
+  };
+  runtime.invalidateUsage = invalidateUsage;
+
+  // Render only extension statuses. The rounded editor already displays model,
+  // context, cost, cwd, and branch info, so pi's default footer would duplicate it.
+  ctx.ui.setFooter((tui, _theme, footerData) => {
+    requestRender = () => tui.requestRender();
     gitBranchProvider = () => footerData.getGitBranch();
     const statuses = footerData.getExtensionStatuses();
+    const disposeBranchChange = footerData.onBranchChange?.(() => {
+      tui.requestRender();
+    });
+
     return {
-      render(width: number): string[] {
+      render(_width: number): string[] {
         if (statuses.size === 0) return [];
         const line = [...statuses.values()].join(" ");
         return ["", line];
       },
       invalidate() {},
+      dispose: disposeBranchChange,
     };
   });
 
+  const previousEditorFactory = ctx.ui.getEditorComponent();
+  const roundedEditorFactory: NonNullable<
+    ReturnType<ExtensionContext["ui"]["getEditorComponent"]>
+  > = (tui, theme, kb) => {
+    requestRender = () => tui.requestRender();
+    return new RoundedEditor(
+      tui,
+      theme,
+      kb,
+      ctx,
+      pi,
+      getGitBranch,
+      getCurrentUsage,
+    );
+  };
+
   function applyEditor() {
-    ctx.ui.setEditorComponent((tui, theme, kb) => {
-      return new RoundedEditor(tui, theme, kb, ctx, pi, getGitBranch);
-    });
+    ctx.ui.setEditorComponent(roundedEditorFactory);
   }
   applyEditor();
   onReregister(applyEditor);
 
   return {
     dispose() {
-      ctx.ui.setEditorComponent(undefined);
+      if (runtime.invalidateUsage === invalidateUsage) {
+        runtime.invalidateUsage = null;
+      }
+      requestRender = null;
+      if (ctx.ui.getEditorComponent() === roundedEditorFactory) {
+        ctx.ui.setEditorComponent(previousEditorFactory);
+      }
       ctx.ui.setFooter(undefined);
     },
   };
@@ -98,6 +154,7 @@ class RoundedEditor extends CustomEditor {
     private ctx: ExtensionContext,
     private pi: ExtensionAPI,
     private getGitBranch: () => string | null,
+    private getCurrentUsage: () => ReturnType<typeof getTotalUsage>,
   ) {
     super(tui, theme, kb, { paddingX: 0 });
   }
@@ -141,7 +198,9 @@ class RoundedEditor extends CustomEditor {
   }
 
   private buildTopLine(width: number, cwd: string, border: BorderFn): string {
-    const topRight = ` ${border(cwd)} `;
+    const cwdBudget = Math.max(1, width - 5);
+    const cwdDisplay = truncateToWidth(cwd, cwdBudget, "...");
+    const topRight = ` ${border(cwdDisplay)} `;
     const topGap = Math.max(1, width - 3 - visibleWidth(topRight));
     return `${border("╭")}${border("─".repeat(topGap))}${topRight}${border("─╮")}`;
   }
@@ -199,11 +258,27 @@ class RoundedEditor extends CustomEditor {
     }
     stats.push(coloredPct);
 
-    const bottomRight = ` ${stats.join(" ")} `;
-    const bw = visibleWidth(bottomLeft);
-    const rw = visibleWidth(bottomRight);
+    let bottomRight = ` ${stats.join(" ")} `;
+    let left = bottomLeft;
+    let bw = visibleWidth(left);
+    let rw = visibleWidth(bottomRight);
+    const available = Math.max(1, width - 5);
+
+    if (bw + rw > available) {
+      const rightBudget = Math.min(rw, Math.max(1, Math.floor(available / 2)));
+      const leftBudget = Math.max(1, available - rightBudget);
+      left = truncateToWidth(left, leftBudget, theme.fg("text", "..."));
+      bottomRight = truncateToWidth(
+        bottomRight,
+        Math.max(1, available - visibleWidth(left)),
+        theme.fg("text", "..."),
+      );
+      bw = visibleWidth(left);
+      rw = visibleWidth(bottomRight);
+    }
+
     const botGap = Math.max(1, width - 4 - bw - rw);
-    return `${border("╰─")}${bottomLeft}${border("─".repeat(botGap))}${bottomRight}${border("─╯")}`;
+    return `${border("╰─")}${left}${border("─".repeat(botGap))}${bottomRight}${border("─╯")}`;
   }
 
   private removeSeparatorLine(lines: string[], innerWidth: number): void {
@@ -243,7 +318,7 @@ class RoundedEditor extends CustomEditor {
       cacheReadTokens,
       cacheWriteTokens,
       totalCost,
-    } = getTotalUsage(this.ctx);
+    } = this.getCurrentUsage();
     const { modelId, pct, pctValue, thinkingLevel, cwd } =
       this.buildStatusInfo();
 
@@ -295,6 +370,6 @@ class RoundedEditor extends CustomEditor {
     // Left/right lines
     this.frameInterior(lines, width, innerWidth, border);
 
-    return lines;
+    return lines.map((line) => truncateToWidth(line, Math.max(0, width), ""));
   }
 }

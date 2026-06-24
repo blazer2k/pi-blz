@@ -26,6 +26,9 @@
     "README.md",
     "LICENSE"
   ],
+  "dependencies": {
+    "figlet": "^1.11.0"
+  },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",

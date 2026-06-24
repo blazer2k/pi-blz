@@ -4,7 +4,7 @@ import {
   type ExtensionContext,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
-import { visibleWidth } from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import figlet from "figlet";
 import { getConfig } from "./config";
 import type { Handle } from "./types";
@@ -87,12 +87,17 @@ function padLine(
   width: number,
   align: string,
 ) {
-  if (align === "left") return " " + styled;
-  const pad =
-    align === "center"
-      ? Math.max(0, Math.floor((width - rawWidth) / 2))
-      : Math.max(1, width - rawWidth - 1);
-  return " ".repeat(pad) + styled;
+  const safeWidth = Math.max(0, width);
+  const line = (() => {
+    if (align === "left") return " " + styled;
+    const pad =
+      align === "center"
+        ? Math.max(0, Math.floor((safeWidth - rawWidth) / 2))
+        : Math.max(1, safeWidth - rawWidth - 1);
+    return " ".repeat(pad) + styled;
+  })();
+
+  return truncateToWidth(line, safeWidth, "");
 }
 
 export function buildAsciiHeader(

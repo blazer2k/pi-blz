@@ -1,6 +1,7 @@
 import type {
   ExtensionAPI,
   ExtensionContext,
+  Theme,
 } from "@earendil-works/pi-coding-agent";
 import { RESET_FG, type Color, rgbFg, blend, resolveTheme } from "./colors";
 import type { Handle } from "./types";
@@ -12,10 +13,42 @@ const INTERRUPT_MSG = "esc to interrupt";
 // 20 FPS
 const ANIM_INTERVAL_MS = 50;
 
+type WorkingIndicatorAgentEndEvent = {
+  messages: Array<{ role: string; stopReason?: string }>;
+};
+
+type WorkingIndicatorSession = {
+  start(): void;
+  end(event: WorkingIndicatorAgentEndEvent): void;
+  dispose(): void;
+};
+
+type WorkingIndicatorRuntime = {
+  current: WorkingIndicatorSession | null;
+};
+
+const runtimes = new WeakMap<ExtensionAPI, WorkingIndicatorRuntime>();
+
+function getRuntime(pi: ExtensionAPI): WorkingIndicatorRuntime {
+  let runtime = runtimes.get(pi);
+  if (runtime) return runtime;
+
+  runtime = { current: null };
+  pi.on("agent_start", async () => {
+    runtime.current?.start();
+  });
+  pi.on("agent_end", async (event) => {
+    runtime.current?.end(event as WorkingIndicatorAgentEndEvent);
+  });
+  runtimes.set(pi, runtime);
+  return runtime;
+}
+
 function shimmerText(
   text: string,
   baseRgb: Color | undefined,
   highlightRgb: Color | undefined,
+  theme: Theme,
 ): string {
   const t = Date.now() / 1000;
   const chars = [...text];
@@ -37,8 +70,7 @@ function shimmerText(
       out += `${rgbFg(blended)}${ch}${RESET_FG}`;
     }
   } else {
-    // Fallback
-    out = text;
+    out = theme.fg("dim", text);
   }
   return out;
 }
@@ -62,6 +94,7 @@ export function registerWorkingIndicator(
   pi: ExtensionAPI,
   ctx: ExtensionContext,
 ): Handle {
+  const runtime = getRuntime(pi);
   let runStartTime = 0;
   let animTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -85,7 +118,12 @@ export function registerWorkingIndicator(
     function renderFrame(): void {
       const cfg = getConfig();
       const theme = resolveTheme(ctx);
-      const shimmered = shimmerText(LABEL, theme.baseRgb, theme.highlightRgb);
+      const shimmered = shimmerText(
+        LABEL,
+        theme.baseRgb,
+        theme.highlightRgb,
+        ctx.ui.theme,
+      );
       const suffixParts: string[] = [];
 
       if (runStartTime > 0 && cfg.workingIndicatorShowDuration) {
@@ -113,27 +151,35 @@ export function registerWorkingIndicator(
     animTimer = setInterval(renderFrame, ANIM_INTERVAL_MS);
   }
 
-  pi.on("agent_start", async (_event) => {
-    runStartTime = Date.now();
-    startAnimation();
-  });
-
-  pi.on("agent_end", async (event) => {
-    stopIndicator();
-
-    if (runStartTime > 0 && getConfig().workingIndicatorShowDuration) {
-      const lastAssistant = [...event.messages]
-        .reverse()
-        .find((m) => m.role === "assistant");
-      if (lastAssistant?.stopReason === "stop") {
-        ctx.ui.notify(`Worked for ${assembleRunDuration(runStartTime)}`);
-      }
-    }
-  });
-
-  return {
-    dispose() {
+  const session: WorkingIndicatorSession = {
+    start() {
+      runStartTime = Date.now();
+      startAnimation();
+    },
+    end(event) {
+      const startedAt = runStartTime;
+      runStartTime = 0;
       stopIndicator();
+
+      if (startedAt > 0 && getConfig().workingIndicatorShowDuration) {
+        const lastAssistant = [...event.messages]
+          .reverse()
+          .find((m) => m.role === "assistant");
+        if (lastAssistant?.stopReason === "stop") {
+          ctx.ui.notify(`Worked for ${assembleRunDuration(startedAt)}`);
+        }
+      }
+    },
+    dispose() {
+      if (runtime.current === session) {
+        runtime.current = null;
+      }
+      stopAnimation();
+      ctx.ui.setWorkingMessage("");
+      ctx.ui.setWorkingIndicator();
     },
   };
+
+  runtime.current = session;
+  return session;
 }
