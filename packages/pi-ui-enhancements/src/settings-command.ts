@@ -104,6 +104,13 @@ function getWorkingIndicatorSettings(config: Config): SettingItem[] {
 function getToolRenderingSettings(config: Config): SettingItem[] {
   return [
     {
+      id: "patchedBuiltInTools",
+      label: "Patched built-in tools",
+      description: "Which built-in tool renderers to replace (reload required)",
+      currentValue: String(config.patchedBuiltInTools),
+      values: ["essential", "all"],
+    },
+    {
       id: "patchCustomTools",
       label: "Patch custom tools",
       description: "Apply compact rendering to third-party tools",

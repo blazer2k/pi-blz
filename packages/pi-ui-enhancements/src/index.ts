@@ -22,8 +22,8 @@ function hasTui(ctx: { hasUI: boolean; mode?: string }): boolean {
 }
 
 export default function (pi: ExtensionAPI) {
-  patchTools(pi);
   loadConfig();
+  patchTools(pi);
   let customToolRenderingHandle: Handle | null = getConfig().patchCustomTools
     ? patchCustomToolRendering()
     : null;

@@ -24,6 +24,24 @@ afterEach(() => {
   loadConfig();
 });
 
+describe("tool patch config", () => {
+  it("defaults to essential built-in tools", () => {
+    expect(getConfig().patchedBuiltInTools).toBe("essential");
+  });
+
+  it("saves all built-in tool patch mode", () => {
+    saveConfig("patchedBuiltInTools", "all");
+
+    expect(getConfig().patchedBuiltInTools).toBe("all");
+  });
+
+  it("rejects invalid built-in tool patch mode", () => {
+    expect(() => saveConfig("patchedBuiltInTools", "invalid")).toThrow(
+      "Invalid config update",
+    );
+  });
+});
+
 describe("config numeric values", () => {
   it("rejects fractional numeric updates", () => {
     expect(() => saveConfig("maxExpandedEntries", "20.5")).toThrow(
