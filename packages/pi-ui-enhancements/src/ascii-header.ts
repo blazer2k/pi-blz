@@ -13,6 +13,7 @@ export interface AsciiHeaderConfig {
   enabled: boolean;
   text: string;
   font: string;
+  color: "text" | "accent" | "dim";
   align: "left" | "center" | "right";
   showVersion: boolean;
 }
@@ -23,6 +24,7 @@ export function loadAsciiHeaderConfig(): AsciiHeaderConfig {
     enabled: cfg.asciiHeaderEnabled,
     text: "pi",
     font: cfg.asciiHeaderFont,
+    color: cfg.asciiHeaderColor,
     align: cfg.asciiHeaderAlign,
     showVersion: cfg.asciiHeaderShowVersion,
   };
@@ -53,16 +55,28 @@ export function buildAsciiHeaderData(
   config: AsciiHeaderConfig,
 ): AsciiHeaderData {
   let rawLines: string[];
-  try {
-    rawLines = stripEmptyEdgeLines(
-      figlet.textSync(config.text, { font: config.font }).split("\n"),
-    );
-  } catch {
-    rawLines = [config.text];
+  let rawLineWidths: number[];
+  if (config.font === "pi") {
+    rawLines = [
+      "\u2588\u2588\u2588\u2588\u2588\u2588  ",
+      "\u2588\u2588  \u2588\u2588  ",
+      "\u2588\u2588\u2588\u2588  \u2588\u2588",
+      "\u2588\u2588    \u2588\u2588",
+    ];
+    rawLineWidths = [8, 8, 8, 8];
+  } else {
+    try {
+      rawLines = stripEmptyEdgeLines(
+        figlet.textSync(config.text, { font: config.font }).split("\n"),
+      );
+    } catch {
+      rawLines = [config.text];
+    }
+    rawLineWidths = rawLines.map((line) => visibleWidth(line));
   }
   return {
     rawLines,
-    rawLineWidths: rawLines.map((line) => visibleWidth(line)),
+    rawLineWidths,
     versionWidth: visibleWidth(`v${VERSION}`),
   };
 }
@@ -91,7 +105,7 @@ export function buildAsciiHeader(
     "",
     ...data.rawLines.map((line, i) =>
       padLine(
-        theme.fg("accent", line),
+        theme.fg(config.color, line),
         data.rawLineWidths[i]!,
         width,
         config.align,
@@ -118,21 +132,27 @@ export function buildAsciiHeader(
 export function registerAsciiHeader(
   _pi: ExtensionAPI,
   ctx: ExtensionContext,
+  onReregister: (fn: () => void) => void,
 ): Handle {
-  const config = loadAsciiHeaderConfig();
+  function applyHeader() {
+    const config = loadAsciiHeaderConfig();
 
-  if (!config.enabled) {
-    return { dispose() {} };
+    if (!config.enabled) {
+      ctx.ui.setHeader(undefined);
+      return;
+    }
+
+    const data = buildAsciiHeaderData(config);
+
+    ctx.ui.setHeader((_tui, theme) => ({
+      render(width: number): string[] {
+        return buildAsciiHeader(theme, width, config, data);
+      },
+      invalidate() {},
+    }));
   }
-
-  const data = buildAsciiHeaderData(config);
-
-  ctx.ui.setHeader((_tui, theme) => ({
-    render(width: number): string[] {
-      return buildAsciiHeader(theme, width, config, data);
-    },
-    invalidate() {},
-  }));
+  applyHeader();
+  onReregister(applyHeader);
 
   return {
     dispose() {
