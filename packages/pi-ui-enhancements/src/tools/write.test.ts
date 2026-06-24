@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { getConfig } from "../config";
 import { patchWriteTool } from "./write";
 import { mkTheme, mkToolCtx, setupTool } from "../test-helpers";
 
@@ -66,12 +67,14 @@ describe("write renderResult", () => {
     expect(output).toContain("to expand");
   });
 
-  it("expanded result previews max 20 lines", () => {
+  it("expanded result previews up to maxExpandedEntries lines", () => {
     const def = setupWriteTool();
     const renderResult = def.renderResult!;
     const theme = mkTheme();
+    const maxEntries = getConfig().maxExpandedEntries;
+    const totalLines = maxEntries + 5;
     const lines = Array.from(
-      { length: 25 },
+      { length: totalLines },
       (_, i) => `L${String(i + 1).padStart(2, "0")}`,
     ).join("\n");
     const ctx = mkToolCtx({
@@ -80,7 +83,7 @@ describe("write renderResult", () => {
 
     const component = renderResult(
       {
-        content: [{ type: "text", text: "wrote 25 lines" }],
+        content: [{ type: "text", text: `wrote ${totalLines} lines` }],
         details: undefined,
       },
       { expanded: true, isPartial: false },
@@ -90,8 +93,10 @@ describe("write renderResult", () => {
 
     const output = component.render(120).join("\n");
     expect(output).toContain("L01");
-    expect(output).toContain("L20");
-    expect(output).not.toContain("L21");
+    const lastVisible = String(maxEntries).padStart(2, "0");
+    expect(output).toContain(`L${lastVisible}`);
+    const nextLine = String(maxEntries + 1).padStart(2, "0");
+    expect(output).not.toContain(`L${nextLine}`);
     expect(output).toContain("5 more lines");
   });
 });

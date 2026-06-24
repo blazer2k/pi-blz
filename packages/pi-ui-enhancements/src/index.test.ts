@@ -4,6 +4,7 @@ import type {
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { ExtensionRunner } from "@earendil-works/pi-coding-agent";
+import { mkTheme, mkToolCtx } from "./test-helpers";
 import ext from "./index";
 import { cleanRunnerProto, PROTOTYPE_PATCHED } from "./test-helpers";
 
@@ -12,6 +13,9 @@ afterEach(cleanRunnerProto);
 
 function mkPi() {
   const registeredTools: string[] = [];
+  const registeredToolDefinitions: Array<
+    Parameters<ExtensionAPI["registerTool"]>[0]
+  > = [];
   const activeTools: string[] = [];
   const handlers: Record<string, Array<(...args: unknown[]) => void>> = {};
   let activeToolsArg: string[] | undefined;
@@ -21,8 +25,9 @@ function mkPi() {
       handlers[event] = handlers[event] ?? [];
       handlers[event].push(handler);
     },
-    registerTool: (tool: { name: string }) => {
+    registerTool: (tool: Parameters<ExtensionAPI["registerTool"]>[0]) => {
       registeredTools.push(tool.name);
+      registeredToolDefinitions.push(tool);
     },
     registerCommand: () => {},
     getActiveTools: () => [...activeTools],
@@ -33,6 +38,7 @@ function mkPi() {
     // Test helpers
     _handlers: handlers,
     _registeredTools: () => registeredTools,
+    _registeredToolDefinitions: () => registeredToolDefinitions,
     _setActiveToolsArg: () => activeToolsArg,
     _setActiveTools: (tools: string[]) => {
       activeTools.push(...tools);
@@ -40,6 +46,9 @@ function mkPi() {
   } as unknown as ExtensionAPI & {
     _handlers: Record<string, Array<(...args: unknown[]) => void>>;
     _registeredTools: () => string[];
+    _registeredToolDefinitions: () => Array<
+      Parameters<ExtensionAPI["registerTool"]>[0]
+    >;
     _setActiveToolsArg: () => string[] | undefined;
     _setActiveTools: (tools: string[]) => void;
   };
@@ -51,6 +60,8 @@ function mkCtx(overrides?: Partial<ExtensionContext>) {
     hasUI: true,
     ui: {
       setEditorComponent: overrides?.ui?.setEditorComponent ?? (() => {}),
+      getEditorComponent:
+        overrides?.ui?.getEditorComponent ?? (() => undefined),
       setFooter: overrides?.ui?.setFooter ?? (() => {}),
       setWorkingIndicator: overrides?.ui?.setWorkingIndicator ?? (() => {}),
       setWorkingMessage: overrides?.ui?.setWorkingMessage ?? (() => {}),
@@ -68,6 +79,7 @@ function mkCtx(overrides?: Partial<ExtensionContext>) {
     },
     sessionManager: {
       getEntries: () => [],
+      getBranch: () => [],
     },
     getContextUsage: () => undefined,
     model: undefined,
@@ -76,9 +88,8 @@ function mkCtx(overrides?: Partial<ExtensionContext>) {
 }
 
 describe("extension lifecycle", () => {
-  it("session_start patches tools and preserves pre-existing active tools", () => {
+  it("session_start does not override active tools", () => {
     const pi = mkPi();
-    // Simulate a pre-existing active tool from another extension
     (pi as any)._setActiveTools(["custom"]);
 
     ext(pi);
@@ -87,11 +98,7 @@ describe("extension lifecycle", () => {
     const handler = (pi as any)._handlers.session_start[0];
     handler({} as any, ctx);
 
-    const active = (pi as any)._setActiveToolsArg();
-    expect(active).toContain("read");
-    expect(active).toContain("bash");
-    expect(active).toContain("custom");
-    expect(active.length).toBeGreaterThan(7); // built-ins + custom
+    expect((pi as any)._setActiveToolsArg()).toBeUndefined();
   });
 
   it("session_start skips UI enhancements when hasUI is false", () => {
@@ -130,6 +137,7 @@ describe("extension lifecycle", () => {
         setEditorComponent: () => {
           editorSet = true;
         },
+        getEditorComponent: () => undefined,
         setFooter: () => {},
         setWorkingIndicator: () => {},
         setWorkingMessage: () => {},
@@ -177,5 +185,48 @@ describe("extension lifecycle", () => {
       unknown
     >;
     expect(proto[PROTOTYPE_PATCHED]).toBeUndefined();
+  });
+
+  it("session_shutdown clears tool timers on later sessions", () => {
+    const originalSetInterval = globalThis.setInterval;
+    const originalClearInterval = globalThis.clearInterval;
+    const timer = { id: "timer" } as unknown as ReturnType<typeof setInterval>;
+    const cleared: unknown[] = [];
+
+    globalThis.setInterval = (() => timer) as unknown as typeof setInterval;
+    globalThis.clearInterval = ((id: unknown) => {
+      cleared.push(id);
+    }) as typeof clearInterval;
+
+    try {
+      const pi = mkPi();
+      ext(pi);
+
+      const ctx = mkCtx();
+      const startHandler = (pi as any)._handlers.session_start[0];
+      const shutdownHandler = (pi as any)._handlers.session_shutdown[0];
+
+      startHandler({} as any, ctx);
+      shutdownHandler({} as any);
+      startHandler({} as any, ctx);
+
+      const bashTool = (pi as any)
+        ._registeredToolDefinitions()
+        .find((tool: { name: string }) => tool.name === "bash");
+
+      bashTool.renderResult(
+        { content: [{ type: "text", text: "running" }] },
+        { expanded: false, isPartial: true },
+        mkTheme(),
+        mkToolCtx({ state: { startedAt: Date.now() } }),
+      );
+
+      shutdownHandler({} as any);
+
+      expect(cleared).toContain(timer);
+    } finally {
+      globalThis.setInterval = originalSetInterval;
+      globalThis.clearInterval = originalClearInterval;
+    }
   });
 });

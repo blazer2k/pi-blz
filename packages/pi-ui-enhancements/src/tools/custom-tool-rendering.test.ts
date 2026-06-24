@@ -4,6 +4,8 @@ import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { patchCustomToolRendering } from "./custom-tool-rendering";
 import {
   cleanRunnerProto,
+  mkTheme,
+  mkToolCtx,
   PATCH_REF_COUNT,
   PROTOTYPE_PATCHED,
 } from "../test-helpers";
@@ -98,18 +100,95 @@ describe("patchCustomToolRendering", () => {
     const h1 = patchCustomToolRendering();
     const h2 = patchCustomToolRendering();
 
-    // Both active — still patched
+    // Both active - still patched
     expect(proto.getAllRegisteredTools).not.toBe(original);
     expect(proto[PATCH_REF_COUNT]).toBe(2);
 
-    // Dispose first — still patched
+    // Dispose first - still patched
     h1.dispose();
     expect(proto.getAllRegisteredTools).not.toBe(original);
     expect(proto[PATCH_REF_COUNT]).toBe(1);
 
-    // Dispose second — restored
+    // Dispose second - restored
     h2.dispose();
     expect(proto.getAllRegisteredTools).toBe(original);
     expect(proto[PROTOTYPE_PATCHED]).toBeUndefined();
+  });
+
+  it("falls back to generic call rendering when original renderCall throws", () => {
+    const tool = mkRegisteredTool("myTool");
+    tool.definition.renderCall = () => {
+      throw new Error("boom");
+    };
+    proto.getAllRegisteredTools = function () {
+      return [tool];
+    };
+
+    const handle = patchCustomToolRendering();
+    const tools = (proto.getAllRegisteredTools as Function).call(
+      {} as any,
+    ) as Array<{ definition: ToolDefinition }>;
+
+    const component = tools[0]!.definition.renderCall!(
+      { value: 1 },
+      mkTheme(),
+      mkToolCtx(),
+    );
+    const rendered = component.render(80).join("\n");
+
+    expect(rendered).toContain("myTool");
+    expect(rendered).toContain("value=1");
+    handle.dispose();
+  });
+
+  it("marks generic results truncated from tool details", () => {
+    const tool = mkRegisteredTool("myTool");
+    proto.getAllRegisteredTools = function () {
+      return [tool];
+    };
+
+    const handle = patchCustomToolRendering();
+    const tools = (proto.getAllRegisteredTools as Function).call(
+      {} as any,
+    ) as Array<{ definition: ToolDefinition }>;
+    const state = {};
+    const component = tools[0]!.definition.renderResult!(
+      {
+        content: [{ type: "text", text: "one\ntwo" }],
+        details: { truncation: { truncated: true } },
+      },
+      { expanded: false, isPartial: false },
+      mkTheme(),
+      mkToolCtx({ state }),
+    );
+
+    expect(component.render(80).join("\n")).toContain("2 lines");
+    expect(state).toEqual(
+      expect.objectContaining({
+        _uiEnhancements: expect.objectContaining({ truncated: true }),
+      }),
+    );
+    handle.dispose();
+  });
+
+  it("disabled patch stops wrapping even when another patch is chained after it", () => {
+    const original = function () {
+      return [mkRegisteredTool("myTool")];
+    };
+    proto.getAllRegisteredTools = original;
+
+    const handle = patchCustomToolRendering();
+    const patched = proto.getAllRegisteredTools as Function;
+    proto.getAllRegisteredTools = function () {
+      return patched.call(this);
+    };
+
+    handle.dispose();
+
+    const tools = (proto.getAllRegisteredTools as Function).call(
+      {} as any,
+    ) as Array<{ definition: ToolDefinition }>;
+
+    expect(tools[0]!.definition.renderShell).toBeUndefined();
   });
 });

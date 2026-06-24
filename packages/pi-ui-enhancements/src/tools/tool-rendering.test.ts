@@ -1,14 +1,20 @@
 import { describe, expect, it } from "bun:test";
-import type { ToolRenderResultOptions } from "@earendil-works/pi-coding-agent";
+import type {
+  Theme,
+  ToolRenderResultOptions,
+} from "@earendil-works/pi-coding-agent";
 import {
   type BaseRenderState,
   type ListResultConfig,
   buildHint,
+  clearBlinkTimers,
   countLines,
   extractTextContent,
   formatErrorBody,
   formatListResult,
   formatSimpleErrorResult,
+  getCallRenderParts,
+  getStatusColor,
   normalizeOutput,
   renderPath,
   safeTruncateToWidth,
@@ -135,6 +141,15 @@ describe("renderPath", () => {
     const output = renderPath(`${home}/foo`, theme, "/cwd");
     expect(output).toContain("~/foo");
   });
+
+  it("does not shorten paths that only share the home prefix", () => {
+    const theme = mkTheme();
+    const home = process.env.HOME ?? "";
+    if (!home) return; // skip if HOME not set
+    const output = renderPath(`${home}2/foo`, theme, "/cwd");
+    expect(output).toContain(`${home}2/foo`);
+    expect(output).not.toContain("~2/foo");
+  });
 });
 
 describe("safeTruncateToWidth", () => {
@@ -171,6 +186,40 @@ describe("buildHint", () => {
     const theme = mkTheme();
     const hint = buildHint(theme);
     expect(hint).toContain("to expand");
+  });
+});
+
+describe("tool call blink rendering", () => {
+  it("captures blink phase once for symbol and color", () => {
+    const originalNow = Date.now;
+    let calls = 0;
+    Date.now = () => (calls++ === 0 ? 0 : 500);
+
+    try {
+      const theme = {
+        ...mkTheme(),
+        fg: (color: string, text: string) => `[${color}]${text}`,
+      } as Theme;
+      const state: BaseRenderState = {};
+      const { prefix } = getCallRenderParts(state, theme, {
+        executionStarted: true,
+        isPartial: false,
+        invalidate: () => {},
+      });
+
+      expect(state.blinkOn).toBe(true);
+      expect(prefix).toBe("[success]● ");
+    } finally {
+      Date.now = originalNow;
+      clearBlinkTimers();
+    }
+  });
+
+  it("keeps error and truncation colors above blink status", () => {
+    expect(getStatusColor(false, { isError: true }, true)).toBe("error");
+    expect(getStatusColor(false, { truncated: true }, true)).toBe("warning");
+    expect(getStatusColor(true, { isError: true }, true)).toBe("error");
+    expect(getStatusColor(true, { truncated: true }, true)).toBe("warning");
   });
 });
 

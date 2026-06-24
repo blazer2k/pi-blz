@@ -41,6 +41,18 @@ describe("bash renderCall", () => {
     expect(text).toContain("echo   hello");
     expect(text).toContain("pwd");
   });
+
+  it("renders incomplete partial args without throwing", () => {
+    const def = setupBashTool();
+    const renderCall = def.renderCall!;
+    const theme = mkTheme();
+    const ctx = mkToolCtx({ isPartial: true, argsComplete: false });
+
+    const component = renderCall({}, theme, ctx);
+    const text = component.render(120).join("\n");
+    expect(text).toContain("Bash");
+    expect(text).toContain("...");
+  });
 });
 
 describe("bash renderResult", () => {

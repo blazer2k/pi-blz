@@ -1,5 +1,50 @@
 import { describe, expect, it } from "bun:test";
-import { formatTokens } from "./rounded-editor";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { formatTokens, getTotalUsage } from "./rounded-editor";
+
+describe("getTotalUsage", () => {
+  it("sums assistant usage from the active branch only", () => {
+    const branchEntries = [
+      {
+        type: "message",
+        message: {
+          role: "assistant",
+          usage: {
+            input: 10,
+            output: 5,
+            cacheRead: 2,
+            cacheWrite: 1,
+            cost: { total: 0.25 },
+          },
+        },
+      },
+    ];
+    const allEntries = [
+      ...branchEntries,
+      {
+        type: "message",
+        message: {
+          role: "assistant",
+          usage: { input: 1000, output: 1000, cost: { total: 99 } },
+        },
+      },
+    ];
+    const ctx = {
+      sessionManager: {
+        getBranch: () => branchEntries,
+        getEntries: () => allEntries,
+      },
+    } as unknown as ExtensionContext;
+
+    expect(getTotalUsage(ctx)).toEqual({
+      inputTokens: 10,
+      outputTokens: 5,
+      cacheReadTokens: 2,
+      cacheWriteTokens: 1,
+      totalCost: 0.25,
+    });
+  });
+});
 
 describe("formatTokens", () => {
   it("returns raw number under 1000", () => {

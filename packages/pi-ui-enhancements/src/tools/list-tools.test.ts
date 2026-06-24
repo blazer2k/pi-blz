@@ -135,6 +135,18 @@ describe("find renderCall", () => {
     const text = component.render(120).join("\n");
     expect(text).toContain("(limit 100)");
   });
+
+  it("renders incomplete partial args without throwing", () => {
+    const def = setupFindTool();
+    const renderCall = def.renderCall!;
+    const theme = mkTheme();
+    const ctx = mkToolCtx({ isPartial: true, argsComplete: false });
+
+    const component = renderCall({}, theme, ctx);
+    const text = component.render(120).join("\n");
+    expect(text).toContain("Find");
+    expect(text).toContain("...");
+  });
 });
 
 describe("find renderResult", () => {
@@ -224,6 +236,18 @@ describe("grep renderCall", () => {
     const component = renderCall({ pattern: "TODO", limit: 500 }, theme, ctx);
     const text = component.render(120).join("\n");
     expect(text).toContain("(limit 500)");
+  });
+
+  it("renders incomplete partial args without throwing", () => {
+    const def = setupGrepTool();
+    const renderCall = def.renderCall!;
+    const theme = mkTheme();
+    const ctx = mkToolCtx({ isPartial: true, argsComplete: false });
+
+    const component = renderCall({}, theme, ctx);
+    const text = component.render(120).join("\n");
+    expect(text).toContain("Grep");
+    expect(text).toContain("...");
   });
 });
 
