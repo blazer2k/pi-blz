@@ -252,9 +252,9 @@ describe("tool call blink rendering", () => {
       }
 
       expect(scheduled).toHaveLength(1);
-      expect(scheduled[0].delay).toBe(400);
+      expect(scheduled[0]!.delay).toBe(400);
 
-      scheduled[0].callback();
+      scheduled[0]!.callback();
       expect(invalidated).toEqual(["a", "b", "c"]);
       expect(scheduled).toHaveLength(2);
     } finally {

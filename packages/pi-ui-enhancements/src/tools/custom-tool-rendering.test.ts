@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach } from "bun:test";
 import { ExtensionRunner } from "@earendil-works/pi-coding-agent";
-import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
+import type { Theme, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import { patchCustomToolRendering } from "./custom-tool-rendering";
 import {
   cleanRunnerProto,
@@ -138,6 +139,63 @@ describe("patchCustomToolRendering", () => {
 
     expect(rendered).toContain("myTool");
     expect(rendered).toContain("value=1");
+    handle.dispose();
+  });
+
+  it("preserves safe ANSI styling from original renderCall", () => {
+    const tool = mkRegisteredTool("myTool");
+    tool.definition.renderCall = (_args, theme) =>
+      new Text(theme.fg("toolTitle", "search") + " query", 0, 0);
+    proto.getAllRegisteredTools = function () {
+      return [tool];
+    };
+
+    const theme = {
+      ...mkTheme(),
+      fg: (color: string, text: string) =>
+        color === "toolTitle" ? `\x1b[35m${text}\x1b[39m` : text,
+    } as Theme;
+
+    const handle = patchCustomToolRendering();
+    const tools = (proto.getAllRegisteredTools as Function).call(
+      {} as any,
+    ) as Array<{ definition: ToolDefinition }>;
+
+    const component = tools[0]!.definition.renderCall!(
+      { query: "query" },
+      theme,
+      mkToolCtx(),
+    );
+    const rendered = component.render(80).join("\n");
+
+    expect(rendered).toContain("\x1b[35msearch\x1b[39m");
+    handle.dispose();
+  });
+
+  it("trims padded original renderResult lines before adding tree prefixes", () => {
+    const tool = mkRegisteredTool("myTool");
+    tool.definition.renderResult = (_result, _options, theme) =>
+      new Text(theme.fg("dim", "10 results"), 0, 0);
+    proto.getAllRegisteredTools = function () {
+      return [tool];
+    };
+
+    const handle = patchCustomToolRendering();
+    const tools = (proto.getAllRegisteredTools as Function).call(
+      {} as any,
+    ) as Array<{ definition: ToolDefinition }>;
+
+    const component = tools[0]!.definition.renderResult!(
+      { content: [], details: { status: "ok" } },
+      { expanded: false, isPartial: false },
+      mkTheme(),
+      mkToolCtx(),
+    );
+    const rendered = component.render(80);
+    const nonEmpty = rendered.filter((line) => line.trim().length > 0);
+
+    expect(nonEmpty).toHaveLength(1);
+    expect(nonEmpty[0]!.trim()).toBe("└─ 10 results");
     handle.dispose();
   });
 

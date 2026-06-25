@@ -88,6 +88,57 @@ function shouldWrapTool(
   return true;
 }
 
+function sanitizeRenderedText(value: string): string {
+  let output = "";
+  let index = 0;
+
+  while (index < value.length) {
+    const char = value[index];
+
+    if (char === "\u001B") {
+      if (value[index + 1] === "[") {
+        let end = index + 2;
+        while (end < value.length && !/[\x40-\x7E]/.test(value[end]!)) {
+          end++;
+        }
+        if (end < value.length) {
+          const sequence = value.slice(index, end + 1);
+          const body = sequence.slice(2, -1);
+          if (sequence.endsWith("m") && /^[\d;:]*$/.test(body)) {
+            output += sequence;
+          }
+          index = end + 1;
+          continue;
+        }
+      }
+
+      if (value[index + 1] === "]" || value[index + 1] === "_") {
+        const belEnd = value.indexOf("\u0007", index + 2);
+        const stEnd = value.indexOf("\u001B\\", index + 2);
+        const usesBel = belEnd !== -1 && (stEnd === -1 || belEnd < stEnd);
+        const end = usesBel ? belEnd : stEnd;
+        index = end === -1 ? value.length : end + (usesBel ? 1 : 2);
+        continue;
+      }
+
+      index += 2;
+      continue;
+    }
+
+    const code = char?.codePointAt(0);
+    if (
+      code !== undefined &&
+      (code === 0x09 || code === 0x0a || code === 0x0d || code > 0x1f) &&
+      (code < 0xfff9 || code > 0xfffb)
+    ) {
+      output += char;
+    }
+    index++;
+  }
+
+  return output.replace(/\r/g, "").replace(/[\n\t]+/g, " ");
+}
+
 function buildGenericCallHeader(
   args: Record<string, unknown>,
   label: string,
@@ -345,7 +396,7 @@ function wrapDefinition<T extends ToolDefinition>(definition: T): T {
           });
           state.callComponent = inner;
 
-          const innerText = sanitizeDisplayText(
+          const innerText = sanitizeRenderedText(
             inner
               .render(MAX_CALL_WIDTH())
               .map((line) => line.trimEnd())
@@ -414,7 +465,10 @@ function wrapDefinition<T extends ToolDefinition>(definition: T): T {
       }
       state.resultComponent = inner;
 
-      const innerLines = inner.render(MAX_CALL_WIDTH());
+      const innerLines = inner
+        .render(MAX_CALL_WIDTH())
+        .map((line) => line.trimEnd())
+        .filter((line) => line.length > 0);
       if (innerLines.length === 0) {
         text.setText(
           state.isError
