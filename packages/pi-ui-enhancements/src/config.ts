@@ -28,12 +28,10 @@ export const ALLOWED_FONTS = [
   "Future",
   "Future Smooth",
   "Georgia11",
+  "Greek",
   "Italic",
   "Jazmine",
   "Larry 3D",
-  "pi-big",
-  "pi-medium",
-  "pi-small",
   "Poison",
   "Rebel",
   "Slant",
@@ -70,7 +68,7 @@ export interface Config {
 
 const defaultConfig: Config = {
   asciiHeaderEnabled: true,
-  asciiHeaderFont: "pi-medium",
+  asciiHeaderFont: "Larry 3D",
   asciiHeaderColor: "text",
   asciiHeaderAlign: "center",
   asciiHeaderShowVersion: true,
