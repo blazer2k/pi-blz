@@ -58,12 +58,18 @@ export function buildAsciiHeaderData(
   let rawLineWidths: number[];
   if (config.font === "pi") {
     rawLines = [
-      "\u2588\u2588\u2588\u2588\u2588\u2588  ",
-      "\u2588\u2588  \u2588\u2588  ",
-      "\u2588\u2588\u2588\u2588  \u2588\u2588",
-      "\u2588\u2588    \u2588\u2588",
+      "███████████████╗",
+      "███████████████║",
+      "█████╔════█████║",
+      "█████║    █████║",
+      "██████████╔════█████╗",
+      "██████████║    █████║",
+      "█████╔════╝    █████║",
+      "█████║         █████║",
+      "╚════╝         ╚════╝",
     ];
-    rawLineWidths = [8, 8, 8, 8];
+    const maxWidth = Math.max(...rawLines.map((l) => visibleWidth(l)));
+    rawLineWidths = rawLines.map(() => maxWidth);
   } else {
     try {
       rawLines = stripEmptyEdgeLines(

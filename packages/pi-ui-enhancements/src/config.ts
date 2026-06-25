@@ -18,6 +18,7 @@ function getConfigPath(): string {
 }
 
 export const ALLOWED_FONTS = [
+  "3D-ASCII",
   "Alligator",
   "ANSI Compact",
   "Classy",
@@ -30,18 +31,13 @@ export const ALLOWED_FONTS = [
   "Italic",
   "Jazmine",
   "Larry 3D",
-  "NV Script",
-  "Nancyj",
   "pi",
   "Poison",
   "Rebel",
-  "Roman",
-  "Speed",
+  "Slant",
   "Tmplr",
   "Trek",
   "Univers",
-  "Varsity",
-  "Whimsy",
 ];
 
 export interface Config {
@@ -72,7 +68,7 @@ export interface Config {
 
 const defaultConfig: Config = {
   asciiHeaderEnabled: true,
-  asciiHeaderFont: "Larry 3D",
+  asciiHeaderFont: "pi",
   asciiHeaderColor: "text",
   asciiHeaderAlign: "center",
   asciiHeaderShowVersion: true,
