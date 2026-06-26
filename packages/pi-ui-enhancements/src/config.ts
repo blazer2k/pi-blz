@@ -29,6 +29,7 @@ export const ALLOWED_FONTS = [
   "Future Smooth",
   "Georgia11",
   "Greek",
+  "Greek Large",
   "Italic",
   "Jazmine",
   "Larry 3D",
@@ -68,7 +69,7 @@ export interface Config {
 
 const defaultConfig: Config = {
   asciiHeaderEnabled: true,
-  asciiHeaderFont: "Larry 3D",
+  asciiHeaderFont: "Greek",
   asciiHeaderColor: "text",
   asciiHeaderAlign: "center",
   asciiHeaderShowVersion: true,
