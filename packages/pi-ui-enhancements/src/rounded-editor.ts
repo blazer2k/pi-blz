@@ -12,6 +12,21 @@ import type { Handle } from "./types";
 
 type BorderFn = (c: string) => string;
 
+export type ScrollIndicators = {
+  hiddenAbove: boolean;
+  hiddenBelow: boolean;
+  contentLineCount: number;
+};
+
+export function getRightBorderGlyph(
+  row: number,
+  scroll: ScrollIndicators | null,
+): "│" | "▲" | "▼" {
+  if (scroll?.hiddenAbove && row === 0) return "▲";
+  if (scroll?.hiddenBelow && row === scroll.contentLineCount - 1) return "▼";
+  return "│";
+}
+
 type RoundedEditorRuntime = {
   invalidateUsage: (() => void) | null;
 };
@@ -294,18 +309,30 @@ class RoundedEditor extends CustomEditor {
     return `${border("╰─")}${left}${border("─".repeat(botGap))}${bottomRight}${border("─╯")}`;
   }
 
-  private removeSeparatorLine(lines: string[], innerWidth: number): void {
+  private removeSeparatorLine(
+    lines: string[],
+    innerWidth: number,
+  ): ScrollIndicators | null {
+    const hiddenAbove = lines[0]?.includes("↑") ?? false;
     const plain = (line: string) => line.replace(/\x1b\[[0-9;]*m/g, "");
+
     for (let i = lines.length - 1; i > 0; i--) {
       const stripped = plain(lines[i]!);
       if (
         stripped.startsWith("─") &&
         [...stripped].filter((c) => c === "─").length >= innerWidth / 2
       ) {
+        const scroll = {
+          hiddenAbove,
+          hiddenBelow: lines[i]!.includes("↓"),
+          contentLineCount: i - 1,
+        };
         lines.splice(i, 1);
-        break;
+        return scroll.hiddenAbove || scroll.hiddenBelow ? scroll : null;
       }
     }
+
+    return null;
   }
 
   private frameInterior(
@@ -313,13 +340,15 @@ class RoundedEditor extends CustomEditor {
     width: number,
     innerWidth: number,
     border: BorderFn,
+    scroll: ScrollIndicators | null,
   ): void {
     if (width >= 3) {
-      const v = border("│");
+      const leftBorder = border("│");
       for (let i = 1; i < lines.length - 1; i++) {
         const line = lines[i]!;
         const pad = Math.max(0, innerWidth - visibleWidth(line));
-        lines[i] = `${v}${line}${" ".repeat(pad)}${v}`;
+        const rightBorder = border(getRightBorderGlyph(i - 1, scroll));
+        lines[i] = `${leftBorder}${line}${" ".repeat(pad)}${rightBorder}`;
       }
     }
   }
@@ -357,11 +386,11 @@ class RoundedEditor extends CustomEditor {
       }
     }
 
+    // Capture scroll state before replacing pi's borders
+    const scroll = this.removeSeparatorLine(lines, innerWidth);
+
     // Top line
     lines[0] = this.buildTopLine(width, cwd, border);
-
-    // Remove separator line when the editor is expanded
-    this.removeSeparatorLine(lines, innerWidth);
 
     // Bottom line
     lines.push(
@@ -381,7 +410,7 @@ class RoundedEditor extends CustomEditor {
     );
 
     // Left/right lines
-    this.frameInterior(lines, width, innerWidth, border);
+    this.frameInterior(lines, width, innerWidth, border, scroll);
 
     return lines.map((line) => truncateToWidth(line, Math.max(0, width), ""));
   }

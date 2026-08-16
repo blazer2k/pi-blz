@@ -1,6 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { formatTokens, getTotalUsage } from "./rounded-editor";
+import {
+  formatTokens,
+  getRightBorderGlyph,
+  getTotalUsage,
+} from "./rounded-editor";
 
 describe("getTotalUsage", () => {
   it("sums assistant usage from the active branch only", () => {
@@ -43,6 +47,24 @@ describe("getTotalUsage", () => {
       cacheWriteTokens: 1,
       totalCost: 0.25,
     });
+  });
+});
+
+describe("getRightBorderGlyph", () => {
+  const scroll = {
+    hiddenAbove: true,
+    hiddenBelow: true,
+    contentLineCount: 5,
+  };
+
+  it("marks hidden content at the top and bottom of the right border", () => {
+    expect(getRightBorderGlyph(0, scroll)).toBe("▲");
+    expect(getRightBorderGlyph(2, scroll)).toBe("│");
+    expect(getRightBorderGlyph(4, scroll)).toBe("▼");
+  });
+
+  it("renders a normal border without overflow", () => {
+    expect(getRightBorderGlyph(0, null)).toBe("│");
   });
 });
 
