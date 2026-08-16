@@ -7,6 +7,8 @@ type ToolRegistration = Parameters<ExtensionAPI["registerTool"]>[0];
 type BaseTool = {
   description: ToolRegistration["description"];
   parameters: ToolRegistration["parameters"];
+  prepareArguments?: ToolRegistration["prepareArguments"];
+  executionMode?: ToolRegistration["executionMode"];
   execute: NonNullable<ToolRegistration["execute"]>;
 };
 
@@ -43,6 +45,8 @@ export function registerPatchedTool(config: {
     promptSnippet: config.promptSnippet,
     promptGuidelines: config.promptGuidelines,
     parameters: config.tool.parameters,
+    prepareArguments: config.tool.prepareArguments,
+    executionMode: config.tool.executionMode,
     renderShell: "self",
     execute: config.execute ?? config.tool.execute,
     renderCall: config.renderCall,
