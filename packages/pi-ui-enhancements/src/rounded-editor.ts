@@ -26,6 +26,9 @@ function getRuntime(pi: ExtensionAPI): RoundedEditorRuntime {
   pi.on("agent_end", async () => {
     runtime.invalidateUsage?.();
   });
+  pi.on("session_tree", async () => {
+    runtime.invalidateUsage?.();
+  });
   runtimes.set(pi, runtime);
   return runtime;
 }
