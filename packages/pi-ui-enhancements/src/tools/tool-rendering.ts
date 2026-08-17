@@ -91,6 +91,21 @@ export function getResultSymbolColor(
   return "dim";
 }
 
+export function buildResultStatusParts(
+  state: BaseRenderState,
+  theme: Theme,
+  includeError = false,
+): string[] {
+  const parts: string[] = [];
+  if (includeError && state.isError) {
+    parts.push(theme.fg("error", "error"));
+  }
+  if (state.truncated) {
+    parts.push(theme.fg("warning", "truncated"));
+  }
+  return parts;
+}
+
 export function getStatusColor(
   isDone: boolean,
   state: BaseRenderState,
@@ -382,7 +397,9 @@ export function formatSimpleErrorResult(
     options,
     theme.fg("error", "..."),
   );
-  const lines = errorBody.text.split("\n");
+  const hasErrorBody = errorBody.text.length > 0;
+  const bodyText = hasErrorBody ? errorBody.text : "error";
+  const lines = bodyText.split("\n");
 
   const formatted = lines
     .map((line, index) => {
@@ -398,6 +415,27 @@ export function formatSimpleErrorResult(
     })
     .join("\n");
 
+  if (state.truncated) {
+    const status = buildResultStatusParts(state, theme, true).join(
+      theme.fg("muted", ", "),
+    );
+    if (options.expanded) {
+      return (
+        theme.fg(getResultSymbolColor(state), "├─ ") + status + "\n" + formatted
+      );
+    }
+
+    const suffix = errorBody.truncated ? buildHint(theme) : "";
+    return (
+      theme.fg(getResultSymbolColor(state), "└─ ") +
+      status +
+      (hasErrorBody
+        ? theme.fg("muted", ", ") + theme.fg("error", bodyText)
+        : "") +
+      suffix
+    );
+  }
+
   if (options.expanded) {
     return formatted;
   }
@@ -405,7 +443,7 @@ export function formatSimpleErrorResult(
   const suffix = errorBody.truncated ? buildHint(theme) : "";
   return (
     theme.fg(getResultSymbolColor(state), "└─ ") +
-    theme.fg("error", errorBody.text) +
+    theme.fg("error", bodyText) +
     suffix
   );
 }
@@ -644,11 +682,18 @@ export function formatListResult(
     );
   }
 
+  const details = result.details as Record<string, unknown> | undefined;
+  const truncation = details?.truncation as { truncated?: boolean } | undefined;
+  const isTruncated =
+    truncation?.truncated || config.details.extraTruncated?.(details ?? {});
+  const resultState = { ...state, truncated: isTruncated };
   const normalized = normalizeOutput(extractTextContent(result));
   if (normalized === "" || normalized === config.emptyMessage) {
+    const emptyParts = buildResultStatusParts(resultState, theme);
+    emptyParts.push(theme.fg("muted", config.emptyMessage));
     return (
       theme.fg(getResultSymbolColor(state), "└─ ") +
-      theme.fg("muted", config.emptyMessage)
+      emptyParts.join(theme.fg("toolOutput", ", "))
     );
   }
 
@@ -656,8 +701,8 @@ export function formatListResult(
   const total = items.length;
   const label = total === 1 ? config.singularLabel : config.pluralLabel;
 
-  const details = result.details as Record<string, unknown> | undefined;
-  const summaryParts: string[] = [`${total} ${label}`];
+  const summaryParts = buildResultStatusParts(resultState, theme);
+  summaryParts.push(theme.fg("toolOutput", `${total} ${label}`));
 
   if (
     config.details.limitKey &&
@@ -666,11 +711,6 @@ export function formatListResult(
     summaryParts.push(
       theme.fg("warning", `${details[config.details.limitKey]} limit`),
     );
-  }
-
-  const truncation = details?.truncation as { truncated?: boolean } | undefined;
-  if (truncation?.truncated || config.details.extraTruncated?.(details ?? {})) {
-    summaryParts.push(theme.fg("warning", "truncated"));
   }
 
   const summary = summaryParts.join(theme.fg("toolOutput", ", "));

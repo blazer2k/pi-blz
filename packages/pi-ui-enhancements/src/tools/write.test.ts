@@ -67,6 +67,29 @@ describe("write renderResult", () => {
     expect(output).toContain("to expand");
   });
 
+  it("puts truncation before line metadata when collapsed and expanded", () => {
+    const def = setupWriteTool();
+    const renderResult = def.renderResult!;
+    const theme = mkTheme();
+
+    for (const expanded of [false, true]) {
+      const ctx = mkToolCtx({
+        args: { path: "a.ts", content: "line1\nline2" },
+      });
+      const component = renderResult(
+        {
+          content: [{ type: "text", text: "wrote 2 lines" }],
+          details: { truncation: { truncated: true } },
+        },
+        { expanded, isPartial: false },
+        theme,
+        ctx,
+      );
+
+      expect(component.render(120).join("\n")).toContain("truncated, 2 lines");
+    }
+  });
+
   it("expanded result previews up to maxExpandedEntries lines", () => {
     const def = setupWriteTool();
     const renderResult = def.renderResult!;

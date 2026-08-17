@@ -9,6 +9,7 @@ import {
   type BaseRenderState,
   type ListResultConfig,
   buildHint,
+  buildResultStatusParts,
   clearBlinkTimers,
   countLines,
   extractTextContent,
@@ -16,6 +17,7 @@ import {
   formatListResult,
   formatSimpleErrorResult,
   getCallRenderParts,
+  getResultSymbolColor,
   getResultText,
   getStatusColor,
   normalizeOutput,
@@ -134,6 +136,27 @@ describe("formatSimpleErrorResult", () => {
     expect(output).toContain("└─");
     expect(output).toContain("something went wrong");
   });
+
+  it("puts error before truncation in collapsed and expanded results", () => {
+    const theme = mkTheme();
+    const state: BaseRenderState = { isError: true, truncated: true };
+
+    for (const options of [opts, optsExpanded]) {
+      const output = formatSimpleErrorResult(
+        "something went wrong",
+        state,
+        options,
+        theme,
+      );
+      expect(output).toContain("error, truncated");
+    }
+  });
+
+  it("labels empty errors", () => {
+    expect(
+      formatSimpleErrorResult("", { isError: true }, opts, mkTheme()),
+    ).toContain("└─ error");
+  });
 });
 
 describe("renderPath", () => {
@@ -204,6 +227,28 @@ describe("updateResultState", () => {
       isError: false,
     });
     expect(same).toBe(false);
+  });
+});
+
+describe("buildResultStatusParts", () => {
+  it("orders and colors statuses by connector precedence", () => {
+    const theme = {
+      ...mkTheme(),
+      fg: (color: string, text: string) => `${color}:${text}`,
+    } as Theme;
+
+    const combinedState = { isError: true, truncated: true };
+    expect(getResultSymbolColor(combinedState)).toBe("error");
+    expect(buildResultStatusParts(combinedState, theme, true)).toEqual([
+      "error:error",
+      "warning:truncated",
+    ]);
+
+    const truncatedState = { truncated: true };
+    expect(getResultSymbolColor(truncatedState)).toBe("warning");
+    expect(buildResultStatusParts(truncatedState, theme)).toEqual([
+      "warning:truncated",
+    ]);
   });
 });
 
@@ -364,6 +409,21 @@ describe("formatListResult", () => {
     expect(output).toContain("(empty)");
   });
 
+  it("puts truncation before an empty-result message", () => {
+    const output = formatListResult(
+      {
+        content: [{ type: "text", text: "(empty)" }],
+        details: { truncation: { truncated: true } },
+      },
+      { truncated: true },
+      opts,
+      mkTheme(),
+      baseConfig,
+    );
+
+    expect(output).toContain("truncated, (empty)");
+  });
+
   it("collapsed shows count and expand hint", () => {
     const theme = mkTheme();
     const state: BaseRenderState = {};
@@ -407,14 +467,17 @@ describe("formatListResult", () => {
     expect(output).toContain("1000 limit");
   });
 
-  it("marks truncation", () => {
+  it("puts truncation before count and limit metadata", () => {
     const theme = mkTheme();
     const state: BaseRenderState = {};
     const result = {
       content: [{ type: "text", text: "a.txt\nb.txt" }],
-      details: { truncation: { truncated: true } },
+      details: {
+        truncation: { truncated: true },
+        resultLimitReached: 1000,
+      },
     };
     const output = formatListResult(result, state, opts, theme, baseConfig);
-    expect(output).toContain("truncated");
+    expect(output).toContain("truncated, 2 files, 1000 limit");
   });
 });

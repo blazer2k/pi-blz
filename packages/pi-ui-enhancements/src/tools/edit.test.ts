@@ -73,7 +73,7 @@ describe("edit renderResult", () => {
     const component = renderResult(
       {
         content: [{ type: "text", text: "edited" }],
-        details: { diff },
+        details: { diff, truncation: { truncated: true } },
       },
       { expanded: false, isPartial: false },
       theme,
@@ -81,6 +81,7 @@ describe("edit renderResult", () => {
     );
 
     const output = component.render(120).join("\n");
+    expect(output).toContain("truncated, +2 -1");
     expect(output).toContain("+2");
     expect(output).toContain("-1");
     expect(output).toContain("to expand");

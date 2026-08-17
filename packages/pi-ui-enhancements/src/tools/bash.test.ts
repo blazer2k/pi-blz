@@ -76,6 +76,55 @@ describe("bash renderResult", () => {
     expect(output).toContain("took 1.2s");
   });
 
+  it("puts truncation before duration metadata", () => {
+    const def = setupBashTool();
+    const renderResult = def.renderResult!;
+    const theme = mkTheme();
+    const ctx = mkToolCtx();
+
+    const component = renderResult(
+      {
+        content: [{ type: "text", text: "hello" }],
+        details: {
+          durationMs: 50,
+          truncation: { truncated: true },
+        },
+      },
+      { expanded: false, isPartial: false },
+      theme,
+      ctx,
+    );
+
+    const output = component.render(120).join("\n");
+    expect(output).toContain("truncated, took 50ms");
+  });
+
+  it("keeps error before truncation in single-line and expanded errors", () => {
+    const def = setupBashTool();
+    const renderResult = def.renderResult!;
+    const theme = mkTheme();
+
+    for (const expanded of [false, true]) {
+      const ctx = mkToolCtx({ isError: true, expanded });
+      const component = renderResult(
+        {
+          content: [{ type: "text", text: "failure" }],
+          details: {
+            durationMs: 50,
+            truncation: { truncated: true },
+          },
+        },
+        { expanded, isPartial: false },
+        theme,
+        ctx,
+      );
+
+      expect(component.render(120).join("\n")).toContain(
+        "error, truncated, took 50ms",
+      );
+    }
+  });
+
   it("collapsed output shows last five lines", () => {
     const def = setupBashTool();
     const renderResult = def.renderResult!;
@@ -184,7 +233,10 @@ describe("bash renderResult", () => {
             ),
           },
         ],
-        details: { durationMs: 123 },
+        details: {
+          durationMs: 123,
+          truncation: { truncated: true },
+        },
       },
       { expanded: false, isPartial: false },
       theme,
@@ -192,8 +244,7 @@ describe("bash renderResult", () => {
     );
 
     const output = component.render(120).join("\n");
-    expect(output).toContain("took 123ms, error");
-    expect(output).toContain("3 more lines");
+    expect(output).toContain("error, truncated, took 123ms, 3 more lines");
     const lines = output.split("\n");
     expect(
       lines.some((l) => l.includes("│  line1") || l.includes("└─ line1")),

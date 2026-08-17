@@ -292,12 +292,37 @@ describe("patchCustomToolRendering", () => {
       mkToolCtx({ state }),
     );
 
-    expect(component.render(80).join("\n")).toContain("2 lines");
+    expect(component.render(80).join("\n")).toContain("truncated, 2 lines");
     expect(state).toEqual(
       expect.objectContaining({
         _uiEnhancements: expect.objectContaining({ truncated: true }),
       }),
     );
+    handle.dispose();
+  });
+
+  it("puts error and truncation before original custom result output", () => {
+    const tool = mkRegisteredTool("myTool");
+    tool.definition.renderResult = () => new Text("failure details", 0, 0);
+    proto.getAllRegisteredTools = function () {
+      return [tool];
+    };
+
+    const handle = patchCustomToolRendering();
+    const tools = (proto.getAllRegisteredTools as Function).call(
+      {} as any,
+    ) as Array<{ definition: ToolDefinition }>;
+    const component = tools[0]!.definition.renderResult!(
+      {
+        content: [{ type: "text", text: "failure details" }],
+        details: { truncation: { truncated: true } },
+      },
+      { expanded: false, isPartial: false },
+      mkTheme(),
+      mkToolCtx({ isError: true }),
+    );
+
+    expect(component.render(80).join("\n")).toContain("error, truncated");
     handle.dispose();
   });
 

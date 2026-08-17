@@ -26,6 +26,7 @@ import {
   type BaseRenderState,
   MAX_CALL_WIDTH,
   buildRenderResult,
+  buildResultStatusParts,
   countLines,
   extractTextContent,
   formatSimpleErrorResult,
@@ -182,16 +183,19 @@ function formatReadResult(
     }
   }
   const summary = parts.length > 0 ? parts.join(", ") : "no content";
-  const truncation = details?.truncation?.truncated
-    ? theme.fg("warning", "truncated")
-    : undefined;
-  const output = truncation
-    ? theme.fg("toolOutput", summary) +
-      theme.fg("toolOutput", ", ") +
-      truncation
-    : theme.fg("toolOutput", summary);
+  const metadataParts = buildResultStatusParts(
+    {
+      ...state,
+      truncated: details?.truncation?.truncated === true,
+    },
+    theme,
+  );
+  metadataParts.push(theme.fg("toolOutput", summary));
 
-  return theme.fg(getResultSymbolColor(state), "└─ ") + output;
+  return (
+    theme.fg(getResultSymbolColor(state), "└─ ") +
+    metadataParts.join(theme.fg("toolOutput", ", "))
+  );
 }
 
 export function patchReadTool(pi: ExtensionAPI): Handle {

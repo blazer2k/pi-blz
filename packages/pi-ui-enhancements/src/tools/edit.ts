@@ -17,6 +17,7 @@ import { TOOL_PROMPTS } from "./tool-prompts";
 import {
   buildHint,
   buildRenderResult,
+  buildResultStatusParts,
   extractTextContent,
   formatSimpleErrorResult,
   formatTreeLine,
@@ -61,11 +62,13 @@ function formatEditResult(
     );
   }
 
+  const metadataParts = buildResultStatusParts(state, theme);
   const diff = (result.details as EditToolDetails | undefined)?.diff;
   if (!diff) {
+    metadataParts.push(theme.fg("toolOutput", "no diff"));
     return (
       theme.fg(getResultSymbolColor(state), "└─ ") +
-      theme.fg("toolOutput", "no diff")
+      metadataParts.join(theme.fg("toolOutput", ", "))
     );
   }
 
@@ -79,26 +82,32 @@ function formatEditResult(
   }
 
   const stats = parts.join(" ");
+  if (stats) metadataParts.push(stats);
+  const metadata = metadataParts.join(theme.fg("toolOutput", ", "));
   const hint = buildHint(theme);
 
   if (!options.expanded) {
-    return theme.fg(getResultSymbolColor(state), "└─ ") + stats + hint;
+    return theme.fg(getResultSymbolColor(state), "└─ ") + metadata + hint;
   }
 
   const rendered = renderDiff(diff);
   const lines = rendered.split("\n");
-  return lines
-    .map((line, index) => {
-      const prefix = index === lines.length - 1 ? "└─ " : "│  ";
-      return formatTreeLine(line, {
-        theme,
-        state,
-        prefix,
-        width: MAX_CALL_WIDTH() - 1,
-        mode: "preserve",
-      }).text;
-    })
-    .join("\n");
+  const renderedLines = lines.map((line, index) => {
+    const prefix = index === lines.length - 1 ? "└─ " : "│  ";
+    return formatTreeLine(line, {
+      theme,
+      state,
+      prefix,
+      width: MAX_CALL_WIDTH() - 1,
+      mode: "preserve",
+    }).text;
+  });
+  if (state.truncated) {
+    renderedLines.unshift(
+      theme.fg(getResultSymbolColor(state), "├─ ") + metadata,
+    );
+  }
+  return renderedLines.join("\n");
 }
 
 export function patchEditTool(pi: ExtensionAPI): Handle {

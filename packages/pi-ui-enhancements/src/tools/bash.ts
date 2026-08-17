@@ -16,6 +16,7 @@ import {
   type BaseRenderState,
   MAX_CALL_WIDTH,
   buildHint,
+  buildResultStatusParts,
   countLines,
   extractTextContent,
   formatErrorBody,
@@ -70,11 +71,16 @@ function buildBashMetadataParts(
     callTruncated?: boolean;
     lineTruncated?: boolean;
     toolTruncated?: boolean;
+    isError?: boolean;
     expanded?: boolean;
   },
   theme: Theme,
 ): { parts: string[]; needsHint: boolean } {
-  const parts: string[] = [];
+  const parts = buildResultStatusParts(
+    { isError: args.isError, truncated: args.toolTruncated },
+    theme,
+    true,
+  );
   let needsHint = false;
 
   if (args.durationSummary) {
@@ -95,9 +101,6 @@ function buildBashMetadataParts(
   }
   if (args.lineTruncated) {
     needsHint = true;
-  }
-  if (args.toolTruncated) {
-    parts.push(theme.fg("warning", "truncated"));
   }
 
   return { parts, needsHint };
@@ -202,7 +205,16 @@ function formatBashResult(
     );
 
     if (options.expanded) {
-      const summary = durationSummary ? `${durationSummary}, error` : "error";
+      const { parts } = buildBashMetadataParts(
+        {
+          isError: true,
+          toolTruncated: details?.truncation?.truncated === true,
+          durationSummary,
+          expanded: true,
+        },
+        theme,
+      );
+      const summary = parts.join(theme.fg("muted", ", "));
       const outputLines = formatOutputLines(
         errorBody.text,
         theme,
@@ -216,7 +228,7 @@ function formatBashResult(
         theme.fg(
           getResultSymbolColor(state),
           outputLines.text ? "├─ " : "└─ ",
-        ) + theme.fg("error", summary),
+        ) + summary,
         outputLines.text,
       ]
         .filter((line): line is string => Boolean(line))
@@ -243,6 +255,7 @@ function formatBashResult(
       );
       const { parts, needsHint } = buildBashMetadataParts(
         {
+          isError: true,
           durationSummary,
           remainingLines,
           callTruncated: state.callTruncated,
@@ -252,11 +265,8 @@ function formatBashResult(
         },
         theme,
       );
-      const summaryParts = durationSummary
-        ? [parts[0]!, theme.fg("error", "error"), ...parts.slice(1)]
-        : [theme.fg("error", "error"), ...parts];
       const summary =
-        summaryParts.join(theme.fg("muted", ", ")) + (needsHint ? hint : "");
+        parts.join(theme.fg("muted", ", ")) + (needsHint ? hint : "");
 
       return [
         commandLine,
@@ -270,12 +280,22 @@ function formatBashResult(
         .join("\n");
     }
 
-    const prefix = durationSummary ? `${durationSummary}, ` : "";
-    const suffix = errorBody.truncated || state.callTruncated ? hint : "";
+    const { parts, needsHint } = buildBashMetadataParts(
+      {
+        isError: true,
+        toolTruncated: details?.truncation?.truncated === true,
+        durationSummary,
+        callTruncated: state.callTruncated,
+        lineTruncated: errorBody.truncated,
+        expanded: options.expanded,
+      },
+      theme,
+    );
+    if (errorBody.text) parts.push(theme.fg("error", errorBody.text));
     return (
       theme.fg(getResultSymbolColor(state), "└─ ") +
-      theme.fg("error", `${prefix}${errorBody.text}`) +
-      suffix
+      parts.join(theme.fg("muted", ", ")) +
+      (needsHint ? hint : "")
     );
   }
 

@@ -10,6 +10,7 @@ import {
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import {
   buildHint,
+  buildResultStatusParts,
   countLines,
   extractTextContent,
   formatSimpleErrorResult,
@@ -50,6 +51,9 @@ function formatWriteResult(
 
   const lines = countLines(args.content);
   const summary = `${lines} ${lines === 1 ? "line" : "lines"}`;
+  const metadataParts = buildResultStatusParts(state, theme);
+  metadataParts.push(theme.fg("toolOutput", summary));
+  const metadata = metadataParts.join(theme.fg("toolOutput", ", "));
 
   if (options.expanded) {
     const lang = getLanguageFromPath(args.path);
@@ -86,14 +90,16 @@ function formatWriteResult(
       );
     }
 
+    if (state.truncated) {
+      renderedLines.unshift(
+        theme.fg(getResultSymbolColor(state), "├─ ") + metadata,
+      );
+    }
+
     return renderedLines.join("\n");
   }
 
-  return (
-    theme.fg(getResultSymbolColor(state), "└─ ") +
-    theme.fg("toolOutput", summary) +
-    hint
-  );
+  return theme.fg(getResultSymbolColor(state), "└─ ") + metadata + hint;
 }
 
 export function patchWriteTool(pi: ExtensionAPI): Handle {
