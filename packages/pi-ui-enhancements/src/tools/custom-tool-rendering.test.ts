@@ -1,10 +1,13 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, beforeEach, afterEach } from "bun:test";
 import { ExtensionRunner } from "@earendil-works/pi-coding-agent";
 import type { Theme, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { patchCustomToolRendering } from "./custom-tool-rendering";
 import { clearBlinkTimers } from "./tool-rendering";
-import { saveConfig, getConfig } from "../config";
+import { getConfig, loadConfig, saveConfig } from "../config";
 import {
   cleanRunnerProto,
   mkTheme,
@@ -13,8 +16,28 @@ import {
   PROTOTYPE_PATCHED,
 } from "../test-helpers";
 
-beforeEach(cleanRunnerProto);
-afterEach(cleanRunnerProto);
+const originalConfigPath = process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH;
+let configDir: string;
+
+beforeEach(() => {
+  cleanRunnerProto();
+  configDir = mkdtempSync(join(tmpdir(), "pi-ui-custom-tools-"));
+  process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH = join(configDir, "settings.json");
+  loadConfig();
+  saveConfig("capitalizeToolNames", "false");
+});
+
+afterEach(() => {
+  cleanRunnerProto();
+  clearBlinkTimers();
+  rmSync(configDir, { recursive: true, force: true });
+  if (originalConfigPath === undefined) {
+    delete process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH;
+  } else {
+    process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH = originalConfigPath;
+  }
+  loadConfig();
+});
 
 const proto = ExtensionRunner.prototype as unknown as Record<
   string | symbol,
@@ -328,7 +351,6 @@ describe("patchCustomToolRendering", () => {
     expect(rendered).not.toContain("search");
 
     handle.dispose();
-    saveConfig("capitalizeToolNames", "false");
   });
 
   it("capitalizes with ANSI-styled original renderCall output", () => {
@@ -375,7 +397,6 @@ describe("patchCustomToolRendering", () => {
     expect(rendered).not.toContain("search");
 
     handle.dispose();
-    saveConfig("capitalizeToolNames", "false");
   });
 
   it("skips non-SGR and malformed escape sequences when capitalizing", () => {
@@ -402,7 +423,6 @@ describe("patchCustomToolRendering", () => {
     expect(rendered).toContain("Search");
 
     handle.dispose();
-    saveConfig("capitalizeToolNames", "false");
   });
 
   it("does not capitalize when config is disabled", () => {
