@@ -16,6 +16,7 @@ import {
   formatListResult,
   formatSimpleErrorResult,
   getCallRenderParts,
+  getResultText,
   getStatusColor,
   normalizeOutput,
   renderPath,
@@ -211,6 +212,43 @@ describe("buildHint", () => {
     const theme = mkTheme();
     const hint = buildHint(theme);
     expect(hint).toContain("to expand");
+  });
+});
+
+describe("tree-aware text wrapping", () => {
+  it("prefixes every wrapped result row and closes only the final row", () => {
+    const text = getResultText({}, optsExpanded, undefined);
+    text.setText(
+      "├─ summary\n└─ a long result line that wraps across several visual rows",
+    );
+
+    const lines = text
+      .render(28)
+      .map((line) => line.trimEnd().slice(1))
+      .filter(Boolean);
+
+    expect(lines.length).toBeGreaterThan(3);
+    expect(lines.every((line) => /^[├│└]/u.test(line))).toBe(true);
+    expect(lines.at(-1)).toStartWith("└─ ");
+  });
+
+  it("prefixes wrapped tree rows embedded in partial tool calls", () => {
+    const { text, prefix } = getCallRenderParts({}, mkTheme(), {
+      executionStarted: true,
+      isPartial: true,
+      invalidate: () => {},
+    });
+    text.setText(
+      `${prefix}Write file\n└─ a long preview line that wraps across visual rows`,
+    );
+
+    const lines = text
+      .render(28)
+      .map((line) => line.trimEnd().slice(1))
+      .filter(Boolean);
+
+    expect(lines.slice(1).every((line) => /^[│└]/u.test(line))).toBe(true);
+    clearBlinkTimers();
   });
 });
 

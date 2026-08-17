@@ -470,9 +470,7 @@ export function patchBashTool(pi: ExtensionAPI): Handle {
     },
     renderResult(result, options, theme, toolCtx) {
       const state = toolCtx.state as BashRenderState;
-      const text = getResultText(state, options, toolCtx.lastComponent, {
-        wrapTreeLines: true,
-      });
+      const text = getResultText(state, options, toolCtx.lastComponent);
 
       const details = result.details as BashToolDetails | undefined;
 

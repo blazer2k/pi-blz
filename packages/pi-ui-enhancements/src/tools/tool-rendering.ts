@@ -446,7 +446,7 @@ export function getCallRenderParts(
   },
   renderOptions?: { paddingX?: number; animate?: boolean },
 ): { text: Text; prefix: string; isDone: boolean } {
-  const text = new Text("", renderOptions?.paddingX ?? 1, 0);
+  const text = new TreeText(renderOptions?.paddingX ?? 1);
 
   const isDone =
     state.hasResult || (!toolCtx.executionStarted && !toolCtx.isPartial);
@@ -541,21 +541,15 @@ export function getResultText(
   state: BaseRenderState,
   options: ToolRenderResultOptions,
   lastComponent: unknown,
-  renderOptions?: { paddingX?: number; wrapTreeLines?: boolean },
+  renderOptions?: { paddingX?: number },
 ): Text {
   const paddingX = renderOptions?.paddingX ?? 1;
-  const wrapTreeLines = renderOptions?.wrapTreeLines ?? false;
   const previousText =
-    lastComponent instanceof Text ? lastComponent : undefined;
-  const hasCompatibleText = wrapTreeLines
-    ? previousText instanceof TreeText
-    : previousText !== undefined && !(previousText instanceof TreeText);
-  const createText = () =>
-    wrapTreeLines ? new TreeText(paddingX) : new Text("", paddingX, 0);
+    lastComponent instanceof TreeText ? lastComponent : undefined;
   const text =
-    state.expanded !== options.expanded || !hasCompatibleText
-      ? createText()
-      : previousText!;
+    state.expanded !== options.expanded || !previousText
+      ? new TreeText(paddingX)
+      : previousText;
 
   state.expanded = options.expanded;
   return text;
@@ -707,6 +701,7 @@ export function formatListResult(
         prefix,
         width: MAX_CALL_WIDTH() - 1,
         mode: "preserve",
+        color: "toolOutput",
       }).text,
     );
   });
