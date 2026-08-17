@@ -24,8 +24,19 @@ function hasTui(ctx: { hasUI: boolean; mode?: string }): boolean {
 export default function (pi: ExtensionAPI) {
   loadConfig();
   patchTools(pi);
+
+  const activeToolCallIds = new Set<string>();
+  const isToolCallActive = (toolCallId: string) =>
+    activeToolCallIds.has(toolCallId);
+  pi.on("tool_execution_start", async (event) => {
+    activeToolCallIds.add(event.toolCallId);
+  });
+  pi.on("tool_execution_end", async (event) => {
+    activeToolCallIds.delete(event.toolCallId);
+  });
+
   let customToolRenderingHandle: Handle | null = getConfig().patchCustomTools
-    ? patchCustomToolRendering()
+    ? patchCustomToolRendering(isToolCallActive)
     : null;
 
   let headerReregister: (() => void) | null = null;
@@ -34,7 +45,7 @@ export default function (pi: ExtensionAPI) {
 
   function syncCustomToolRenderingPatch() {
     if (getConfig().patchCustomTools && !customToolRenderingHandle) {
-      customToolRenderingHandle = patchCustomToolRendering();
+      customToolRenderingHandle = patchCustomToolRendering(isToolCallActive);
     } else if (!getConfig().patchCustomTools && customToolRenderingHandle) {
       customToolRenderingHandle.dispose();
       customToolRenderingHandle = null;
@@ -98,6 +109,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("session_shutdown", async () => {
+    activeToolCallIds.clear();
     clearBlinkTimers();
 
     for (const h of handles) {

@@ -411,7 +411,10 @@ function buildGenericResult(
   return rendered.join("\n");
 }
 
-function wrapDefinition<T extends ToolDefinition>(definition: T): T {
+function wrapDefinition<T extends ToolDefinition>(
+  definition: T,
+  isToolCallActive: (toolCallId: string) => boolean,
+): T {
   if (!shouldWrapTool(definition)) return definition;
 
   const proto = ExtensionRunner.prototype as PatchedRunnerPrototype;
@@ -428,7 +431,9 @@ function wrapDefinition<T extends ToolDefinition>(definition: T): T {
     renderShell: "self",
     renderCall(args, theme, toolCtx) {
       const state = getCustomState(toolCtx.state);
-      const { text, prefix } = getCallRenderParts(state, theme, toolCtx);
+      const { text, prefix } = getCallRenderParts(state, theme, toolCtx, {
+        animate: isToolCallActive(toolCtx.toolCallId),
+      });
       const cfg = getConfig();
 
       if (originalRenderCall) {
@@ -550,8 +555,11 @@ function wrapDefinition<T extends ToolDefinition>(definition: T): T {
   return wrapped as T;
 }
 
-function wrapRegisteredTool(tool: RegisteredTool): RegisteredTool {
-  const definition = wrapDefinition(tool.definition);
+function wrapRegisteredTool(
+  tool: RegisteredTool,
+  isToolCallActive: (toolCallId: string) => boolean,
+): RegisteredTool {
+  const definition = wrapDefinition(tool.definition, isToolCallActive);
   return definition === tool.definition ? tool : { ...tool, definition };
 }
 
@@ -575,7 +583,9 @@ function disposeCustomToolRenderingPatch(): void {
   delete current[PROTOTYPE_PATCHED];
 }
 
-export function patchCustomToolRendering(): Handle {
+export function patchCustomToolRendering(
+  isToolCallActive: (toolCallId: string) => boolean = () => false,
+): Handle {
   const proto = ExtensionRunner.prototype as PatchedRunnerPrototype;
 
   if (proto[PROTOTYPE_PATCHED]) {
@@ -607,7 +617,7 @@ export function patchCustomToolRendering(): Handle {
       if (!Array.isArray(tools)) {
         return tools;
       }
-      return tools.map(wrapRegisteredTool);
+      return tools.map((tool) => wrapRegisteredTool(tool, isToolCallActive));
     };
   proto[PATCHED_GET_ALL_TOOLS] = patchedGetAllRegisteredTools;
   proto.getAllRegisteredTools = patchedGetAllRegisteredTools;

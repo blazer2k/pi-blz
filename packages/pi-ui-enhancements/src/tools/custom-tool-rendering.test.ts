@@ -3,6 +3,7 @@ import { ExtensionRunner } from "@earendil-works/pi-coding-agent";
 import type { Theme, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { patchCustomToolRendering } from "./custom-tool-rendering";
+import { clearBlinkTimers } from "./tool-rendering";
 import { saveConfig, getConfig } from "../config";
 import {
   cleanRunnerProto,
@@ -200,6 +201,53 @@ describe("patchCustomToolRendering", () => {
     handle.dispose();
   });
 
+  it("does not schedule blink invalidation for wrapped custom calls", () => {
+    const tool = mkRegisteredTool("myTool");
+    proto.getAllRegisteredTools = function () {
+      return [tool];
+    };
+
+    const handle = patchCustomToolRendering();
+    const tools = (proto.getAllRegisteredTools as Function).call(
+      {} as any,
+    ) as Array<{ definition: ToolDefinition }>;
+    const state = {};
+
+    tools[0]!.definition.renderCall!(
+      {},
+      mkTheme(),
+      mkToolCtx({ state, isPartial: true, executionStarted: true }),
+    );
+
+    expect((state as any)._uiEnhancements.blinkTimer).toBeUndefined();
+    handle.dispose();
+  });
+
+  it("schedules blink invalidation only for active custom calls", () => {
+    const tool = mkRegisteredTool("myTool");
+    proto.getAllRegisteredTools = function () {
+      return [tool];
+    };
+
+    const handle = patchCustomToolRendering(
+      (toolCallId) => toolCallId === "call-1",
+    );
+    const tools = (proto.getAllRegisteredTools as Function).call(
+      {} as any,
+    ) as Array<{ definition: ToolDefinition }>;
+    const state = {};
+
+    tools[0]!.definition.renderCall!(
+      {},
+      mkTheme(),
+      mkToolCtx({ state, isPartial: true, executionStarted: true }),
+    );
+
+    expect((state as any)._uiEnhancements.blinkTimer).toBeDefined();
+    clearBlinkTimers();
+    handle.dispose();
+  });
+
   it("marks generic results truncated from tool details", () => {
     const tool = mkRegisteredTool("myTool");
     proto.getAllRegisteredTools = function () {
@@ -290,7 +338,9 @@ describe("patchCustomToolRendering", () => {
     tool.definition.label = "Web Search";
     tool.definition.renderCall = (_args, theme) =>
       new Text(
-        theme.fg("toolTitle", "search") + " " + theme.fg("accent", "latest news"),
+        theme.fg("toolTitle", "search") +
+          " " +
+          theme.fg("accent", "latest news"),
         0,
         0,
       );

@@ -265,6 +265,23 @@ describe("tool call blink rendering", () => {
     }
   });
 
+  it("renders a static pending state when animation is disabled", () => {
+    const state: BaseRenderState = {};
+    const { prefix } = getCallRenderParts(
+      state,
+      mkTheme(),
+      {
+        executionStarted: true,
+        isPartial: true,
+        invalidate: () => {},
+      },
+      { animate: false },
+    );
+
+    expect(prefix).toBe("○ ");
+    expect(state.blinkTimer).toBeUndefined();
+  });
+
   it("keeps error and truncation colors above blink status", () => {
     expect(getStatusColor(false, { isError: true }, true)).toBe("error");
     expect(getStatusColor(false, { truncated: true }, true)).toBe("warning");

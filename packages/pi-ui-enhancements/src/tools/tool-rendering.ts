@@ -438,18 +438,19 @@ export function getCallRenderParts(
     isPartial?: boolean;
     invalidate: () => void;
   },
-  paddingX = 1,
+  renderOptions?: { paddingX?: number; animate?: boolean },
 ): { text: Text; prefix: string; isDone: boolean } {
-  const text = new Text("", paddingX, 0);
+  const text = new Text("", renderOptions?.paddingX ?? 1, 0);
 
   const isDone =
     state.hasResult || (!toolCtx.executionStarted && !toolCtx.isPartial);
 
   // Capture blink phase once so renderCall and renderResult stay in sync
-  const blinkOn = isBlinkOn();
+  const animate = renderOptions?.animate ?? true;
+  const blinkOn = animate ? isBlinkOn() : false;
   state.blinkOn = blinkOn;
 
-  updateBlinkTimer(state, !isDone, toolCtx.invalidate);
+  updateBlinkTimer(state, animate && !isDone, toolCtx.invalidate);
 
   const prefix = theme.fg(
     getStatusColor(isDone, state, blinkOn),
