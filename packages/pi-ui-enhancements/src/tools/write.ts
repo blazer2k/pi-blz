@@ -90,11 +90,9 @@ function formatWriteResult(
       );
     }
 
-    if (state.truncated) {
-      renderedLines.unshift(
-        theme.fg(getResultSymbolColor(state), "├─ ") + metadata,
-      );
-    }
+    renderedLines.unshift(
+      theme.fg(getResultSymbolColor(state), "├─ ") + metadata,
+    );
 
     return renderedLines.join("\n");
   }

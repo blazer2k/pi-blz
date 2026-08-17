@@ -102,7 +102,7 @@ function formatEditResult(
       mode: "preserve",
     }).text;
   });
-  if (state.truncated) {
+  if (metadata) {
     renderedLines.unshift(
       theme.fg(getResultSymbolColor(state), "├─ ") + metadata,
     );

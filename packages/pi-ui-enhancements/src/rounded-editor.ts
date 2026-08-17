@@ -8,6 +8,7 @@ import {
 import type { EditorTheme, TUI } from "@earendil-works/pi-tui";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { getConfig } from "./config";
+import { shortenPath } from "./path-utils";
 import type { Handle } from "./types";
 
 type BorderFn = (c: string) => string;
@@ -213,9 +214,7 @@ class RoundedEditor extends CustomEditor {
       }
     }
 
-    let cwd = this.ctx.cwd;
-    const home = process.env.HOME ?? process.env.USERPROFILE;
-    if (home && cwd.startsWith(home)) cwd = `~${cwd.slice(home.length)}`;
+    let cwd = shortenPath(this.ctx.cwd);
 
     const branch = getConfig().roundedEditorShowBranch
       ? this.getGitBranch()

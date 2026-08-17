@@ -29,7 +29,6 @@ const GREP_CONFIG: ListResultConfig = {
   moreLabel: "more lines",
   details: {
     limitKey: "matchLimitReached",
-    extraTruncated: (d: GrepToolDetails) => d.linesTruncated === true,
   },
   preprocess: (text) => {
     const body = text.includes("\n\n[")

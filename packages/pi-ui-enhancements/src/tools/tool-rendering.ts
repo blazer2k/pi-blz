@@ -1,5 +1,4 @@
-import { homedir } from "node:os";
-import { isAbsolute, resolve, sep } from "node:path";
+import { isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   keyText,
@@ -17,6 +16,7 @@ import {
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
 import { getConfig } from "../config";
+import { shortenPath } from "../path-utils";
 
 export type BaseRenderState = {
   blinkTimer?: { invalidate: () => void };
@@ -35,6 +35,11 @@ export type BaseRenderState = {
   blinkOn?: boolean;
 };
 
+export type ResultStatusState = BaseRenderState & {
+  truncated: boolean;
+  isError: boolean;
+};
+
 export type ListResultConfig = {
   emptyMessage: string;
   singularLabel: string; // "entry" | "file" | "line"
@@ -42,7 +47,6 @@ export type ListResultConfig = {
   moreLabel: string; // "more entries" | "more files" | "more lines"
   details: {
     limitKey?: string; // "entryLimitReached" | "resultLimitReached" | "matchLimitReached"
-    extraTruncated?: (d: object) => boolean; // e.g. d => d.linesTruncated
   };
   preprocess: (text: string) => string[]; // split + optional notice stripping
   renderItem?: (item: string, theme: Theme) => string; // e.g. color directories
@@ -53,7 +57,7 @@ export type FormatResultFn = (
     content: Array<{ type: string; text?: string }>;
     details?: unknown;
   },
-  state: BaseRenderState,
+  state: ResultStatusState,
   options: ToolRenderResultOptions,
   theme: Theme,
 ) => string;
@@ -116,17 +120,6 @@ export function getStatusColor(
 
   if (!isDone) return blinkOn ? "success" : "dim";
   return "success";
-}
-
-function shortenPath(filePath: string): string {
-  const home = homedir();
-  const suffix = filePath.slice(home.length);
-  const isInsideHome =
-    filePath === home ||
-    (filePath.startsWith(home) &&
-      (suffix.startsWith(sep) || (sep === "\\" && suffix.startsWith("/"))));
-
-  return isInsideHome ? `~${suffix}` : filePath;
 }
 
 function truncatePathMiddle(filePath: string, maxWidth: number): string {
@@ -668,7 +661,7 @@ export function formatListResult(
     content: Array<{ type: string; text?: string }>;
     details?: unknown;
   },
-  state: BaseRenderState,
+  state: ResultStatusState,
   options: ToolRenderResultOptions,
   theme: Theme,
   config: ListResultConfig,
@@ -682,14 +675,11 @@ export function formatListResult(
     );
   }
 
+  // state.truncated is set by buildRenderResult before this runs
   const details = result.details as Record<string, unknown> | undefined;
-  const truncation = details?.truncation as { truncated?: boolean } | undefined;
-  const isTruncated =
-    truncation?.truncated || config.details.extraTruncated?.(details ?? {});
-  const resultState = { ...state, truncated: isTruncated };
   const normalized = normalizeOutput(extractTextContent(result));
   if (normalized === "" || normalized === config.emptyMessage) {
-    const emptyParts = buildResultStatusParts(resultState, theme);
+    const emptyParts = buildResultStatusParts(state, theme);
     emptyParts.push(theme.fg("muted", config.emptyMessage));
     return (
       theme.fg(getResultSymbolColor(state), "└─ ") +
@@ -701,7 +691,7 @@ export function formatListResult(
   const total = items.length;
   const label = total === 1 ? config.singularLabel : config.pluralLabel;
 
-  const summaryParts = buildResultStatusParts(resultState, theme);
+  const summaryParts = buildResultStatusParts(state, theme);
   summaryParts.push(theme.fg("toolOutput", `${total} ${label}`));
 
   if (
@@ -774,6 +764,7 @@ export function buildRenderResult(
           )?.truncation?.truncated === true,
       isError: toolCtx.isError,
     });
+    const resultState = state as ResultStatusState;
 
     invalidateIfChanged(changed, toolCtx.invalidate);
     const key = [
@@ -782,11 +773,11 @@ export function buildRenderResult(
       state.truncated ? "truncated" : "full",
     ].join(":");
     if (options.isPartial) {
-      text.setText(formatFn(result, state, options, theme));
+      text.setText(formatFn(result, resultState, options, theme));
     } else {
       text.setText(
         getCachedFormat(state, key, { result, theme }, () =>
-          formatFn(result, state, options, theme),
+          formatFn(result, resultState, options, theme),
         ),
       );
     }

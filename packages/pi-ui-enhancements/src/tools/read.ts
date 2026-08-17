@@ -10,7 +10,6 @@ import { getPackageDir } from "@earendil-works/pi-coding-agent";
 import type {
   ExtensionAPI,
   ToolRenderResultOptions,
-  ReadToolDetails,
   Theme,
   ReadToolInput,
 } from "@earendil-works/pi-coding-agent";
@@ -161,7 +160,6 @@ function formatReadResult(
   options: ToolRenderResultOptions,
   theme: Theme,
 ): string {
-  const details = result.details as ReadToolDetails | undefined;
   const hasImage = result.content.some((c) => c.type === "image");
   const textContent = extractTextContent(result);
 
@@ -183,13 +181,7 @@ function formatReadResult(
     }
   }
   const summary = parts.length > 0 ? parts.join(", ") : "no content";
-  const metadataParts = buildResultStatusParts(
-    {
-      ...state,
-      truncated: details?.truncation?.truncated === true,
-    },
-    theme,
-  );
+  const metadataParts = buildResultStatusParts(state, theme);
   metadataParts.push(theme.fg("toolOutput", summary));
 
   return (

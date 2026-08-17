@@ -8,6 +8,7 @@ import type {
 import {
   type BaseRenderState,
   type ListResultConfig,
+  type ResultStatusState,
   buildHint,
   buildResultStatusParts,
   clearBlinkTimers,
@@ -397,10 +398,16 @@ const baseConfig: ListResultConfig = {
   preprocess: (text) => text.split("\n").filter((l) => l.length > 0),
 };
 
+function resultStatusState(
+  overrides: Partial<ResultStatusState> = {},
+): ResultStatusState {
+  return { truncated: false, isError: false, ...overrides };
+}
+
 describe("formatListResult", () => {
   it("renders empty message", () => {
     const theme = mkTheme();
-    const state: BaseRenderState = {};
+    const state = resultStatusState();
     const result = {
       content: [{ type: "text", text: "(empty)" }],
     };
@@ -415,7 +422,7 @@ describe("formatListResult", () => {
         content: [{ type: "text", text: "(empty)" }],
         details: { truncation: { truncated: true } },
       },
-      { truncated: true },
+      resultStatusState({ truncated: true }),
       opts,
       mkTheme(),
       baseConfig,
@@ -426,7 +433,7 @@ describe("formatListResult", () => {
 
   it("collapsed shows count and expand hint", () => {
     const theme = mkTheme();
-    const state: BaseRenderState = {};
+    const state = resultStatusState();
     const result = {
       content: [{ type: "text", text: "a.txt\nb.txt\nc.txt" }],
     };
@@ -437,7 +444,7 @@ describe("formatListResult", () => {
 
   it("expanded renders first 20 items", () => {
     const theme = mkTheme();
-    const state: BaseRenderState = {};
+    const state = resultStatusState();
     const lines = Array.from({ length: 25 }, (_, i) => `file${i}.txt`).join(
       "\n",
     );
@@ -458,7 +465,7 @@ describe("formatListResult", () => {
 
   it("marks configured limit as warning", () => {
     const theme = mkTheme();
-    const state: BaseRenderState = {};
+    const state = resultStatusState();
     const result = {
       content: [{ type: "text", text: "a.txt\nb.txt" }],
       details: { resultLimitReached: 1000 },
@@ -469,15 +476,39 @@ describe("formatListResult", () => {
 
   it("puts truncation before count and limit metadata", () => {
     const theme = mkTheme();
-    const state: BaseRenderState = {};
+    const state = resultStatusState({ truncated: true });
     const result = {
       content: [{ type: "text", text: "a.txt\nb.txt" }],
-      details: {
-        truncation: { truncated: true },
-        resultLimitReached: 1000,
-      },
+      details: { resultLimitReached: 1000 },
     };
     const output = formatListResult(result, state, opts, theme, baseConfig);
     expect(output).toContain("truncated, 2 files, 1000 limit");
+  });
+
+  it("colors the connector from the same truncation state", () => {
+    const theme = {
+      ...mkTheme(),
+      fg: (color: string, text: string) => `${color}:${text}`,
+    } as Theme;
+
+    expect(
+      formatListResult(
+        { content: [{ type: "text", text: "a.txt" }] },
+        resultStatusState({ truncated: true }),
+        opts,
+        theme,
+        baseConfig,
+      ),
+    ).toContain("warning:└─ ");
+
+    expect(
+      formatListResult(
+        { content: [{ type: "text", text: "a.txt" }] },
+        resultStatusState(),
+        opts,
+        theme,
+        baseConfig,
+      ),
+    ).toContain("dim:└─ ");
   });
 });

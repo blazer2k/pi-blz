@@ -115,6 +115,7 @@ describe("write renderResult", () => {
     );
 
     const output = component.render(120).join("\n");
+    expect(output).toContain(`├─ ${totalLines} lines`);
     expect(output).toContain("L01");
     const lastVisible = String(maxEntries).padStart(2, "0");
     expect(output).toContain(`L${lastVisible}`);

@@ -208,7 +208,7 @@ function formatBashResult(
       const { parts } = buildBashMetadataParts(
         {
           isError: true,
-          toolTruncated: details?.truncation?.truncated === true,
+          toolTruncated: state.truncated === true,
           durationSummary,
           expanded: true,
         },
@@ -260,7 +260,7 @@ function formatBashResult(
           remainingLines,
           callTruncated: state.callTruncated,
           lineTruncated: outputLines.truncated,
-          toolTruncated: details?.truncation?.truncated === true,
+          toolTruncated: state.truncated === true,
           expanded: options.expanded,
         },
         theme,
@@ -283,7 +283,7 @@ function formatBashResult(
     const { parts, needsHint } = buildBashMetadataParts(
       {
         isError: true,
-        toolTruncated: details?.truncation?.truncated === true,
+        toolTruncated: state.truncated === true,
         durationSummary,
         callTruncated: state.callTruncated,
         lineTruncated: errorBody.truncated,
@@ -322,7 +322,7 @@ function formatBashResult(
       remainingLines,
       callTruncated: state.callTruncated,
       lineTruncated: outputLines.truncated,
-      toolTruncated: details?.truncation?.truncated === true,
+      toolTruncated: state.truncated === true,
       expanded: options.expanded,
     },
     theme,
@@ -351,7 +351,7 @@ function formatBashResult(
           durationSummary,
           callTruncated: state.callTruncated,
           lineTruncated: shouldTruncate,
-          toolTruncated: details?.truncation?.truncated === true,
+          toolTruncated: state.truncated === true,
           expanded: options.expanded,
         },
         theme,
