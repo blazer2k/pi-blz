@@ -1,5 +1,5 @@
 import { homedir } from "node:os";
-import { isAbsolute, resolve } from "node:path";
+import { isAbsolute, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   keyText,
@@ -103,9 +103,13 @@ export function getStatusColor(
 
 function shortenPath(filePath: string): string {
   const home = homedir();
-  return filePath === home || filePath.startsWith(`${home}/`)
-    ? `~${filePath.slice(home.length)}`
-    : filePath;
+  const suffix = filePath.slice(home.length);
+  const isInsideHome =
+    filePath === home ||
+    (filePath.startsWith(home) &&
+      (suffix.startsWith(sep) || (sep === "\\" && suffix.startsWith("/"))));
+
+  return isInsideHome ? `~${suffix}` : filePath;
 }
 
 function truncatePathMiddle(filePath: string, maxWidth: number): string {

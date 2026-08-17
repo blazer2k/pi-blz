@@ -1,3 +1,5 @@
+import { homedir } from "node:os";
+import { sep } from "node:path";
 import { describe, expect, it } from "bun:test";
 import type {
   Theme,
@@ -148,19 +150,30 @@ describe("renderPath", () => {
 
   it("shortens home directory paths", () => {
     const theme = mkTheme();
-    const home = process.env.HOME ?? "";
-    if (!home) return; // skip if HOME not set
-    const output = renderPath(`${home}/foo`, theme, "/cwd");
-    expect(output).toContain("~/foo");
+    const home = homedir();
+    const output = renderPath(`${home}${sep}foo`, theme, "/cwd");
+    expect(output).toContain(`~${sep}foo`);
+  });
+
+  it("supports forward slashes on Windows without treating backslashes as POSIX separators", () => {
+    const theme = mkTheme();
+    const home = homedir();
+
+    if (sep === "\\") {
+      expect(renderPath(`${home}/foo`, theme, "/cwd")).toContain("~/foo");
+    } else {
+      const siblingPath = `${home}\\foo`;
+      expect(renderPath(siblingPath, theme, "/cwd")).toContain(siblingPath);
+      expect(renderPath(siblingPath, theme, "/cwd")).not.toContain("~\\foo");
+    }
   });
 
   it("does not shorten paths that only share the home prefix", () => {
     const theme = mkTheme();
-    const home = process.env.HOME ?? "";
-    if (!home) return; // skip if HOME not set
-    const output = renderPath(`${home}2/foo`, theme, "/cwd");
-    expect(output).toContain(`${home}2/foo`);
-    expect(output).not.toContain("~2/foo");
+    const home = homedir();
+    const output = renderPath(`${home}2${sep}foo`, theme, "/cwd");
+    expect(output).toContain(`${home}2${sep}foo`);
+    expect(output).not.toContain(`~2${sep}foo`);
   });
 });
 
