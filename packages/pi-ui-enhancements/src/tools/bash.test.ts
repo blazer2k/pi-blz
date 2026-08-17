@@ -108,6 +108,40 @@ describe("bash renderResult", () => {
     expect(output).toContain("5 more lines");
   });
 
+  it("keeps tree prefixes on wrapped expanded output", () => {
+    const def = setupBashTool();
+    const renderResult = def.renderResult!;
+    const theme = mkTheme();
+    const ctx = mkToolCtx({ expanded: true });
+
+    const component = renderResult(
+      {
+        content: [
+          {
+            type: "text",
+            text: [
+              "first output line that wraps across several visual rows",
+              "second output line that also wraps across several visual rows",
+            ].join("\n"),
+          },
+        ],
+        details: { durationMs: 50 },
+      },
+      { expanded: true, isPartial: false },
+      theme,
+      ctx,
+    );
+
+    const lines = component
+      .render(36)
+      .map((line) => line.trimEnd().slice(1))
+      .filter(Boolean);
+
+    expect(lines.length).toBeGreaterThan(3);
+    expect(lines.every((line) => /^[├│└]/u.test(line))).toBe(true);
+    expect(lines.at(-1)).toStartWith("└─ ");
+  });
+
   it('error strips noisy "no output" prefix', () => {
     const def = setupBashTool();
     const renderResult = def.renderResult!;

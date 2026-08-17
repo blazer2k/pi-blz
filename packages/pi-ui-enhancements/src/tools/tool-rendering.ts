@@ -11,8 +11,10 @@ import {
   getCapabilities,
   hyperlink,
   visibleWidth,
+  sliceByColumn,
   Text,
   truncateToWidth,
+  wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
 import { getConfig } from "../config";
 
@@ -464,17 +466,96 @@ export function getCallRenderParts(
   return { text, prefix, isDone };
 }
 
+function wrapTreeText(text: string, width: number): string {
+  if (!text || width <= 3) return text;
+
+  return text
+    .split("\n")
+    .flatMap((line) => {
+      const lineWidth = visibleWidth(line);
+      if (lineWidth <= width) return [line];
+
+      const prefix = sliceByColumn(line, 0, 3);
+      const visiblePrefix = stripAnsi(prefix);
+      if (!/^[│├└][─ ] /u.test(visiblePrefix)) {
+        return wrapTextWithAnsi(line, width);
+      }
+
+      const content = sliceByColumn(line, 3, lineWidth - 3);
+      const chunks = wrapTextWithAnsi(content, Math.max(1, width - 3));
+      const continuationPrefix = prefix
+        .replace("├─ ", "│  ")
+        .replace("└─ ", "│  ");
+
+      return chunks.map((chunk, index) => {
+        const isLastChunk = index === chunks.length - 1;
+        const chunkPrefix =
+          visiblePrefix === "└─ "
+            ? isLastChunk
+              ? prefix
+              : continuationPrefix
+            : index === 0
+              ? prefix
+              : continuationPrefix;
+        return chunkPrefix + chunk;
+      });
+    })
+    .join("\n");
+}
+
+class TreeText extends Text {
+  private sourceText = "";
+  private renderedSource?: string;
+  private renderedWidth?: number;
+
+  constructor(private readonly horizontalPadding: number) {
+    super("", horizontalPadding, 0);
+  }
+
+  override setText(text: string): void {
+    if (text === this.sourceText) return;
+    this.sourceText = text;
+    this.renderedSource = undefined;
+    this.renderedWidth = undefined;
+  }
+
+  override render(width: number): string[] {
+    if (
+      this.renderedSource !== this.sourceText ||
+      this.renderedWidth !== width
+    ) {
+      super.setText(
+        wrapTreeText(
+          this.sourceText,
+          Math.max(1, width - this.horizontalPadding * 2),
+        ),
+      );
+      this.renderedSource = this.sourceText;
+      this.renderedWidth = width;
+    }
+    return super.render(width);
+  }
+}
+
 export function getResultText(
   state: BaseRenderState,
   options: ToolRenderResultOptions,
   lastComponent: unknown,
-  renderOptions?: { paddingX?: number },
+  renderOptions?: { paddingX?: number; wrapTreeLines?: boolean },
 ): Text {
   const paddingX = renderOptions?.paddingX ?? 1;
+  const wrapTreeLines = renderOptions?.wrapTreeLines ?? false;
+  const previousText =
+    lastComponent instanceof Text ? lastComponent : undefined;
+  const hasCompatibleText = wrapTreeLines
+    ? previousText instanceof TreeText
+    : previousText !== undefined && !(previousText instanceof TreeText);
+  const createText = () =>
+    wrapTreeLines ? new TreeText(paddingX) : new Text("", paddingX, 0);
   const text =
-    state.expanded !== options.expanded
-      ? new Text("", paddingX, 0)
-      : ((lastComponent as Text | undefined) ?? new Text("", paddingX, 0));
+    state.expanded !== options.expanded || !hasCompatibleText
+      ? createText()
+      : previousText!;
 
   state.expanded = options.expanded;
   return text;
