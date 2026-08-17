@@ -120,7 +120,8 @@ function getToolRenderingSettings(config: Config): SettingItem[] {
     {
       id: "capitalizeToolNames",
       label: "Capitalize tool names",
-      description: "Capitalize first letter of custom tool names (e.g. mcp → Mcp)",
+      description:
+        "Capitalize first letter of custom tool names (e.g. mcp → Mcp)",
       currentValue: String(config.capitalizeToolNames),
       values: ["false", "true"],
     },

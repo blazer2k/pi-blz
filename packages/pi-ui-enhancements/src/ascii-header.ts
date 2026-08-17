@@ -37,7 +37,7 @@ export interface AsciiHeaderData {
 }
 
 const PI_FONTS: Record<string, string[]> = {
-  "Greek": [
+  Greek: [
     "▄▄▄▄▄▄▄▄▄▄▄▄▄",
     " ███     ███  ",
     " ███     ███  ",

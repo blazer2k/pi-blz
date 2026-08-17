@@ -42,7 +42,7 @@ Run `/ui` in pi to open the settings menu.
 | Setting                | Description                                                                        |
 | ---------------------- | ---------------------------------------------------------------------------------- |
 | Enable ASCII header    | Show ASCII art header at session start                                             |
-| Header font            | Font for ASCII art header (19 figlet fonts + 2 bundled, default: Greek)           |
+| Header font            | Font for ASCII art header (19 figlet fonts + 2 bundled, default: Greek)            |
 | Header color           | Theme color of ASCII header (text, accent, dim)                                    |
 | Header alignment       | Horizontal alignment (left, center, right)                                         |
 | Show version           | Display pi version below ASCII header                                              |
