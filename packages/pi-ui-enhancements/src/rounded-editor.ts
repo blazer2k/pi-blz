@@ -296,7 +296,7 @@ class RoundedEditor extends CustomEditor {
       stats.push(theme.fg("accent", `W${formatTokens(cacheWriteTokens)}`));
     }
     if (cfg.roundedEditorShowCost && totalCost > 0) {
-      stats.push(theme.fg("accent", `$${totalCost.toFixed(1)}`));
+      stats.push(theme.fg("accent", `$${totalCost.toFixed(2)}`));
     }
     stats.push(coloredPct);
 
