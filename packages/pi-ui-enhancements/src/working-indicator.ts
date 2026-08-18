@@ -10,8 +10,9 @@ import { getConfig } from "./config";
 const LABEL = "Working";
 const INTERRUPT_MSG = "esc to interrupt";
 
-// 20 FPS
-const ANIM_INTERVAL_MS = 50;
+// 10 FPS - position is wall-clock based, so sweep speed is unchanged;
+// this only coarsens sampling to keep long-session frame costs down
+const ANIM_INTERVAL_MS = 100;
 
 type WorkingIndicatorAgentEndEvent = {
   messages: Array<{ role: string; stopReason?: string }>;
