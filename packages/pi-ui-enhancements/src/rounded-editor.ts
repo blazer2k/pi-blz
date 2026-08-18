@@ -1,4 +1,5 @@
 // Based on @aphotic/pi-flow-ux's border-status editor, stripped to the essentials.
+import type { Usage } from "@earendil-works/pi-ai";
 import {
   CustomEditor,
   type ExtensionAPI,
@@ -42,6 +43,9 @@ function getRuntime(pi: ExtensionAPI): RoundedEditorRuntime {
   pi.on("agent_end", async () => {
     runtime.invalidateUsage?.();
   });
+  pi.on("session_compact", async () => {
+    runtime.invalidateUsage?.();
+  });
   pi.on("session_tree", async () => {
     runtime.invalidateUsage?.();
   });
@@ -69,14 +73,25 @@ export function getTotalUsage(ctx: ExtensionContext): {
   let cacheWriteTokens = 0;
   let totalCost = 0;
 
-  for (const entry of ctx.sessionManager.getBranch()) {
-    if (entry.type === "message" && entry.message.role === "assistant") {
-      const usage = entry.message.usage;
-      inputTokens += usage.input;
-      outputTokens += usage.output;
-      cacheReadTokens += usage.cacheRead ?? 0;
-      cacheWriteTokens += usage.cacheWrite ?? 0;
-      totalCost += usage.cost?.total ?? 0;
+  const add = (usage: Usage | undefined) => {
+    if (!usage) return;
+    inputTokens += usage.input;
+    outputTokens += usage.output;
+    cacheReadTokens += usage.cacheRead ?? 0;
+    cacheWriteTokens += usage.cacheWrite ?? 0;
+    totalCost += usage.cost?.total ?? 0;
+  };
+
+  // Match pi's native session accounting
+  for (const entry of ctx.sessionManager.getEntries()) {
+    if (entry.type === "message") {
+      if (entry.message.role === "assistant") add(entry.message.usage);
+      else if (entry.message.role === "toolResult") add(entry.message.usage);
+    } else if (
+      (entry.type === "branch_summary" || entry.type === "compaction") &&
+      entry.usage
+    ) {
+      add(entry.usage);
     }
   }
 

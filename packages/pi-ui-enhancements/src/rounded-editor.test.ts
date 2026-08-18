@@ -7,45 +7,67 @@ import {
 } from "./rounded-editor";
 
 describe("getTotalUsage", () => {
-  it("sums assistant usage from the active branch only", () => {
-    const branchEntries = [
-      {
-        type: "message",
-        message: {
-          role: "assistant",
-          usage: {
-            input: 10,
-            output: 5,
-            cacheRead: 2,
-            cacheWrite: 1,
-            cost: { total: 0.25 },
-          },
-        },
-      },
-    ];
+  const usage = (
+    input: number,
+    output: number,
+    cost: number,
+    cacheRead = 0,
+    cacheWrite = 0,
+  ) => ({ input, output, cacheRead, cacheWrite, cost: { total: cost } });
+
+  it("sums usage from all session entries, not just the active branch", () => {
     const allEntries = [
-      ...branchEntries,
       {
         type: "message",
-        message: {
-          role: "assistant",
-          usage: { input: 1000, output: 1000, cost: { total: 99 } },
-        },
+        message: { role: "assistant", usage: usage(10, 5, 0.25, 2, 1) },
+      },
+      {
+        type: "message",
+        message: { role: "toolResult", usage: usage(1, 2, 0.5) },
+      },
+      { type: "compaction", usage: usage(3, 4, 0.125, 5) },
+      { type: "branch_summary", usage: usage(6, 7, 0.0625, 0, 8) },
+      // Entry outside the active branch (e.g. compacted or sibling history)
+      {
+        type: "message",
+        message: { role: "assistant", usage: usage(1000, 1000, 99) },
       },
     ];
     const ctx = {
       sessionManager: {
-        getBranch: () => branchEntries,
+        getBranch: () => allEntries.slice(0, 1),
         getEntries: () => allEntries,
       },
     } as unknown as ExtensionContext;
 
     expect(getTotalUsage(ctx)).toEqual({
-      inputTokens: 10,
-      outputTokens: 5,
-      cacheReadTokens: 2,
-      cacheWriteTokens: 1,
-      totalCost: 0.25,
+      inputTokens: 10 + 1 + 3 + 6 + 1000,
+      outputTokens: 5 + 2 + 4 + 7 + 1000,
+      cacheReadTokens: 2 + 5,
+      cacheWriteTokens: 1 + 8,
+      totalCost: 0.25 + 0.5 + 0.125 + 0.0625 + 99,
+    });
+  });
+
+  it("skips entries without usage", () => {
+    const allEntries = [
+      { type: "message", message: { role: "user", content: [] } },
+      { type: "message", message: { role: "toolResult" } },
+      { type: "compaction", summary: "" },
+      { type: "branch_summary", summary: "" },
+    ];
+    const ctx = {
+      sessionManager: {
+        getEntries: () => allEntries,
+      },
+    } as unknown as ExtensionContext;
+
+    expect(getTotalUsage(ctx)).toEqual({
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+      totalCost: 0,
     });
   });
 });
