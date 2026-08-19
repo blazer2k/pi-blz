@@ -1,5 +1,5 @@
 import {
-  createEditTool,
+  createEditToolDefinition,
   renderDiff,
   Theme,
   type EditToolDetails,
@@ -13,7 +13,6 @@ import {
   registerPatchedTool,
 } from "./tool-registration";
 import type { Handle } from "../types";
-import { TOOL_PROMPTS } from "./tool-prompts";
 import {
   buildHint,
   buildRenderResult,
@@ -111,15 +110,11 @@ function formatEditResult(
 }
 
 export function patchEditTool(pi: ExtensionAPI): Handle {
-  const tool = createCwdDeferredTool(createEditTool);
+  const tool = createCwdDeferredTool(createEditToolDefinition);
 
   return registerPatchedTool({
     pi,
     tool,
-    name: "edit",
-    label: "edit",
-    promptSnippet: TOOL_PROMPTS.edit.promptSnippet,
-    promptGuidelines: [...TOOL_PROMPTS.edit.promptGuidelines],
     renderCall(args, theme, toolCtx) {
       const state = toolCtx.state as BaseRenderState;
       const renderArgs = args as EditToolInput;

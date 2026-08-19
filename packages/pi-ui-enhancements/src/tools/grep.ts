@@ -3,10 +3,9 @@ import type {
   GrepToolDetails,
   GrepToolInput,
 } from "@earendil-works/pi-coding-agent";
-import { createGrepTool } from "@earendil-works/pi-coding-agent";
+import { createGrepToolDefinition } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { Handle } from "../types";
-import { TOOL_PROMPTS } from "./tool-prompts";
 import {
   createCwdDeferredTool,
   registerPatchedTool,
@@ -39,14 +38,11 @@ const GREP_CONFIG: ListResultConfig = {
 };
 
 export function patchGrepTool(pi: ExtensionAPI): Handle {
-  const tool = createCwdDeferredTool(createGrepTool);
+  const tool = createCwdDeferredTool(createGrepToolDefinition);
 
   return registerPatchedTool({
     pi,
     tool,
-    name: "grep",
-    label: "grep",
-    promptSnippet: TOOL_PROMPTS.grep.promptSnippet,
     renderCall(args, theme, toolCtx) {
       const state = toolCtx.state as BaseRenderState;
       const { text, prefix } = getCallRenderParts(state, theme, toolCtx);

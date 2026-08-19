@@ -4,10 +4,9 @@ import type {
   Theme,
   BashToolDetails,
 } from "@earendil-works/pi-coding-agent";
-import { createBashTool } from "@earendil-works/pi-coding-agent";
+import { createBashToolDefinition } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { Handle } from "../types";
-import { TOOL_PROMPTS } from "./tool-prompts";
 import {
   createCwdDeferredTool,
   registerPatchedTool,
@@ -37,7 +36,7 @@ import {
 const DURATION_UPDATE_INTERVAL_MS = 250;
 
 type BashToolInput = Parameters<
-  ReturnType<typeof createBashTool>["execute"]
+  ReturnType<typeof createBashToolDefinition>["execute"]
 >[1];
 
 type BashRenderState = BaseRenderState & {
@@ -413,14 +412,11 @@ function formatBashResult(
 }
 
 export function patchBashTool(pi: ExtensionAPI): Handle {
-  const tool = createCwdDeferredTool(createBashTool);
+  const tool = createCwdDeferredTool(createBashToolDefinition);
 
   return registerPatchedTool({
     pi,
     tool,
-    name: "bash",
-    label: "bash",
-    promptSnippet: TOOL_PROMPTS.bash.promptSnippet,
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const startedAt = Date.now();
       const result = await tool.execute(

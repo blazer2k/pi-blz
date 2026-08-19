@@ -13,10 +13,9 @@ import type {
   Theme,
   ReadToolInput,
 } from "@earendil-works/pi-coding-agent";
-import { createReadTool } from "@earendil-works/pi-coding-agent";
+import { createReadToolDefinition } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { Handle } from "../types";
-import { TOOL_PROMPTS } from "./tool-prompts";
 import {
   createCwdDeferredTool,
   registerPatchedTool,
@@ -191,15 +190,11 @@ function formatReadResult(
 }
 
 export function patchReadTool(pi: ExtensionAPI): Handle {
-  const tool = createCwdDeferredTool(createReadTool);
+  const tool = createCwdDeferredTool(createReadToolDefinition);
 
   return registerPatchedTool({
     pi,
     tool,
-    name: "read",
-    label: "read",
-    promptSnippet: TOOL_PROMPTS.read.promptSnippet,
-    promptGuidelines: [...TOOL_PROMPTS.read.promptGuidelines],
     renderCall(args, theme, toolCtx) {
       const state = toolCtx.state as BaseRenderState;
       const { text, prefix } = getCallRenderParts(state, theme, toolCtx);

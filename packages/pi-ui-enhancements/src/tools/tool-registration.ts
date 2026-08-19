@@ -1,22 +1,20 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ToolDefinition,
+} from "@earendil-works/pi-coding-agent";
 import type { Handle } from "../types";
 import { clearBlinkTimers } from "./tool-rendering";
 
-type ToolRegistration = Parameters<ExtensionAPI["registerTool"]>[0];
-
-type BaseTool = {
-  description: ToolRegistration["description"];
-  parameters: ToolRegistration["parameters"];
-  prepareArguments?: ToolRegistration["prepareArguments"];
-  executionMode?: ToolRegistration["executionMode"];
-  execute: NonNullable<ToolRegistration["execute"]>;
-};
+// Loose tool type: concrete tool definitions (with their own parameter,
+// details, and state generics) are all assignable to it, while any remains
+// bidirectional so renderers and execute keep working through it.
+type AnyToolDefinition = ToolDefinition<any, any, any>;
 
 export function createCwdDeferredTool(
-  createTool: (cwd: string) => BaseTool,
-): BaseTool {
+  createTool: (cwd: string) => AnyToolDefinition,
+): AnyToolDefinition {
   const meta = createTool(process.cwd());
-  const execute: BaseTool["execute"] = (
+  const execute: NonNullable<AnyToolDefinition["execute"]> = (
     toolCallId,
     params,
     signal,
@@ -27,26 +25,20 @@ export function createCwdDeferredTool(
   return { ...meta, execute };
 }
 
+/**
+ * Re-register a native tool with custom rendering. All native properties
+ * (description, parameters, prompt metadata, constrained sampling, ...) are
+ * kept as-is; only the renderers, and optionally execute, are replaced.
+ */
 export function registerPatchedTool(config: {
   pi: ExtensionAPI;
-  tool: BaseTool;
-  name: ToolRegistration["name"];
-  label: ToolRegistration["label"];
-  promptSnippet: NonNullable<ToolRegistration["promptSnippet"]>;
-  promptGuidelines?: ToolRegistration["promptGuidelines"];
-  execute?: ToolRegistration["execute"];
-  renderCall: NonNullable<ToolRegistration["renderCall"]>;
-  renderResult: NonNullable<ToolRegistration["renderResult"]>;
+  tool: AnyToolDefinition;
+  execute?: AnyToolDefinition["execute"];
+  renderCall: NonNullable<AnyToolDefinition["renderCall"]>;
+  renderResult: NonNullable<AnyToolDefinition["renderResult"]>;
 }): Handle {
   config.pi.registerTool({
-    name: config.name,
-    label: config.label,
-    description: config.tool.description,
-    promptSnippet: config.promptSnippet,
-    promptGuidelines: config.promptGuidelines,
-    parameters: config.tool.parameters,
-    prepareArguments: config.tool.prepareArguments,
-    executionMode: config.tool.executionMode,
+    ...config.tool,
     renderShell: "self",
     execute: config.execute ?? config.tool.execute,
     renderCall: config.renderCall,

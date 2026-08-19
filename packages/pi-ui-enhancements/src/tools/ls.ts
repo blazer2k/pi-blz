@@ -2,10 +2,9 @@ import type {
   ExtensionAPI,
   LsToolInput,
 } from "@earendil-works/pi-coding-agent";
-import { createLsTool } from "@earendil-works/pi-coding-agent";
+import { createLsToolDefinition } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { Handle } from "../types";
-import { TOOL_PROMPTS } from "./tool-prompts";
 import {
   createCwdDeferredTool,
   registerPatchedTool,
@@ -37,14 +36,11 @@ const LS_CONFIG: ListResultConfig = {
 };
 
 export function patchLsTool(pi: ExtensionAPI): Handle {
-  const tool = createCwdDeferredTool(createLsTool);
+  const tool = createCwdDeferredTool(createLsToolDefinition);
 
   return registerPatchedTool({
     pi,
     tool,
-    name: "ls",
-    label: "ls",
-    promptSnippet: TOOL_PROMPTS.ls.promptSnippet,
     renderCall(args, theme, toolCtx) {
       const state = toolCtx.state as BaseRenderState;
       const { text, prefix } = getCallRenderParts(state, theme, toolCtx);

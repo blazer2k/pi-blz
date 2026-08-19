@@ -2,10 +2,9 @@ import type {
   ExtensionAPI,
   FindToolInput,
 } from "@earendil-works/pi-coding-agent";
-import { createFindTool } from "@earendil-works/pi-coding-agent";
+import { createFindToolDefinition } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { Handle } from "../types";
-import { TOOL_PROMPTS } from "./tool-prompts";
 import {
   createCwdDeferredTool,
   registerPatchedTool,
@@ -36,14 +35,11 @@ const FIND_CONFIG: ListResultConfig = {
 };
 
 export function patchFindTool(pi: ExtensionAPI): Handle {
-  const tool = createCwdDeferredTool(createFindTool);
+  const tool = createCwdDeferredTool(createFindToolDefinition);
 
   return registerPatchedTool({
     pi,
     tool,
-    name: "find",
-    label: "find",
-    promptSnippet: TOOL_PROMPTS.find.promptSnippet,
     renderCall(args, theme, toolCtx) {
       const state = toolCtx.state as BaseRenderState;
       const { text, prefix } = getCallRenderParts(state, theme, toolCtx);

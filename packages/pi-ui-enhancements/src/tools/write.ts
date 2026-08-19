@@ -1,5 +1,5 @@
 import {
-  createWriteTool,
+  createWriteToolDefinition,
   Theme,
   highlightCode,
   getLanguageFromPath,
@@ -28,7 +28,6 @@ import {
   type BaseRenderState,
 } from "./tool-rendering";
 import type { Handle } from "../types";
-import { TOOL_PROMPTS } from "./tool-prompts";
 import {
   createCwdDeferredTool,
   registerPatchedTool,
@@ -101,15 +100,11 @@ function formatWriteResult(
 }
 
 export function patchWriteTool(pi: ExtensionAPI): Handle {
-  const tool = createCwdDeferredTool(createWriteTool);
+  const tool = createCwdDeferredTool(createWriteToolDefinition);
 
   return registerPatchedTool({
     pi,
     tool,
-    name: "write",
-    label: "write",
-    promptSnippet: TOOL_PROMPTS.write.promptSnippet,
-    promptGuidelines: [...TOOL_PROMPTS.write.promptGuidelines],
     renderCall(args, theme, toolCtx) {
       const state = toolCtx.state as BaseRenderState;
       const renderArgs = args as WriteToolInput;
