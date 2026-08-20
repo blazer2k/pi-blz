@@ -104,6 +104,30 @@ export function getTotalUsage(ctx: ExtensionContext): {
   };
 }
 
+type FooterTheme = { fg(color: string, text: string): string };
+
+// Mirrors pi's native footer: sort by key, strip line/tabs/CR, collapse and
+// trim spaces, then truncate to the terminal width. Keeps the line safe for
+// the TUI's one-string-per-row rendering contract.
+export function formatStatusLine(
+  statuses: ReadonlyMap<string, string>,
+  width: number,
+  theme: FooterTheme,
+): string[] {
+  if (statuses.size === 0) return [];
+  const parts = [...statuses.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, text]) =>
+      text
+        .replace(/[\r\n\t]/g, " ")
+        .replace(/ +/g, " ")
+        .trim(),
+    )
+    .filter((text) => text !== "");
+  if (parts.length === 0) return [];
+  return ["", truncateToWidth(parts.join(" "), width, theme.fg("dim", "..."))];
+}
+
 export function registerRoundedEditor(
   pi: ExtensionAPI,
   ctx: ExtensionContext,
@@ -129,7 +153,7 @@ export function registerRoundedEditor(
 
   // Render only extension statuses. The rounded editor already displays model,
   // context, cost, cwd, and branch info, so pi's default footer would duplicate it.
-  ctx.ui.setFooter((tui, _theme, footerData) => {
+  ctx.ui.setFooter((tui, theme, footerData) => {
     footerOwned = true;
     requestRender = () => tui.requestRender();
     gitBranchProvider = () => footerData.getGitBranch();
@@ -139,10 +163,8 @@ export function registerRoundedEditor(
     });
 
     return {
-      render(_width: number): string[] {
-        if (statuses.size === 0) return [];
-        const line = [...statuses.values()].join(" ");
-        return ["", line];
+      render(width: number): string[] {
+        return formatStatusLine(statuses, width, theme);
       },
       invalidate() {},
       dispose() {

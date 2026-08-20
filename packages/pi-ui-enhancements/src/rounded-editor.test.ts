@@ -1,10 +1,13 @@
 import { describe, expect, it } from "bun:test";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
+  formatStatusLine,
   formatTokens,
   getRightBorderGlyph,
   getTotalUsage,
 } from "./rounded-editor";
+
+const footerTheme = { fg: (_color: string, text: string) => text };
 
 describe("getTotalUsage", () => {
   const usage = (
@@ -109,5 +112,59 @@ describe("formatTokens", () => {
   it("formats millions with one decimal", () => {
     expect(formatTokens(1500000)).toBe("1.5M");
     expect(formatTokens(9900000)).toBe("9.9M");
+  });
+});
+
+describe("formatStatusLine", () => {
+  it("returns no lines when there are no statuses", () => {
+    expect(formatStatusLine(new Map(), 80, footerTheme)).toEqual([]);
+  });
+
+  it("sorts statuses by key and joins them on a single line", () => {
+    const statuses = new Map([
+      ["br", "branch"],
+      ["alpha", "first"],
+    ]);
+    expect(formatStatusLine(statuses, 80, footerTheme)).toEqual([
+      "",
+      "first branch",
+    ]);
+  });
+
+  it("strips newlines, tabs and carriage returns, and collapses spaces", () => {
+    const statuses = new Map([
+      ["b", "x\ty"],
+      ["a", "line1\nline2"],
+      ["c", "a  b"],
+    ]);
+    expect(formatStatusLine(statuses, 80, footerTheme)).toEqual([
+      "",
+      "line1 line2 x y a b",
+    ]);
+  });
+
+  it("drops statuses that are only whitespace", () => {
+    expect(
+      formatStatusLine(
+        new Map([
+          ["a", " \n	 "],
+          ["b", "ok"],
+        ]),
+        80,
+        footerTheme,
+      ),
+    ).toEqual(["", "ok"]);
+    expect(formatStatusLine(new Map([["a", " \n	 "]]), 80, footerTheme)).toEqual(
+      [],
+    );
+  });
+
+  it("truncates the joined line to the terminal width", () => {
+    const statuses = new Map([["a", "hello world"]]);
+    // truncateToWidth appends ANSI resets around the truncation point
+    expect(formatStatusLine(statuses, 5, footerTheme)).toEqual([
+      "",
+      "he\u001b[0m...\u001b[0m",
+    ]);
   });
 });
