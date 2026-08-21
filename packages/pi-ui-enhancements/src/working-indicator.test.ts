@@ -18,9 +18,12 @@ function mkIndicatorHarness() {
   } as unknown as ExtensionAPI;
 
   let notifyCount = 0;
+  let lastFrames: string[] | null = null;
   const ctx = {
     ui: {
-      setWorkingIndicator: () => {},
+      setWorkingIndicator: (options?: { frames: string[] }) => {
+        lastFrames = options?.frames ?? null;
+      },
       setWorkingMessage: () => {},
       notify: () => {
         notifyCount++;
@@ -33,7 +36,13 @@ function mkIndicatorHarness() {
     },
   } as unknown as ExtensionContext;
 
-  return { pi, ctx, handlers, getNotifyCount: () => notifyCount };
+  return {
+    pi,
+    ctx,
+    handlers,
+    getNotifyCount: () => notifyCount,
+    getLastFrames: () => lastFrames,
+  };
 }
 
 describe("assembleRunDuration", () => {
@@ -59,29 +68,133 @@ describe("assembleRunDuration", () => {
   });
 });
 
+function emitAssistantMessageEnd(
+  handlers: Record<string, Array<(...args: any[]) => void>>,
+  stopReason: string,
+) {
+  handlers.message_end![0]!({
+    type: "message_end",
+    message: { role: "assistant", stopReason },
+  });
+}
+
 describe("registerWorkingIndicator", () => {
-  it("does not reuse stale start time after a run ends", () => {
+  it("notifies on agent_settled after a clean run", () => {
     const { pi, ctx, handlers, getNotifyCount } = mkIndicatorHarness();
     const handle = registerWorkingIndicator(pi, ctx);
 
     handlers.agent_start![0]!();
-    handlers.agent_end![0]!({
-      messages: [{ role: "assistant", stopReason: "stop" }],
-    });
-    handlers.agent_end![0]!({
-      messages: [{ role: "assistant", stopReason: "stop" }],
-    });
+    emitAssistantMessageEnd(handlers, "stop");
+    expect(getNotifyCount()).toBe(0);
+    handlers.agent_settled![0]!({ type: "agent_settled" });
 
     expect(getNotifyCount()).toBe(1);
     handle.dispose();
   });
 
-  it("handles missing agent_end messages defensively", () => {
+  it("handles missing message_end payload defensively", () => {
     const { pi, ctx, handlers, getNotifyCount } = mkIndicatorHarness();
     const handle = registerWorkingIndicator(pi, ctx);
 
     handlers.agent_start![0]!();
-    expect(() => handlers.agent_end![0]!({})).not.toThrow();
+    expect(() => handlers.message_end![0]!({})).not.toThrow();
+    handlers.agent_settled![0]!({ type: "agent_settled" });
+
+    expect(getNotifyCount()).toBe(0);
+    handle.dispose();
+  });
+
+  it("hides the indicator when the run settles", () => {
+    const { pi, ctx, handlers, getLastFrames } = mkIndicatorHarness();
+    const handle = registerWorkingIndicator(pi, ctx);
+
+    handlers.agent_start![0]!();
+    expect(getLastFrames()!.join("\n")).toContain("Working");
+    handlers.agent_settled![0]!({ type: "agent_settled" });
+
+    expect(getLastFrames()).toEqual([]);
+    handle.dispose();
+  });
+});
+
+describe("working indicator across auto-compaction", () => {
+  it("keeps the total running time across a compaction split", async () => {
+    const { pi, ctx, handlers, getLastFrames } = mkIndicatorHarness();
+    const handle = registerWorkingIndicator(pi, ctx);
+
+    handlers.agent_start![0]!();
+    await Bun.sleep(1100);
+    handlers["session_before_compact"]![0]!({
+      type: "session_before_compact",
+      reason: "threshold",
+    });
+    handlers.agent_start![0]!();
+
+    expect(getLastFrames()!.join("\n")).toContain("1s");
+    handle.dispose();
+  });
+
+  it("keeps the indicator lit through the compaction gap", () => {
+    const { pi, ctx, handlers, getLastFrames } = mkIndicatorHarness();
+    const handle = registerWorkingIndicator(pi, ctx);
+
+    handlers.agent_start![0]!();
+    handlers["session_before_compact"]![0]!({
+      type: "session_before_compact",
+      reason: "threshold",
+    });
+
+    expect(getLastFrames()!.join("\n")).toContain("Working");
+    handle.dispose();
+  });
+
+  it("resets the timer for a new task after compaction", async () => {
+    const { pi, ctx, handlers, getLastFrames } = mkIndicatorHarness();
+    const handle = registerWorkingIndicator(pi, ctx);
+
+    handlers.agent_start![0]!();
+    await Bun.sleep(1100);
+    handlers["session_before_compact"]![0]!({
+      type: "session_before_compact",
+      reason: "threshold",
+    });
+    handlers.input![0]!({
+      type: "input",
+      text: "next task",
+      source: "interactive",
+    });
+    handlers.agent_start![0]!();
+
+    expect(getLastFrames()!.join("\n")).toContain("0s");
+    handle.dispose();
+  });
+
+  it("notifies once at final settle across a compaction split", () => {
+    const { pi, ctx, handlers, getNotifyCount } = mkIndicatorHarness();
+    const handle = registerWorkingIndicator(pi, ctx);
+
+    handlers.agent_start![0]!();
+    emitAssistantMessageEnd(handlers, "stop");
+    handlers["session_before_compact"]![0]!({
+      type: "session_before_compact",
+      reason: "threshold",
+    });
+    handlers.agent_start![0]!();
+    emitAssistantMessageEnd(handlers, "stop");
+    expect(getNotifyCount()).toBe(0);
+    handlers.agent_settled![0]!({ type: "agent_settled" });
+
+    expect(getNotifyCount()).toBe(1);
+    handle.dispose();
+  });
+
+  it("does not notify for aborted runs", () => {
+    const { pi, ctx, handlers, getNotifyCount } = mkIndicatorHarness();
+    const handle = registerWorkingIndicator(pi, ctx);
+
+    handlers.agent_start![0]!();
+    emitAssistantMessageEnd(handlers, "aborted");
+    handlers.agent_settled![0]!({ type: "agent_settled" });
 
     expect(getNotifyCount()).toBe(0);
     handle.dispose();

@@ -14,13 +14,17 @@ const INTERRUPT_MSG = "esc to interrupt";
 // this only coarsens sampling to keep long-session frame costs down
 const ANIM_INTERVAL_MS = 100;
 
-type WorkingIndicatorAgentEndEvent = {
-  messages: Array<{ role: string; stopReason?: string }>;
+type WorkingIndicatorAssistantMessage = {
+  role: string;
+  stopReason?: string;
 };
 
 type WorkingIndicatorSession = {
   start(): void;
-  end(event: WorkingIndicatorAgentEndEvent): void;
+  noteMessageEnd(message: WorkingIndicatorAssistantMessage | undefined): void;
+  noteCompaction(): void;
+  noteInput(): void;
+  settle(): void;
   dispose(): void;
 };
 
@@ -38,8 +42,19 @@ function getRuntime(pi: ExtensionAPI): WorkingIndicatorRuntime {
   pi.on("agent_start", async () => {
     runtime.current?.start();
   });
-  pi.on("agent_end", async (event) => {
-    runtime.current?.end(event as WorkingIndicatorAgentEndEvent);
+  pi.on("message_end", async (event: { message?: unknown }) => {
+    runtime.current?.noteMessageEnd(
+      event.message as WorkingIndicatorAssistantMessage | undefined,
+    );
+  });
+  pi.on("session_before_compact", async () => {
+    runtime.current?.noteCompaction();
+  });
+  pi.on("input", async () => {
+    runtime.current?.noteInput();
+  });
+  pi.on("agent_settled", async () => {
+    runtime.current?.settle();
   });
   runtimes.set(pi, runtime);
   return runtime;
@@ -112,65 +127,88 @@ export function registerWorkingIndicator(
     stopAnimation();
   }
 
-  function startAnimation(): void {
-    if (animTimer) return;
-    ctx.ui.setWorkingMessage("");
+  function renderFrame(): void {
+    const cfg = getConfig();
+    const theme = resolveTheme(ctx);
+    const shimmered = shimmerText(
+      LABEL,
+      theme.baseRgb,
+      theme.highlightRgb,
+      ctx.ui.theme,
+    );
+    const suffixParts: string[] = [];
 
-    function renderFrame(): void {
-      const cfg = getConfig();
-      const theme = resolveTheme(ctx);
-      const shimmered = shimmerText(
-        LABEL,
-        theme.baseRgb,
-        theme.highlightRgb,
-        ctx.ui.theme,
-      );
-      const suffixParts: string[] = [];
-
-      if (runStartTime > 0 && cfg.workingIndicatorShowDuration) {
-        suffixParts.push(assembleRunDuration(runStartTime));
-      }
-
-      if (cfg.workingIndicatorShowInterruptMsg) {
-        suffixParts.push(INTERRUPT_MSG);
-      }
-
-      const frames = [
-        shimmered +
-          (suffixParts.length > 0
-            ? ctx.ui.theme.fg("dim", ` (${suffixParts.join(" • ")})`)
-            : ""),
-      ];
-
-      ctx.ui.setWorkingIndicator({
-        frames,
-        intervalMs: ANIM_INTERVAL_MS,
-      });
+    if (runStartTime > 0 && cfg.workingIndicatorShowDuration) {
+      suffixParts.push(assembleRunDuration(runStartTime));
     }
 
+    if (cfg.workingIndicatorShowInterruptMsg) {
+      suffixParts.push(INTERRUPT_MSG);
+    }
+
+    const frames = [
+      shimmered +
+        (suffixParts.length > 0
+          ? ctx.ui.theme.fg("dim", ` (${suffixParts.join(" • ")})`)
+          : ""),
+    ];
+
+    ctx.ui.setWorkingIndicator({
+      frames,
+      intervalMs: ANIM_INTERVAL_MS,
+    });
+  }
+
+  function startAnimation(): void {
+    // Always render immediately so a state change is visible even when
+    // the interval from a previous run is still active.
+    ctx.ui.setWorkingMessage("");
     renderFrame();
+    if (animTimer) return;
     animTimer = setInterval(renderFrame, ANIM_INTERVAL_MS);
   }
 
+  let compactionPending = false;
+  let lastStopReason: string | undefined;
+
   const session: WorkingIndicatorSession = {
     start() {
-      runStartTime = Date.now();
+      // A compaction split continues the same task, so keep the original
+      // start time and let the compaction gap count toward the total.
+      if (!compactionPending) runStartTime = Date.now();
+      compactionPending = false;
       startAnimation();
     },
-    end(event) {
+    noteMessageEnd(message) {
+      if (message?.role === "assistant") lastStopReason = message.stopReason;
+    },
+    noteCompaction() {
+      // A mid-run compaction sets this too, but the running timer is
+      // already correct; noteInput() clears any stale mark before the
+      // next task starts.
+      compactionPending = true;
+    },
+    noteInput() {
+      // New user input starts a new task: drop task-bound state.
+      compactionPending = false;
+      lastStopReason = undefined;
+    },
+    settle() {
+      // agent_settled fires only when no retry, compaction, or queued
+      // continuation will run, so this is the true end of the task.
       const startedAt = runStartTime;
       runStartTime = 0;
       stopIndicator();
 
-      if (startedAt > 0 && getConfig().workingIndicatorShowDuration) {
-        const messages = Array.isArray(event.messages) ? event.messages : [];
-        const lastAssistant = [...messages]
-          .reverse()
-          .find((m) => m.role === "assistant");
-        if (lastAssistant?.stopReason === "stop") {
-          ctx.ui.notify(`Worked for ${assembleRunDuration(startedAt)}`);
-        }
+      if (
+        startedAt > 0 &&
+        lastStopReason === "stop" &&
+        getConfig().workingIndicatorShowDuration
+      ) {
+        ctx.ui.notify(`Worked for ${assembleRunDuration(startedAt)}`);
       }
+      lastStopReason = undefined;
+      compactionPending = false;
     },
     dispose() {
       if (runtime.current === session) {
