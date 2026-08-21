@@ -41,6 +41,23 @@ describe("write renderCall", () => {
     expect(text).toContain("b.ts");
     expect(text).toContain("3 lines");
   });
+
+  it("expanded partial call without path still previews content", () => {
+    const def = setupWriteTool();
+    const renderCall = def.renderCall!;
+    const theme = mkTheme();
+    const ctx = mkToolCtx({ isPartial: true, expanded: true });
+
+    const component = renderCall(
+      { content: "line1\nline2\nline3" },
+      theme,
+      ctx,
+    );
+
+    const text = component.render(120).join("\n");
+    expect(text).toContain("3 lines");
+    expect(text).toContain("line1");
+  });
 });
 
 describe("write renderResult", () => {

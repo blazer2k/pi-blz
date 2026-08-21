@@ -53,7 +53,7 @@ function formatWriteResult(
   const metadata = metadataParts.join(theme.fg("toolOutput", ", "));
 
   if (options.expanded) {
-    const lang = getLanguageFromPath(args.path);
+    const lang = args.path ? getLanguageFromPath(args.path) : undefined;
     const maxPreviewLines = MAX_EXPANDED_ENTRIES();
     const previewLineCount = Number.isFinite(maxPreviewLines)
       ? maxPreviewLines
@@ -62,10 +62,14 @@ function formatWriteResult(
       .split("\n")
       .slice(0, previewLineCount)
       .join("\n");
-    const highlightedLines = highlightCode(
-      previewText.endsWith("\n") ? previewText.slice(0, -1) : previewText,
-      lang,
-    );
+    const previewBase = previewText.endsWith("\n")
+      ? previewText.slice(0, -1)
+      : previewText;
+    // highlightCode falls back to pi's global theme proxy when no language
+    // matches, so color unhighlighted lines with the injected theme instead.
+    const highlightedLines = lang
+      ? highlightCode(previewBase, lang)
+      : previewBase.split("\n").map((line) => theme.fg("mdCodeBlock", line));
     const remainingLines = Math.max(0, lines - previewLineCount);
 
     const renderedLines = highlightedLines.map((line, index) => {
