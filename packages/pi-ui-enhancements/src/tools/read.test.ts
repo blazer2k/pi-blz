@@ -112,7 +112,7 @@ describe("read renderResult", () => {
     );
 
     const output = component.render(120).join("\n");
-    expect(output).toContain("truncated, 2 lines");
+    expect(output).toContain("truncated • 2 lines");
   });
 
   it("reports no content when empty", () => {

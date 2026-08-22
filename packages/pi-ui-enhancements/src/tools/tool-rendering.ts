@@ -389,7 +389,7 @@ export function formatSimpleErrorResult(
 
   const formatted = lines
     .map((line, index) => {
-      const prefix = index === lines.length - 1 ? "└─ " : "│  ";
+      const prefix = index === lines.length - 1 ? "╰─ " : "│  ";
       return formatTreeLine(line, {
         theme,
         state,
@@ -403,7 +403,7 @@ export function formatSimpleErrorResult(
 
   if (state.truncated) {
     const status = buildResultStatusParts(state, theme, true).join(
-      theme.fg("muted", ", "),
+      theme.fg("muted", " • "),
     );
     if (options.expanded) {
       return (
@@ -413,10 +413,10 @@ export function formatSimpleErrorResult(
 
     const suffix = errorBody.truncated ? buildHint(theme) : "";
     return (
-      theme.fg(getResultSymbolColor(state), "└─ ") +
+      theme.fg(getResultSymbolColor(state), "╰─ ") +
       status +
       (hasErrorBody
-        ? theme.fg("muted", ", ") + theme.fg("error", bodyText)
+        ? theme.fg("muted", " • ") + theme.fg("error", bodyText)
         : "") +
       suffix
     );
@@ -428,7 +428,7 @@ export function formatSimpleErrorResult(
 
   const suffix = errorBody.truncated ? buildHint(theme) : "";
   return (
-    theme.fg(getResultSymbolColor(state), "└─ ") +
+    theme.fg(getResultSymbolColor(state), "╰─ ") +
     theme.fg("error", bodyText) +
     suffix
   );
@@ -439,7 +439,7 @@ export function formatTreeLine(
   options: {
     theme: Theme;
     state: BaseRenderState;
-    prefix: "│  " | "├─ " | "└─ ";
+    prefix: "│  " | "├─ " | "╰─ ";
     width: number;
     mode: "truncate" | "preserve";
     color?: "toolOutput" | "error" | "muted";
@@ -501,7 +501,7 @@ function wrapTreeText(text: string, width: number): string {
 
       const prefix = sliceByColumn(line, 0, 3);
       const visiblePrefix = stripAnsi(prefix);
-      if (!/^[│├└][─ ] /u.test(visiblePrefix)) {
+      if (!/^[│├╰][─ ] /u.test(visiblePrefix)) {
         return wrapTextWithAnsi(line, width);
       }
 
@@ -509,12 +509,12 @@ function wrapTreeText(text: string, width: number): string {
       const chunks = wrapTextWithAnsi(content, Math.max(1, width - 3));
       const continuationPrefix = prefix
         .replace("├─ ", "│  ")
-        .replace("└─ ", "│  ");
+        .replace("╰─ ", "│  ");
 
       return chunks.map((chunk, index) => {
         const isLastChunk = index === chunks.length - 1;
         const chunkPrefix =
-          visiblePrefix === "└─ "
+          visiblePrefix === "╰─ "
             ? isLastChunk
               ? prefix
               : continuationPrefix
@@ -638,8 +638,8 @@ export function formatListResult(
     const emptyParts = buildResultStatusParts(state, theme);
     emptyParts.push(theme.fg("muted", config.emptyMessage));
     return (
-      theme.fg(getResultSymbolColor(state), "└─ ") +
-      emptyParts.join(theme.fg("toolOutput", ", "))
+      theme.fg(getResultSymbolColor(state), "╰─ ") +
+      emptyParts.join(theme.fg("toolOutput", " • "))
     );
   }
 
@@ -659,11 +659,11 @@ export function formatListResult(
     );
   }
 
-  const summary = summaryParts.join(theme.fg("toolOutput", ", "));
+  const summary = summaryParts.join(theme.fg("toolOutput", " • "));
 
   if (!options.expanded) {
     return (
-      theme.fg(getResultSymbolColor(state), "└─ ") +
+      theme.fg(getResultSymbolColor(state), "╰─ ") +
       theme.fg("toolOutput", summary) +
       buildHint(theme)
     );
@@ -678,7 +678,7 @@ export function formatListResult(
 
   visible.forEach((item, index) => {
     const isLast = index === visible.length - 1 && remaining === 0;
-    const prefix: "│  " | "└─ " = isLast ? "└─ " : "│  ";
+    const prefix: "│  " | "╰─ " = isLast ? "╰─ " : "│  ";
     const rendered = config.renderItem ? config.renderItem(item, theme) : item;
     lines.push(
       formatTreeLine(rendered, {
@@ -694,7 +694,7 @@ export function formatListResult(
 
   if (remaining > 0) {
     lines.push(
-      theme.fg(getResultSymbolColor(state), "└─ ") +
+      theme.fg(getResultSymbolColor(state), "╰─ ") +
         theme.fg("muted", `${remaining} ${config.moreLabel}`),
     );
   }

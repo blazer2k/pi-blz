@@ -96,7 +96,7 @@ describe("bash renderResult", () => {
     );
 
     const output = component.render(120).join("\n");
-    expect(output).toContain("truncated, took 50ms");
+    expect(output).toContain("truncated • took 50ms");
   });
 
   it("keeps error before truncation in single-line and expanded errors", () => {
@@ -120,7 +120,7 @@ describe("bash renderResult", () => {
       );
 
       expect(component.render(120).join("\n")).toContain(
-        "error, truncated, took 50ms",
+        "error • truncated • took 50ms",
       );
     }
   });
@@ -153,7 +153,7 @@ describe("bash renderResult", () => {
     expect(output).not.toContain("L01");
     expect(output).not.toContain("L05");
     expect(output).toContain("│  L06");
-    expect(output).toContain("└─ L10");
+    expect(output).toContain("╰─ L10");
     expect(output).toContain("5 more lines");
   });
 
@@ -187,8 +187,8 @@ describe("bash renderResult", () => {
       .filter(Boolean);
 
     expect(lines.length).toBeGreaterThan(3);
-    expect(lines.every((line) => /^[├│└]/u.test(line))).toBe(true);
-    expect(lines.at(-1)).toStartWith("└─ ");
+    expect(lines.every((line) => /^[├│╰]/u.test(line))).toBe(true);
+    expect(lines.at(-1)).toStartWith("╰─ ");
   });
 
   it('error strips noisy "no output" prefix', () => {
@@ -244,16 +244,16 @@ describe("bash renderResult", () => {
     );
 
     const output = component.render(120).join("\n");
-    expect(output).toContain("error, truncated, took 123ms, 3 more lines");
+    expect(output).toContain("error • truncated • took 123ms • 3 more lines");
     const lines = output.split("\n");
     expect(
-      lines.some((l) => l.includes("│  line1") || l.includes("└─ line1")),
+      lines.some((l) => l.includes("│  line1") || l.includes("╰─ line1")),
     ).toBe(false);
     expect(
-      lines.some((l) => l.includes("│  line3") || l.includes("└─ line3")),
+      lines.some((l) => l.includes("│  line3") || l.includes("╰─ line3")),
     ).toBe(false);
     expect(output).toContain("│  line4");
-    expect(output).toContain("└─ line8");
+    expect(output).toContain("╰─ line8");
   });
 });
 

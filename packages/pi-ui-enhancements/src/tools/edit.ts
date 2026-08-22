@@ -66,8 +66,8 @@ function formatEditResult(
   if (!diff) {
     metadataParts.push(theme.fg("toolOutput", "no diff"));
     return (
-      theme.fg(getResultSymbolColor(state), "└─ ") +
-      metadataParts.join(theme.fg("toolOutput", ", "))
+      theme.fg(getResultSymbolColor(state), "╰─ ") +
+      metadataParts.join(theme.fg("toolOutput", " • "))
     );
   }
 
@@ -82,17 +82,17 @@ function formatEditResult(
 
   const stats = parts.join(" ");
   if (stats) metadataParts.push(stats);
-  const metadata = metadataParts.join(theme.fg("toolOutput", ", "));
+  const metadata = metadataParts.join(theme.fg("toolOutput", " • "));
   const hint = buildHint(theme);
 
   if (!options.expanded) {
-    return theme.fg(getResultSymbolColor(state), "└─ ") + metadata + hint;
+    return theme.fg(getResultSymbolColor(state), "╰─ ") + metadata + hint;
   }
 
   const rendered = renderDiff(diff);
   const lines = rendered.split("\n");
   const renderedLines = lines.map((line, index) => {
-    const prefix = index === lines.length - 1 ? "└─ " : "│  ";
+    const prefix = index === lines.length - 1 ? "╰─ " : "│  ";
     return formatTreeLine(line, {
       theme,
       state,

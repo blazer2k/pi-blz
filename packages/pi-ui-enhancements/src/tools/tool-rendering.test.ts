@@ -134,7 +134,7 @@ describe("formatSimpleErrorResult", () => {
       opts,
       theme,
     );
-    expect(output).toContain("└─");
+    expect(output).toContain("╰─");
     expect(output).toContain("something went wrong");
   });
 
@@ -149,14 +149,14 @@ describe("formatSimpleErrorResult", () => {
         options,
         theme,
       );
-      expect(output).toContain("error, truncated");
+      expect(output).toContain("error • truncated");
     }
   });
 
   it("labels empty errors", () => {
     expect(
       formatSimpleErrorResult("", { isError: true }, opts, mkTheme()),
-    ).toContain("└─ error");
+    ).toContain("╰─ error");
   });
 });
 
@@ -265,7 +265,7 @@ describe("tree-aware text wrapping", () => {
   it("prefixes every wrapped result row and closes only the final row", () => {
     const text = getResultText({}, optsExpanded, undefined);
     text.setText(
-      "├─ summary\n└─ a long result line that wraps across several visual rows",
+      "├─ summary\n╰─ a long result line that wraps across several visual rows",
     );
 
     const lines = text
@@ -274,8 +274,8 @@ describe("tree-aware text wrapping", () => {
       .filter(Boolean);
 
     expect(lines.length).toBeGreaterThan(3);
-    expect(lines.every((line) => /^[├│└]/u.test(line))).toBe(true);
-    expect(lines.at(-1)).toStartWith("└─ ");
+    expect(lines.every((line) => /^[├│╰]/u.test(line))).toBe(true);
+    expect(lines.at(-1)).toStartWith("╰─ ");
   });
 
   it("prefixes wrapped tree rows embedded in partial tool calls", () => {
@@ -285,7 +285,7 @@ describe("tree-aware text wrapping", () => {
       invalidate: () => {},
     });
     text.setText(
-      `${prefix}Write file\n└─ a long preview line that wraps across visual rows`,
+      `${prefix}Write file\n╰─ a long preview line that wraps across visual rows`,
     );
 
     const lines = text
@@ -293,7 +293,7 @@ describe("tree-aware text wrapping", () => {
       .map((line) => line.trimEnd().slice(1))
       .filter(Boolean);
 
-    expect(lines.slice(1).every((line) => /^[│└]/u.test(line))).toBe(true);
+    expect(lines.slice(1).every((line) => /^[│╰]/u.test(line))).toBe(true);
     clearBlinkTimers();
   });
 });
@@ -412,7 +412,7 @@ describe("formatListResult", () => {
       content: [{ type: "text", text: "(empty)" }],
     };
     const output = formatListResult(result, state, opts, theme, baseConfig);
-    expect(output).toContain("└─");
+    expect(output).toContain("╰─");
     expect(output).toContain("(empty)");
   });
 
@@ -428,7 +428,7 @@ describe("formatListResult", () => {
       baseConfig,
     );
 
-    expect(output).toContain("truncated, (empty)");
+    expect(output).toContain("truncated • (empty)");
   });
 
   it("collapsed shows count and expand hint", () => {
@@ -482,7 +482,7 @@ describe("formatListResult", () => {
       details: { resultLimitReached: 1000 },
     };
     const output = formatListResult(result, state, opts, theme, baseConfig);
-    expect(output).toContain("truncated, 2 files, 1000 limit");
+    expect(output).toContain("truncated • 2 files • 1000 limit");
   });
 
   it("colors the connector from the same truncation state", () => {
@@ -499,7 +499,7 @@ describe("formatListResult", () => {
         theme,
         baseConfig,
       ),
-    ).toContain("warning:└─ ");
+    ).toContain("warning:╰─ ");
 
     expect(
       formatListResult(
@@ -509,6 +509,6 @@ describe("formatListResult", () => {
         theme,
         baseConfig,
       ),
-    ).toContain("dim:└─ ");
+    ).toContain("dim:╰─ ");
   });
 });

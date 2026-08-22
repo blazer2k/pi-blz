@@ -179,13 +179,13 @@ function formatReadResult(
       parts.push("Image");
     }
   }
-  const summary = parts.length > 0 ? parts.join(", ") : "no content";
+  const summary = parts.length > 0 ? parts.join(" • ") : "no content";
   const metadataParts = buildResultStatusParts(state, theme);
   metadataParts.push(theme.fg("toolOutput", summary));
 
   return (
-    theme.fg(getResultSymbolColor(state), "└─ ") +
-    metadataParts.join(theme.fg("toolOutput", ", "))
+    theme.fg(getResultSymbolColor(state), "╰─ ") +
+    metadataParts.join(theme.fg("toolOutput", " • "))
   );
 }
 

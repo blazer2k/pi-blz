@@ -220,7 +220,7 @@ describe("patchCustomToolRendering", () => {
     const nonEmpty = rendered.filter((line) => line.trim().length > 0);
 
     expect(nonEmpty).toHaveLength(1);
-    expect(nonEmpty[0]!.trim()).toBe("└─ 10 results");
+    expect(nonEmpty[0]!.trim()).toBe("╰─ 10 results");
     handle.dispose();
   });
 
@@ -292,7 +292,7 @@ describe("patchCustomToolRendering", () => {
       mkToolCtx({ state }),
     );
 
-    expect(component.render(80).join("\n")).toContain("truncated, 2 lines");
+    expect(component.render(80).join("\n")).toContain("truncated • 2 lines");
     expect(state).toEqual(
       expect.objectContaining({
         _uiEnhancements: expect.objectContaining({ truncated: true }),
@@ -322,7 +322,7 @@ describe("patchCustomToolRendering", () => {
       mkToolCtx({ isError: true }),
     );
 
-    expect(component.render(80).join("\n")).toContain("error, truncated");
+    expect(component.render(80).join("\n")).toContain("error • truncated");
     handle.dispose();
   });
 

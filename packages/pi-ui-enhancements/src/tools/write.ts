@@ -50,7 +50,7 @@ function formatWriteResult(
   const summary = `${lines} ${lines === 1 ? "line" : "lines"}`;
   const metadataParts = buildResultStatusParts(state, theme);
   metadataParts.push(theme.fg("toolOutput", summary));
-  const metadata = metadataParts.join(theme.fg("toolOutput", ", "));
+  const metadata = metadataParts.join(theme.fg("toolOutput", " • "));
 
   if (options.expanded) {
     const lang = args.path ? getLanguageFromPath(args.path) : undefined;
@@ -74,7 +74,7 @@ function formatWriteResult(
 
     const renderedLines = highlightedLines.map((line, index) => {
       const isLastLine = index === highlightedLines.length - 1;
-      const prefix = remainingLines === 0 && isLastLine ? "└─ " : "│  ";
+      const prefix = remainingLines === 0 && isLastLine ? "╰─ " : "│  ";
       return formatTreeLine(line, {
         theme,
         state,
@@ -86,7 +86,7 @@ function formatWriteResult(
 
     if (remainingLines > 0) {
       renderedLines.push(
-        theme.fg(getResultSymbolColor(state), "└─ ") +
+        theme.fg(getResultSymbolColor(state), "╰─ ") +
           theme.fg("muted", `${remainingLines} more lines`),
       );
     }
@@ -98,7 +98,7 @@ function formatWriteResult(
     return renderedLines.join("\n");
   }
 
-  return theme.fg(getResultSymbolColor(state), "└─ ") + metadata + hint;
+  return theme.fg(getResultSymbolColor(state), "╰─ ") + metadata + hint;
 }
 
 export function patchWriteTool(pi: ExtensionAPI): Handle {

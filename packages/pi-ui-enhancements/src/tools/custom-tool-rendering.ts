@@ -366,8 +366,8 @@ function buildGenericResult(
     const metadataParts = buildResultStatusParts(state, theme);
     metadataParts.push(theme.fg("muted", "(no output)"));
     return (
-      theme.fg(getResultSymbolColor(state), "└─ ") +
-      metadataParts.join(theme.fg("toolOutput", ", "))
+      theme.fg(getResultSymbolColor(state), "╰─ ") +
+      metadataParts.join(theme.fg("toolOutput", " • "))
     );
   }
 
@@ -377,10 +377,10 @@ function buildGenericResult(
   const summary = `${total} ${total === 1 ? "line" : "lines"}`;
   const metadataParts = buildResultStatusParts(state, theme);
   metadataParts.push(theme.fg("toolOutput", summary));
-  const metadata = metadataParts.join(theme.fg("toolOutput", ", "));
+  const metadata = metadataParts.join(theme.fg("toolOutput", " • "));
 
   if (!options.expanded) {
-    return theme.fg(getResultSymbolColor(state), "└─ ") + metadata + hint;
+    return theme.fg(getResultSymbolColor(state), "╰─ ") + metadata + hint;
   }
 
   const visible = lines.slice(0, MAX_EXPANDED_ENTRIES());
@@ -395,7 +395,7 @@ function buildGenericResult(
       formatTreeLine(line, {
         theme,
         state,
-        prefix: isLast ? "└─ " : "│  ",
+        prefix: isLast ? "╰─ " : "│  ",
         width: MAX_CALL_WIDTH() - 1,
         mode: "preserve",
       }).text,
@@ -404,7 +404,7 @@ function buildGenericResult(
 
   if (remaining > 0) {
     rendered.push(
-      theme.fg(getResultSymbolColor(state), "└─ ") +
+      theme.fg(getResultSymbolColor(state), "╰─ ") +
         theme.fg("muted", `${remaining} more lines`),
     );
   }
@@ -539,20 +539,20 @@ function wrapDefinition<T extends ToolDefinition>(
           const metadataParts = buildResultStatusParts(state, theme);
           metadataParts.push(theme.fg("muted", "(no output)"));
           text.setText(
-            theme.fg(getResultSymbolColor(state), "└─ ") +
-              metadataParts.join(theme.fg("toolOutput", ", ")),
+            theme.fg(getResultSymbolColor(state), "╰─ ") +
+              metadataParts.join(theme.fg("toolOutput", " • ")),
           );
         }
         return text;
       }
 
       const renderedLines = innerLines.map((line, index) => {
-        const prefix = index === innerLines.length - 1 ? "└─ " : "│  ";
+        const prefix = index === innerLines.length - 1 ? "╰─ " : "│  ";
         return theme.fg(getResultSymbolColor(state), prefix) + line;
       });
       if (state.truncated) {
         const status = buildResultStatusParts(state, theme, true).join(
-          theme.fg("muted", ", "),
+          theme.fg("muted", " • "),
         );
         renderedLines.unshift(
           theme.fg(getResultSymbolColor(state), "├─ ") + status,

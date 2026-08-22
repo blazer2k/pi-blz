@@ -144,7 +144,7 @@ function formatOutputLines(
   let truncated = false;
   const lines = output.split("\n");
   const renderedLines = lines.map((line, index) => {
-    const prefix = closeLastLine && index === lines.length - 1 ? "└─ " : "│  ";
+    const prefix = closeLastLine && index === lines.length - 1 ? "╰─ " : "│  ";
     const rendered = formatTreeLine(line, {
       theme,
       state,
@@ -211,7 +211,7 @@ function formatBashResult(
         },
         theme,
       );
-      const summary = parts.join(theme.fg("muted", ", "));
+      const summary = parts.join(theme.fg("muted", " • "));
       const outputLines = formatOutputLines(
         errorBody.text,
         theme,
@@ -224,7 +224,7 @@ function formatBashResult(
         commandLine,
         theme.fg(
           getResultSymbolColor(state),
-          outputLines.text ? "├─ " : "└─ ",
+          outputLines.text ? "├─ " : "╰─ ",
         ) + summary,
         outputLines.text,
       ]
@@ -263,13 +263,13 @@ function formatBashResult(
         theme,
       );
       const summary =
-        parts.join(theme.fg("muted", ", ")) + (needsHint ? hint : "");
+        parts.join(theme.fg("muted", " • ")) + (needsHint ? hint : "");
 
       return [
         commandLine,
         theme.fg(
           getResultSymbolColor(state),
-          outputLines.text ? "├─ " : "└─ ",
+          outputLines.text ? "├─ " : "╰─ ",
         ) + summary,
         outputLines.text,
       ]
@@ -290,8 +290,8 @@ function formatBashResult(
     );
     if (errorBody.text) parts.push(theme.fg("error", errorBody.text));
     return (
-      theme.fg(getResultSymbolColor(state), "└─ ") +
-      parts.join(theme.fg("muted", ", ")) +
+      theme.fg(getResultSymbolColor(state), "╰─ ") +
+      parts.join(theme.fg("muted", " • ")) +
       (needsHint ? hint : "")
     );
   }
@@ -327,7 +327,7 @@ function formatBashResult(
 
   const summary =
     parts.length > 0
-      ? parts.join(theme.fg("muted", ", ")) + (needsHint ? hint : "")
+      ? parts.join(theme.fg("muted", " • ")) + (needsHint ? hint : "")
       : theme.fg("muted", "output");
 
   if (lineCount <= 1) {
@@ -356,7 +356,7 @@ function formatBashResult(
 
     const metadataSummary =
       metadataParts.length > 0
-        ? metadataParts.join(theme.fg("muted", ", ")) +
+        ? metadataParts.join(theme.fg("muted", " • ")) +
           (metadataNeedsHint ? hint : "")
         : "";
 
@@ -369,7 +369,7 @@ function formatBashResult(
         ? formatTreeLine(renderedOutput, {
             theme,
             state,
-            prefix: "└─ ",
+            prefix: "╰─ ",
             width: getOutputWidth() + 3,
             mode: options.expanded ? "preserve" : "truncate",
             color: "toolOutput",
@@ -378,7 +378,7 @@ function formatBashResult(
       return [
         commandLine,
         metadataSummary
-          ? theme.fg(getResultSymbolColor(state), outputLine ? "├─ " : "└─ ") +
+          ? theme.fg(getResultSymbolColor(state), outputLine ? "├─ " : "╰─ ") +
             metadataSummary
           : undefined,
         outputLine,
@@ -392,16 +392,16 @@ function formatBashResult(
       inlineOutput ? theme.fg("toolOutput", renderedOutput) : undefined,
     ]
       .filter(Boolean)
-      .join(theme.fg("muted", ", "));
+      .join(theme.fg("muted", " • "));
 
     return (
-      theme.fg(getResultSymbolColor(state), "└─ ") + (inlineParts || summary)
+      theme.fg(getResultSymbolColor(state), "╰─ ") + (inlineParts || summary)
     );
   }
 
   return [
     commandLine,
-    theme.fg(getResultSymbolColor(state), outputLines.text ? "├─ " : "└─ ") +
+    theme.fg(getResultSymbolColor(state), outputLines.text ? "├─ " : "╰─ ") +
       summary,
     outputLines.text,
   ]

@@ -81,7 +81,7 @@ describe("edit renderResult", () => {
     );
 
     const output = component.render(120).join("\n");
-    expect(output).toContain("truncated, +2 -1");
+    expect(output).toContain("truncated • +2 -1");
     expect(output).toContain("+2");
     expect(output).toContain("-1");
     expect(output).toContain("to expand");
@@ -112,7 +112,7 @@ describe("edit renderResult", () => {
 
     const output = component.render(120).join("\n");
     expect(output).toContain("│  ");
-    expect(output).toContain("└─ ");
+    expect(output).toContain("╰─ ");
     expect(output).toContain("├─ +1 -1");
     expect(output).toContain("+new");
     expect(output).toContain("-old");
