@@ -38,9 +38,6 @@ export type ListResultConfig = {
   singularLabel: string; // "entry" | "file" | "line"
   pluralLabel: string; // "entries" | "files" | "lines"
   moreLabel: string; // "more entries" | "more files" | "more lines"
-  details: {
-    limitKey?: string; // "entryLimitReached" | "resultLimitReached" | "matchLimitReached"
-  };
   preprocess: (text: string) => string[]; // split + optional notice stripping
   renderItem?: (item: string, theme: Theme) => string; // e.g. color directories
 };
@@ -80,37 +77,17 @@ export function getStatusSymbol(isDone: boolean, blinkOn: boolean): string {
   return blinkOn ? "●" : "○";
 }
 
-export function getResultSymbolColor(
-  state: BaseRenderState,
-): "dim" | "warning" | "error" {
-  if (state.isError) return "error";
-  if (state.truncated) return "warning";
-  return "dim";
-}
-
 export function buildResultStatusParts(
   state: BaseRenderState,
   theme: Theme,
-  includeError = false,
 ): string[] {
-  const parts: string[] = [];
-  if (includeError && state.isError) {
-    parts.push(theme.fg("error", "error"));
-  }
-  if (state.truncated) {
-    parts.push(theme.fg("warning", "truncated"));
-  }
-  return parts;
+  return state.truncated ? [theme.fg("muted", "truncated")] : [];
 }
 
 export function getStatusColor(
   isDone: boolean,
-  state: BaseRenderState,
   blinkOn: boolean,
-): "success" | "warning" | "error" | "dim" {
-  if (state.isError) return "error";
-  if (state.truncated) return "warning";
-
+): "success" | "dim" {
   if (!isDone) return blinkOn ? "success" : "dim";
   return "success";
 }
@@ -392,7 +369,6 @@ export function formatSimpleErrorResult(
       const prefix = index === lines.length - 1 ? "╰─ " : "│  ";
       return formatTreeLine(line, {
         theme,
-        state,
         prefix,
         width: MAX_CALL_WIDTH() - 1,
         mode: "preserve",
@@ -402,18 +378,16 @@ export function formatSimpleErrorResult(
     .join("\n");
 
   if (state.truncated) {
-    const status = buildResultStatusParts(state, theme, true).join(
+    const status = buildResultStatusParts(state, theme).join(
       theme.fg("muted", " • "),
     );
     if (options.expanded) {
-      return (
-        theme.fg(getResultSymbolColor(state), "├─ ") + status + "\n" + formatted
-      );
+      return theme.fg("dim", "├─ ") + status + "\n" + formatted;
     }
 
     const suffix = errorBody.truncated ? buildHint(theme) : "";
     return (
-      theme.fg(getResultSymbolColor(state), "╰─ ") +
+      theme.fg("dim", "╰─ ") +
       status +
       (hasErrorBody
         ? theme.fg("muted", " • ") + theme.fg("error", bodyText)
@@ -427,25 +401,20 @@ export function formatSimpleErrorResult(
   }
 
   const suffix = errorBody.truncated ? buildHint(theme) : "";
-  return (
-    theme.fg(getResultSymbolColor(state), "╰─ ") +
-    theme.fg("error", bodyText) +
-    suffix
-  );
+  return theme.fg("dim", "╰─ ") + theme.fg("error", bodyText) + suffix;
 }
 
 export function formatTreeLine(
   line: string,
   options: {
     theme: Theme;
-    state: BaseRenderState;
     prefix: "│  " | "├─ " | "╰─ ";
     width: number;
     mode: "truncate" | "preserve";
     color?: "toolOutput" | "error" | "muted";
   },
 ): { text: string; truncated: boolean } {
-  const { theme, state, prefix, width, mode, color } = options;
+  const { theme, prefix, width, mode, color } = options;
   const contentWidth = Math.max(1, width - visibleWidth(prefix));
   const truncated = mode === "truncate" && visibleWidth(line) > contentWidth;
   const renderedLine = truncated
@@ -455,7 +424,7 @@ export function formatTreeLine(
     color === undefined ? renderedLine : theme.fg(color, renderedLine);
 
   return {
-    text: theme.fg(getResultSymbolColor(state), prefix) + styledLine,
+    text: theme.fg("dim", prefix) + styledLine,
     truncated,
   };
 }
@@ -470,7 +439,10 @@ export function getCallRenderParts(
   },
   renderOptions?: { paddingX?: number; animate?: boolean },
 ): { text: Text; prefix: string; isDone: boolean } {
-  const text = new TreeText(renderOptions?.paddingX ?? 1);
+  const text = new TreeText(
+    renderOptions?.paddingX ?? 1,
+    theme.fg("dim", "│  "),
+  );
 
   const isDone =
     state.hasResult || (!toolCtx.executionStarted && !toolCtx.isPartial);
@@ -483,27 +455,39 @@ export function getCallRenderParts(
   updateBlinkTimer(state, animate && !isDone, toolCtx.invalidate);
 
   const prefix = theme.fg(
-    getStatusColor(isDone, state, blinkOn),
+    getStatusColor(isDone, blinkOn),
     `${getStatusSymbol(isDone, blinkOn)} `,
   );
 
   return { text, prefix, isDone };
 }
 
-function wrapTreeText(text: string, width: number): string {
+function wrapTreeText(
+  text: string,
+  width: number,
+  callContinuationPrefix?: string,
+): string {
   if (!text || width <= 3) return text;
 
   return text
     .split("\n")
-    .flatMap((line) => {
+    .flatMap((line, sourceLineIndex) => {
       const lineWidth = visibleWidth(line);
-      if (lineWidth <= width) return [line];
-
       const prefix = sliceByColumn(line, 0, 3);
       const visiblePrefix = stripAnsi(prefix);
-      if (!/^[│├╰][─ ] /u.test(visiblePrefix)) {
-        return wrapTextWithAnsi(line, width);
+      const hasTreePrefix = /^[│├╰][─ ] /u.test(visiblePrefix);
+
+      if (!hasTreePrefix && callContinuationPrefix) {
+        const chunks = wrapTextWithAnsi(line, Math.max(1, width - 3));
+        return chunks.map((chunk, chunkIndex) =>
+          sourceLineIndex === 0 && chunkIndex === 0
+            ? chunk
+            : callContinuationPrefix + chunk,
+        );
       }
+
+      if (lineWidth <= width) return [line];
+      if (!hasTreePrefix) return wrapTextWithAnsi(line, width);
 
       const content = sliceByColumn(line, 3, lineWidth - 3);
       const chunks = wrapTextWithAnsi(content, Math.max(1, width - 3));
@@ -532,7 +516,10 @@ class TreeText extends Text {
   private renderedSource?: string;
   private renderedWidth?: number;
 
-  constructor(private readonly horizontalPadding: number) {
+  constructor(
+    private readonly horizontalPadding: number,
+    private readonly callContinuationPrefix?: string,
+  ) {
     super("", horizontalPadding, 0);
   }
 
@@ -552,6 +539,7 @@ class TreeText extends Text {
         wrapTreeText(
           this.sourceText,
           Math.max(1, width - this.horizontalPadding * 2),
+          this.callContinuationPrefix,
         ),
       );
       this.renderedSource = this.sourceText;
@@ -632,15 +620,11 @@ export function formatListResult(
   }
 
   // state.truncated is set by buildRenderResult before this runs
-  const details = result.details as Record<string, unknown> | undefined;
   const normalized = normalizeOutput(extractTextContent(result));
   if (normalized === "" || normalized === config.emptyMessage) {
     const emptyParts = buildResultStatusParts(state, theme);
     emptyParts.push(theme.fg("muted", config.emptyMessage));
-    return (
-      theme.fg(getResultSymbolColor(state), "╰─ ") +
-      emptyParts.join(theme.fg("toolOutput", " • "))
-    );
+    return theme.fg("dim", "╰─ ") + emptyParts.join(theme.fg("muted", " • "));
   }
 
   const items = config.preprocess(normalized);
@@ -648,33 +632,17 @@ export function formatListResult(
   const label = total === 1 ? config.singularLabel : config.pluralLabel;
 
   const summaryParts = buildResultStatusParts(state, theme);
-  summaryParts.push(theme.fg("toolOutput", `${total} ${label}`));
+  summaryParts.push(theme.fg("muted", `${total} ${label}`));
 
-  if (
-    config.details.limitKey &&
-    details?.[config.details.limitKey] !== undefined
-  ) {
-    summaryParts.push(
-      theme.fg("warning", `${details[config.details.limitKey]} limit`),
-    );
-  }
-
-  const summary = summaryParts.join(theme.fg("toolOutput", " • "));
+  const summary = summaryParts.join(theme.fg("muted", " • "));
 
   if (!options.expanded) {
-    return (
-      theme.fg(getResultSymbolColor(state), "╰─ ") +
-      theme.fg("toolOutput", summary) +
-      buildHint(theme)
-    );
+    return theme.fg("dim", "╰─ ") + summary + buildHint(theme);
   }
 
   const visible = items.slice(0, MAX_EXPANDED_ENTRIES());
   const remaining = Math.max(0, total - MAX_EXPANDED_ENTRIES());
-  const lines: string[] = [
-    theme.fg(getResultSymbolColor(state), "├─ ") +
-      theme.fg("toolOutput", summary),
-  ];
+  const lines: string[] = [theme.fg("dim", "├─ ") + summary];
 
   visible.forEach((item, index) => {
     const isLast = index === visible.length - 1 && remaining === 0;
@@ -683,7 +651,6 @@ export function formatListResult(
     lines.push(
       formatTreeLine(rendered, {
         theme,
-        state,
         prefix,
         width: MAX_CALL_WIDTH() - 1,
         mode: "preserve",
@@ -694,7 +661,7 @@ export function formatListResult(
 
   if (remaining > 0) {
     lines.push(
-      theme.fg(getResultSymbolColor(state), "╰─ ") +
+      theme.fg("dim", "╰─ ") +
         theme.fg("muted", `${remaining} ${config.moreLabel}`),
     );
   }

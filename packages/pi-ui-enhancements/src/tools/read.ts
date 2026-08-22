@@ -29,7 +29,6 @@ import {
   extractTextContent,
   formatSimpleErrorResult,
   getCallRenderParts,
-  getResultSymbolColor,
   renderPath,
 } from "./tool-rendering";
 
@@ -147,7 +146,7 @@ function formatReadLineRange(
   if (args?.offset === undefined && args?.limit === undefined) return "";
   const startLine = args.offset ?? 1;
   const endLine = args.limit !== undefined ? startLine + args.limit - 1 : "";
-  return theme.fg("warning", `:${startLine}${endLine ? `-${endLine}` : ""}`);
+  return theme.fg("dim", `:${startLine}${endLine ? `-${endLine}` : ""}`);
 }
 
 function formatReadResult(
@@ -181,12 +180,9 @@ function formatReadResult(
   }
   const summary = parts.length > 0 ? parts.join(" • ") : "no content";
   const metadataParts = buildResultStatusParts(state, theme);
-  metadataParts.push(theme.fg("toolOutput", summary));
+  metadataParts.push(theme.fg("muted", summary));
 
-  return (
-    theme.fg(getResultSymbolColor(state), "╰─ ") +
-    metadataParts.join(theme.fg("toolOutput", " • "))
-  );
+  return theme.fg("dim", "╰─ ") + metadataParts.join(theme.fg("muted", " • "));
 }
 
 export function patchReadTool(pi: ExtensionAPI): Handle {

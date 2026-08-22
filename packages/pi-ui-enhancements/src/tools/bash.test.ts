@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import { patchBashTool } from "./bash";
 import { clearBlinkTimers } from "./tool-rendering";
 import { mkTheme, mkToolCtx, setupTool } from "../test-helpers";
@@ -8,10 +9,13 @@ function setupBashTool() {
 }
 
 describe("bash renderCall", () => {
-  it("collapses whitespace when not expanded", () => {
+  it("collapses whitespace and renders timeout as dim", () => {
     const def = setupBashTool();
     const renderCall = def.renderCall!;
-    const theme = mkTheme();
+    const theme = {
+      ...mkTheme(),
+      fg: (color: string, text: string) => `${color}:${text}`,
+    } as Theme;
     const ctx = mkToolCtx({ expanded: false });
 
     const component = renderCall(
@@ -22,24 +26,28 @@ describe("bash renderCall", () => {
 
     const text = component.render(120).join("\n");
     expect(text).toContain("echo hello");
+    expect(text).toContain("dim: (timeout 10s)");
     expect(text).not.toContain("echo   hello\npwd");
   });
 
-  it("preserves command when expanded", () => {
+  it("expands the full command with connected continuation lines", () => {
     const def = setupBashTool();
     const renderCall = def.renderCall!;
     const theme = mkTheme();
     const ctx = mkToolCtx({ expanded: true });
+    const command =
+      "echo   hello with a command long enough to wrap across rows\npwd && printf done";
 
-    const component = renderCall(
-      { command: "echo   hello\npwd", timeout: 10 },
-      theme,
-      ctx,
-    );
+    const component = renderCall({ command, timeout: 10 }, theme, ctx);
+    const lines = component
+      .render(36)
+      .map((line) => line.trimEnd().slice(1))
+      .filter(Boolean);
 
-    const text = component.render(120).join("\n");
-    expect(text).toContain("echo   hello");
-    expect(text).toContain("pwd");
+    expect(lines.join("\n")).toContain("echo   hello");
+    expect(lines.join("\n")).toContain("printf done");
+    expect(lines.slice(1).every((line) => line.startsWith("│  "))).toBe(true);
+    expect(lines.join("\n")).not.toContain("...");
   });
 
   it("renders incomplete partial args without throwing", () => {
@@ -76,7 +84,7 @@ describe("bash renderResult", () => {
     expect(output).toContain("took 1.2s");
   });
 
-  it("puts truncation before duration metadata", () => {
+  it("puts duration before truncation metadata", () => {
     const def = setupBashTool();
     const renderResult = def.renderResult!;
     const theme = mkTheme();
@@ -96,10 +104,10 @@ describe("bash renderResult", () => {
     );
 
     const output = component.render(120).join("\n");
-    expect(output).toContain("truncated • took 50ms");
+    expect(output).toContain("took 50ms • truncated");
   });
 
-  it("keeps error before truncation in single-line and expanded errors", () => {
+  it("omits error metadata from single-line and expanded errors", () => {
     const def = setupBashTool();
     const renderResult = def.renderResult!;
     const theme = mkTheme();
@@ -119,9 +127,38 @@ describe("bash renderResult", () => {
         ctx,
       );
 
-      expect(component.render(120).join("\n")).toContain(
-        "error • truncated • took 50ms",
+      const output = component.render(120).join("\n");
+      expect(output).toContain("took 50ms • truncated");
+      expect(output).not.toContain("error •");
+    }
+  });
+
+  it("omits an empty metadata row from short multi-line errors", () => {
+    const def = setupBashTool();
+    const renderResult = def.renderResult!;
+    const theme = mkTheme();
+
+    for (const expanded of [false, true]) {
+      const ctx = mkToolCtx({ isError: true, expanded });
+      const component = renderResult(
+        {
+          content: [
+            {
+              type: "text",
+              text: "line one\nline two\nline three\nCommand exited with code 3",
+            },
+          ],
+          details: {},
+        },
+        { expanded, isPartial: false },
+        theme,
+        ctx,
       );
+
+      const output = component.render(120).join("\n");
+      expect(output).not.toContain("├─");
+      expect(output).toContain("│  line one");
+      expect(output).toContain("╰─ Command exited with code 3");
     }
   });
 
@@ -155,6 +192,31 @@ describe("bash renderResult", () => {
     expect(output).toContain("│  L06");
     expect(output).toContain("╰─ L10");
     expect(output).toContain("5 more lines");
+  });
+
+  it("does not duplicate a truncated call in expanded results", () => {
+    const def = setupBashTool();
+    const renderResult = def.renderResult!;
+    const theme = mkTheme();
+    const state = {
+      callTruncated: true,
+      fullCommand: "echo a command that used to be duplicated",
+    };
+    const ctx = mkToolCtx({ expanded: true, state });
+
+    const component = renderResult(
+      {
+        content: [{ type: "text", text: "done" }],
+        details: { durationMs: 50 },
+      },
+      { expanded: true, isPartial: false },
+      theme,
+      ctx,
+    );
+
+    const output = component.render(120).join("\n");
+    expect(output).not.toContain("$ echo");
+    expect(output).toContain("done");
   });
 
   it("keeps tree prefixes on wrapped expanded output", () => {
@@ -244,7 +306,8 @@ describe("bash renderResult", () => {
     );
 
     const output = component.render(120).join("\n");
-    expect(output).toContain("error • truncated • took 123ms • 3 more lines");
+    expect(output).toContain("took 123ms • truncated • 3 more lines");
+    expect(output).not.toContain("error •");
     const lines = output.split("\n");
     expect(
       lines.some((l) => l.includes("│  line1") || l.includes("╰─ line1")),

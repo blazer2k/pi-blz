@@ -16,7 +16,6 @@ import {
   formatSimpleErrorResult,
   formatTreeLine,
   getCallRenderParts,
-  getResultSymbolColor,
   getResultText,
   invalidateIfChanged,
   MAX_CALL_WIDTH,
@@ -49,8 +48,8 @@ function formatWriteResult(
   const lines = countLines(args.content);
   const summary = `${lines} ${lines === 1 ? "line" : "lines"}`;
   const metadataParts = buildResultStatusParts(state, theme);
-  metadataParts.push(theme.fg("toolOutput", summary));
-  const metadata = metadataParts.join(theme.fg("toolOutput", " • "));
+  metadataParts.push(theme.fg("muted", summary));
+  const metadata = metadataParts.join(theme.fg("muted", " • "));
 
   if (options.expanded) {
     const lang = args.path ? getLanguageFromPath(args.path) : undefined;
@@ -77,7 +76,6 @@ function formatWriteResult(
       const prefix = remainingLines === 0 && isLastLine ? "╰─ " : "│  ";
       return formatTreeLine(line, {
         theme,
-        state,
         prefix,
         width: MAX_CALL_WIDTH() - 1,
         mode: "preserve",
@@ -86,19 +84,17 @@ function formatWriteResult(
 
     if (remainingLines > 0) {
       renderedLines.push(
-        theme.fg(getResultSymbolColor(state), "╰─ ") +
+        theme.fg("dim", "╰─ ") +
           theme.fg("muted", `${remainingLines} more lines`),
       );
     }
 
-    renderedLines.unshift(
-      theme.fg(getResultSymbolColor(state), "├─ ") + metadata,
-    );
+    renderedLines.unshift(theme.fg("dim", "├─ ") + metadata);
 
     return renderedLines.join("\n");
   }
 
-  return theme.fg(getResultSymbolColor(state), "╰─ ") + metadata + hint;
+  return theme.fg("dim", "╰─ ") + metadata + hint;
 }
 
 export function patchWriteTool(pi: ExtensionAPI): Handle {

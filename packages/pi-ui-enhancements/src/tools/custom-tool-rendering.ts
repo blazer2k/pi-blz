@@ -25,7 +25,6 @@ import {
   formatSimpleErrorResult,
   formatTreeLine,
   getCallRenderParts,
-  getResultSymbolColor,
   getResultText,
   invalidateIfChanged,
   normalizeOutput,
@@ -366,8 +365,7 @@ function buildGenericResult(
     const metadataParts = buildResultStatusParts(state, theme);
     metadataParts.push(theme.fg("muted", "(no output)"));
     return (
-      theme.fg(getResultSymbolColor(state), "╰─ ") +
-      metadataParts.join(theme.fg("toolOutput", " • "))
+      theme.fg("dim", "╰─ ") + metadataParts.join(theme.fg("muted", " • "))
     );
   }
 
@@ -376,25 +374,22 @@ function buildGenericResult(
   const total = lines.length;
   const summary = `${total} ${total === 1 ? "line" : "lines"}`;
   const metadataParts = buildResultStatusParts(state, theme);
-  metadataParts.push(theme.fg("toolOutput", summary));
-  const metadata = metadataParts.join(theme.fg("toolOutput", " • "));
+  metadataParts.push(theme.fg("muted", summary));
+  const metadata = metadataParts.join(theme.fg("muted", " • "));
 
   if (!options.expanded) {
-    return theme.fg(getResultSymbolColor(state), "╰─ ") + metadata + hint;
+    return theme.fg("dim", "╰─ ") + metadata + hint;
   }
 
   const visible = lines.slice(0, MAX_EXPANDED_ENTRIES());
   const remaining = Math.max(0, total - MAX_EXPANDED_ENTRIES());
-  const rendered: string[] = [
-    theme.fg(getResultSymbolColor(state), "├─ ") + metadata,
-  ];
+  const rendered: string[] = [theme.fg("dim", "├─ ") + metadata];
 
   visible.forEach((line, index) => {
     const isLast = index === visible.length - 1 && remaining === 0;
     rendered.push(
       formatTreeLine(line, {
         theme,
-        state,
         prefix: isLast ? "╰─ " : "│  ",
         width: MAX_CALL_WIDTH() - 1,
         mode: "preserve",
@@ -404,8 +399,7 @@ function buildGenericResult(
 
   if (remaining > 0) {
     rendered.push(
-      theme.fg(getResultSymbolColor(state), "╰─ ") +
-        theme.fg("muted", `${remaining} more lines`),
+      theme.fg("dim", "╰─ ") + theme.fg("muted", `${remaining} more lines`),
     );
   }
 
@@ -539,8 +533,8 @@ function wrapDefinition<T extends ToolDefinition>(
           const metadataParts = buildResultStatusParts(state, theme);
           metadataParts.push(theme.fg("muted", "(no output)"));
           text.setText(
-            theme.fg(getResultSymbolColor(state), "╰─ ") +
-              metadataParts.join(theme.fg("toolOutput", " • ")),
+            theme.fg("dim", "╰─ ") +
+              metadataParts.join(theme.fg("muted", " • ")),
           );
         }
         return text;
@@ -548,15 +542,13 @@ function wrapDefinition<T extends ToolDefinition>(
 
       const renderedLines = innerLines.map((line, index) => {
         const prefix = index === innerLines.length - 1 ? "╰─ " : "│  ";
-        return theme.fg(getResultSymbolColor(state), prefix) + line;
+        return theme.fg("dim", prefix) + line;
       });
       if (state.truncated) {
-        const status = buildResultStatusParts(state, theme, true).join(
+        const status = buildResultStatusParts(state, theme).join(
           theme.fg("muted", " • "),
         );
-        renderedLines.unshift(
-          theme.fg(getResultSymbolColor(state), "├─ ") + status,
-        );
+        renderedLines.unshift(theme.fg("dim", "├─ ") + status);
       }
       text.setText(renderedLines.join("\n"));
       return text;

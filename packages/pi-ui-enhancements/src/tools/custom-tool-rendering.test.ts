@@ -301,7 +301,7 @@ describe("patchCustomToolRendering", () => {
     handle.dispose();
   });
 
-  it("puts error and truncation before original custom result output", () => {
+  it("shows truncation without error metadata before custom output", () => {
     const tool = mkRegisteredTool("myTool");
     tool.definition.renderResult = () => new Text("failure details", 0, 0);
     proto.getAllRegisteredTools = function () {
@@ -322,7 +322,9 @@ describe("patchCustomToolRendering", () => {
       mkToolCtx({ isError: true }),
     );
 
-    expect(component.render(80).join("\n")).toContain("error • truncated");
+    const output = component.render(80).join("\n");
+    expect(output).toContain("truncated");
+    expect(output).not.toContain("error •");
     handle.dispose();
   });
 

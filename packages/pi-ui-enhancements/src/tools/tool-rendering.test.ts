@@ -17,8 +17,8 @@ import {
   formatErrorBody,
   formatListResult,
   formatSimpleErrorResult,
+  formatTreeLine,
   getCallRenderParts,
-  getResultSymbolColor,
   getResultText,
   getStatusColor,
   normalizeOutput,
@@ -138,7 +138,7 @@ describe("formatSimpleErrorResult", () => {
     expect(output).toContain("something went wrong");
   });
 
-  it("puts error before truncation in collapsed and expanded results", () => {
+  it("shows truncation without error metadata", () => {
     const theme = mkTheme();
     const state: BaseRenderState = { isError: true, truncated: true };
 
@@ -149,7 +149,8 @@ describe("formatSimpleErrorResult", () => {
         options,
         theme,
       );
-      expect(output).toContain("error • truncated");
+      expect(output).toContain("truncated");
+      expect(output).not.toContain("error •");
     }
   });
 
@@ -231,25 +232,34 @@ describe("updateResultState", () => {
   });
 });
 
-describe("buildResultStatusParts", () => {
-  it("orders and colors statuses by connector precedence", () => {
+describe("result status rendering", () => {
+  it("keeps truncation metadata but drops error metadata", () => {
     const theme = {
       ...mkTheme(),
       fg: (color: string, text: string) => `${color}:${text}`,
     } as Theme;
 
-    const combinedState = { isError: true, truncated: true };
-    expect(getResultSymbolColor(combinedState)).toBe("error");
-    expect(buildResultStatusParts(combinedState, theme, true)).toEqual([
-      "error:error",
-      "warning:truncated",
-    ]);
+    expect(
+      buildResultStatusParts({ isError: true, truncated: true }, theme),
+    ).toEqual(["muted:truncated"]);
+  });
 
-    const truncatedState = { truncated: true };
-    expect(getResultSymbolColor(truncatedState)).toBe("warning");
-    expect(buildResultStatusParts(truncatedState, theme)).toEqual([
-      "warning:truncated",
-    ]);
+  it("always colors tree connectors with the healthy default", () => {
+    const theme = {
+      ...mkTheme(),
+      fg: (color: string, text: string) => `${color}:${text}`,
+    } as Theme;
+
+    const output = formatTreeLine("failure", {
+      theme,
+      prefix: "╰─ ",
+      width: 80,
+      mode: "preserve",
+      color: "error",
+    }).text;
+
+    expect(output).toStartWith("dim:╰─ ");
+    expect(output).toContain("error:failure");
   });
 });
 
@@ -379,11 +389,11 @@ describe("tool call blink rendering", () => {
     expect(state.blinkTimer).toBeUndefined();
   });
 
-  it("keeps error and truncation colors above blink status", () => {
-    expect(getStatusColor(false, { isError: true }, true)).toBe("error");
-    expect(getStatusColor(false, { truncated: true }, true)).toBe("warning");
-    expect(getStatusColor(true, { isError: true }, true)).toBe("error");
-    expect(getStatusColor(true, { truncated: true }, true)).toBe("warning");
+  it("uses only success and dim for status indicators", () => {
+    expect(getStatusColor(false, true)).toBe("success");
+    expect(getStatusColor(false, false)).toBe("dim");
+    expect(getStatusColor(true, true)).toBe("success");
+    expect(getStatusColor(true, false)).toBe("success");
   });
 });
 
@@ -394,7 +404,6 @@ const baseConfig: ListResultConfig = {
   singularLabel: "file",
   pluralLabel: "files",
   moreLabel: "more files",
-  details: { limitKey: "resultLimitReached" },
   preprocess: (text) => text.split("\n").filter((l) => l.length > 0),
 };
 
@@ -463,18 +472,22 @@ describe("formatListResult", () => {
     expect(output).toContain("5 more files");
   });
 
-  it("marks configured limit as warning", () => {
-    const theme = mkTheme();
+  it("colors counts as muted and omits redundant result limits", () => {
+    const theme = {
+      ...mkTheme(),
+      fg: (color: string, text: string) => `${color}:${text}`,
+    } as Theme;
     const state = resultStatusState();
     const result = {
       content: [{ type: "text", text: "a.txt\nb.txt" }],
       details: { resultLimitReached: 1000 },
     };
     const output = formatListResult(result, state, opts, theme, baseConfig);
-    expect(output).toContain("1000 limit");
+    expect(output).toContain("muted:2 files");
+    expect(output).not.toContain("1000 limit");
   });
 
-  it("puts truncation before count and limit metadata", () => {
+  it("puts truncation before count metadata", () => {
     const theme = mkTheme();
     const state = resultStatusState({ truncated: true });
     const result = {
@@ -482,10 +495,11 @@ describe("formatListResult", () => {
       details: { resultLimitReached: 1000 },
     };
     const output = formatListResult(result, state, opts, theme, baseConfig);
-    expect(output).toContain("truncated • 2 files • 1000 limit");
+    expect(output).toContain("truncated • 2 files");
+    expect(output).not.toContain("1000 limit");
   });
 
-  it("colors the connector from the same truncation state", () => {
+  it("keeps the connector dim regardless of truncation", () => {
     const theme = {
       ...mkTheme(),
       fg: (color: string, text: string) => `${color}:${text}`,
@@ -499,7 +513,7 @@ describe("formatListResult", () => {
         theme,
         baseConfig,
       ),
-    ).toContain("warning:╰─ ");
+    ).toContain("dim:╰─ ");
 
     expect(
       formatListResult(

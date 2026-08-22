@@ -25,7 +25,6 @@ const FIND_CONFIG: ListResultConfig = {
   singularLabel: "file",
   pluralLabel: "files",
   moreLabel: "more files",
-  details: { limitKey: "resultLimitReached" },
   preprocess: (text) => {
     const body = text.includes("\n\n[")
       ? text.slice(0, text.lastIndexOf("\n\n["))
@@ -47,7 +46,7 @@ export function patchFindTool(pi: ExtensionAPI): Handle {
       const renderArgs = args as FindToolInput;
       const title = theme.fg("toolTitle", theme.bold("Find "));
       const limit = renderArgs.limit
-        ? theme.fg("muted", ` (limit ${renderArgs.limit})`)
+        ? theme.fg("dim", ` (limit ${renderArgs.limit})`)
         : "";
       const pathPrefix = renderArgs.path ? " in " : "";
 
@@ -78,7 +77,7 @@ export function patchFindTool(pi: ExtensionAPI): Handle {
           ? truncateToWidth(rawPattern, patternBudget, "...")
           : rawPattern;
 
-      const pattern = theme.fg("success", patternDisplay);
+      const pattern = theme.fg("accent", patternDisplay);
       const pathDisplay = renderArgs.path
         ? `${pathPrefix}${renderPath(renderArgs.path, theme, toolCtx.cwd, pathBudget)}`
         : "";

@@ -24,15 +24,12 @@ const LS_CONFIG: ListResultConfig = {
   singularLabel: "entry",
   pluralLabel: "entries",
   moreLabel: "more entries",
-  details: { limitKey: "entryLimitReached" },
   preprocess: (text) => {
     const body = text.includes("\n\n[")
       ? text.slice(0, text.lastIndexOf("\n\n["))
       : text;
     return body.split("\n").filter((entry) => entry.length > 0);
   },
-  renderItem: (item, theme) =>
-    item.endsWith("/") ? theme.fg("success", item) : item,
 };
 
 export function patchLsTool(pi: ExtensionAPI): Handle {
@@ -50,7 +47,7 @@ export function patchLsTool(pi: ExtensionAPI): Handle {
       const renderArgs = args as LsToolInput;
       const title = theme.fg("toolTitle", theme.bold("Ls "));
       const limit = renderArgs.limit
-        ? theme.fg("muted", ` (limit ${renderArgs.limit})`)
+        ? theme.fg("dim", ` (limit ${renderArgs.limit})`)
         : "";
       const pathWidth = Math.max(
         1,

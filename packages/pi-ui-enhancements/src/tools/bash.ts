@@ -21,7 +21,6 @@ import {
   formatErrorBody,
   formatTreeLine,
   getCallRenderParts,
-  getResultSymbolColor,
   getResultText,
   invalidateIfChanged,
   normalizeOutput,
@@ -42,7 +41,6 @@ type BashRenderState = BaseRenderState & {
   endedAt?: number;
   durationTimer?: ReturnType<typeof setInterval>;
   callTruncated?: boolean;
-  fullCommand?: string;
 };
 
 type BashDetailsWithTiming = BashToolDetails & {
@@ -68,21 +66,19 @@ function buildBashMetadataParts(
     callTruncated?: boolean;
     lineTruncated?: boolean;
     toolTruncated?: boolean;
-    isError?: boolean;
     expanded?: boolean;
   },
   theme: Theme,
 ): { parts: string[]; needsHint: boolean } {
-  const parts = buildResultStatusParts(
-    { isError: args.isError, truncated: args.toolTruncated },
-    theme,
-    true,
-  );
+  const parts: string[] = [];
   let needsHint = false;
 
   if (args.durationSummary) {
     parts.push(theme.fg("muted", args.durationSummary));
   }
+  parts.push(
+    ...buildResultStatusParts({ truncated: args.toolTruncated }, theme),
+  );
   if ((args.remainingLines ?? 0) > 0) {
     const remainingLines = args.remainingLines ?? 0;
     parts.push(
@@ -133,7 +129,6 @@ function stripBashTruncationNotice(
 function formatOutputLines(
   text: string,
   theme: Theme,
-  state: BashRenderState,
   color: "toolOutput" | "error" = "toolOutput",
   maxLineWidth?: number,
   closeLastLine = false,
@@ -147,7 +142,6 @@ function formatOutputLines(
     const prefix = closeLastLine && index === lines.length - 1 ? "╰─ " : "│  ";
     const rendered = formatTreeLine(line, {
       theme,
-      state,
       prefix,
       width: (maxLineWidth ?? getOutputWidth()) + 3,
       mode: maxLineWidth === undefined ? "preserve" : "truncate",
@@ -186,14 +180,6 @@ function formatBashResult(
       ? undefined
       : `${options.isPartial ? "elapsed" : "took"} ${formatDuration(elapsedMs)}`;
 
-  // Prepend full command line when expanded and call was truncated
-  const commandLine =
-    options.expanded && state.callTruncated && state.fullCommand
-      ? theme.fg(getResultSymbolColor(state), "│  ") +
-        theme.fg("dim", "$ ") +
-        theme.fg("accent", state.fullCommand.replace(/\s+/g, " ").trim())
-      : undefined;
-
   if (state.isError) {
     const errorBody = formatErrorBody(
       normalizeBashErrorText(textContent),
@@ -204,7 +190,6 @@ function formatBashResult(
     if (options.expanded) {
       const { parts } = buildBashMetadataParts(
         {
-          isError: true,
           toolTruncated: state.truncated === true,
           durationSummary,
           expanded: true,
@@ -215,19 +200,14 @@ function formatBashResult(
       const outputLines = formatOutputLines(
         errorBody.text,
         theme,
-        state,
         "error",
         undefined,
         true,
       );
-      return [
-        commandLine,
-        theme.fg(
-          getResultSymbolColor(state),
-          outputLines.text ? "├─ " : "╰─ ",
-        ) + summary,
-        outputLines.text,
-      ]
+      const summaryLine = summary
+        ? theme.fg("dim", outputLines.text ? "├─ " : "╰─ ") + summary
+        : undefined;
+      return [summaryLine, outputLines.text]
         .filter((line): line is string => Boolean(line))
         .join("\n");
     }
@@ -245,14 +225,12 @@ function formatBashResult(
       const outputLines = formatOutputLines(
         output,
         theme,
-        state,
         "error",
         getOutputWidth(),
         true,
       );
       const { parts, needsHint } = buildBashMetadataParts(
         {
-          isError: true,
           durationSummary,
           remainingLines,
           callTruncated: state.callTruncated,
@@ -264,22 +242,17 @@ function formatBashResult(
       );
       const summary =
         parts.join(theme.fg("muted", " • ")) + (needsHint ? hint : "");
+      const summaryLine = summary
+        ? theme.fg("dim", outputLines.text ? "├─ " : "╰─ ") + summary
+        : undefined;
 
-      return [
-        commandLine,
-        theme.fg(
-          getResultSymbolColor(state),
-          outputLines.text ? "├─ " : "╰─ ",
-        ) + summary,
-        outputLines.text,
-      ]
+      return [summaryLine, outputLines.text]
         .filter((line): line is string => Boolean(line))
         .join("\n");
     }
 
     const { parts, needsHint } = buildBashMetadataParts(
       {
-        isError: true,
         toolTruncated: state.truncated === true,
         durationSummary,
         callTruncated: state.callTruncated,
@@ -290,7 +263,7 @@ function formatBashResult(
     );
     if (errorBody.text) parts.push(theme.fg("error", errorBody.text));
     return (
-      theme.fg(getResultSymbolColor(state), "╰─ ") +
+      theme.fg("dim", "╰─ ") +
       parts.join(theme.fg("muted", " • ")) +
       (needsHint ? hint : "")
     );
@@ -307,7 +280,6 @@ function formatBashResult(
   const outputLines = formatOutputLines(
     output,
     theme,
-    state,
     "toolOutput",
     showExpanded ? undefined : getOutputWidth(),
     true,
@@ -362,13 +334,11 @@ function formatBashResult(
 
     if (
       metadataNeedsHint ||
-      commandLine ||
       (options.expanded && renderedOutput && shouldTruncate)
     ) {
       const outputLine = renderedOutput
         ? formatTreeLine(renderedOutput, {
             theme,
-            state,
             prefix: "╰─ ",
             width: getOutputWidth() + 3,
             mode: options.expanded ? "preserve" : "truncate",
@@ -376,10 +346,8 @@ function formatBashResult(
           }).text
         : undefined;
       return [
-        commandLine,
         metadataSummary
-          ? theme.fg(getResultSymbolColor(state), outputLine ? "├─ " : "╰─ ") +
-            metadataSummary
+          ? theme.fg("dim", outputLine ? "├─ " : "╰─ ") + metadataSummary
           : undefined,
         outputLine,
       ]
@@ -394,15 +362,11 @@ function formatBashResult(
       .filter(Boolean)
       .join(theme.fg("muted", " • "));
 
-    return (
-      theme.fg(getResultSymbolColor(state), "╰─ ") + (inlineParts || summary)
-    );
+    return theme.fg("dim", "╰─ ") + (inlineParts || summary);
   }
 
   return [
-    commandLine,
-    theme.fg(getResultSymbolColor(state), outputLines.text ? "├─ " : "╰─ ") +
-      summary,
+    theme.fg("dim", outputLines.text ? "├─ " : "╰─ ") + summary,
     outputLines.text,
   ]
     .filter((line): line is string => Boolean(line))
@@ -453,7 +417,7 @@ export function patchBashTool(pi: ExtensionAPI): Handle {
         ? command
         : command.replace(/\s+/g, " ").trim();
       const timeoutSuffix = renderArgs.timeout
-        ? theme.fg("muted", ` (timeout ${renderArgs.timeout}s)`)
+        ? theme.fg("dim", ` (timeout ${renderArgs.timeout}s)`)
         : "";
       const staticWidth =
         visibleWidth(prefix) +
@@ -461,24 +425,25 @@ export function patchBashTool(pi: ExtensionAPI): Handle {
         visibleWidth("$ ") +
         visibleWidth(timeoutSuffix);
       const commandBudget = Math.max(1, MAX_CALL_WIDTH() - staticWidth);
-      const commandTruncated = visibleWidth(commandPreview) > commandBudget;
+      const commandTruncated =
+        !toolCtx.expanded && visibleWidth(commandPreview) > commandBudget;
+      const visibleCommand = toolCtx.expanded
+        ? commandPreview
+        : truncateToWidth(
+            commandPreview,
+            commandBudget,
+            theme.fg("accent", "..."),
+          );
       const commandDisplay =
         theme.fg("dim", "$ ") +
-        theme.bold(
-          theme.fg(
-            "accent",
-            truncateToWidth(
-              commandPreview,
-              commandBudget,
-              theme.fg("accent", "..."),
-            ),
-          ),
-        );
+        visibleCommand
+          .split("\n")
+          .map((line) => theme.bold(theme.fg("accent", line)))
+          .join("\n");
       content += theme.fg("toolTitle", theme.bold("Bash "));
       content += commandDisplay;
       content += timeoutSuffix;
       state.callTruncated = commandTruncated;
-      state.fullCommand = command;
       text.setText(content);
       return text;
     },

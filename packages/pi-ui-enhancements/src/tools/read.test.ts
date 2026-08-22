@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import { patchReadTool } from "./read";
 import { mkTheme, mkToolCtx, setupTool } from "../test-helpers";
 
@@ -20,10 +21,13 @@ describe("read renderCall", () => {
     expect(text).toContain("src/index.ts");
   });
 
-  it("renders line range", () => {
+  it("renders line range as dim", () => {
     const def = setupReadTool();
     const renderCall = def.renderCall!;
-    const theme = mkTheme();
+    const theme = {
+      ...mkTheme(),
+      fg: (color: string, text: string) => `${color}:${text}`,
+    } as Theme;
     const ctx = mkToolCtx();
 
     const component = renderCall(
@@ -33,7 +37,7 @@ describe("read renderCall", () => {
     );
 
     const text = component.render(120).join("\n");
-    expect(text).toContain(":10-14");
+    expect(text).toContain("dim::10-14");
   });
 
   it("uses compact skill format for SKILL.md", () => {

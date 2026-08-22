@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import { patchLsTool } from "./ls";
 import { patchFindTool } from "./find";
 import { patchGrepTool } from "./grep";
@@ -16,6 +17,13 @@ function setupGrepTool() {
   return setupTool(patchGrepTool);
 }
 
+function mkColorTheme(): Theme {
+  return {
+    ...mkTheme(),
+    fg: (color: string, text: string) => `${color}:${text}`,
+  } as Theme;
+}
+
 // --- ls ---
 
 describe("ls renderCall", () => {
@@ -31,15 +39,14 @@ describe("ls renderCall", () => {
     expect(text).toContain("src");
   });
 
-  it("renders limit suffix", () => {
+  it("renders limit suffix as dim", () => {
     const def = setupLsTool();
     const renderCall = def.renderCall!;
-    const theme = mkTheme();
     const ctx = mkToolCtx();
 
-    const component = renderCall({ path: ".", limit: 50 }, theme, ctx);
+    const component = renderCall({ path: ".", limit: 50 }, mkColorTheme(), ctx);
     const text = component.render(120).join("\n");
-    expect(text).toContain("(limit 50)");
+    expect(text).toContain("dim: (limit 50)");
   });
 
   it("defaults path to dot", () => {
@@ -55,23 +62,25 @@ describe("ls renderCall", () => {
 });
 
 describe("ls renderResult", () => {
-  it("reports entry count", () => {
+  it("reports entry count and renders directories as tool output", () => {
     const def = setupLsTool();
     const renderResult = def.renderResult!;
-    const theme = mkTheme();
-    const ctx = mkToolCtx();
+    const theme = mkColorTheme();
+    const ctx = mkToolCtx({ expanded: true });
 
     const component = renderResult(
       {
         content: [{ type: "text", text: "a.txt\nb/\nc.md" }],
         details: undefined,
       },
-      { expanded: false, isPartial: false },
+      { expanded: true, isPartial: false },
       theme,
       ctx,
     );
     const output = component.render(120).join("\n");
     expect(output).toContain("3 entries");
+    expect(output).toContain("toolOutput:b/");
+    expect(output).not.toContain("success:b/");
   });
 
   it("renders empty directory message", () => {
@@ -97,16 +106,15 @@ describe("ls renderResult", () => {
 // --- find ---
 
 describe("find renderCall", () => {
-  it("renders pattern", () => {
+  it("renders pattern as accent", () => {
     const def = setupFindTool();
     const renderCall = def.renderCall!;
-    const theme = mkTheme();
     const ctx = mkToolCtx();
 
-    const component = renderCall({ pattern: "*.ts" }, theme, ctx);
+    const component = renderCall({ pattern: "*.ts" }, mkColorTheme(), ctx);
     const text = component.render(120).join("\n");
     expect(text).toContain("Find");
-    expect(text).toContain("*.ts");
+    expect(text).toContain("accent:*.ts");
   });
 
   it("renders pattern and path", () => {
@@ -125,15 +133,18 @@ describe("find renderCall", () => {
     expect(text).toContain("src");
   });
 
-  it("renders limit suffix", () => {
+  it("renders limit suffix as dim", () => {
     const def = setupFindTool();
     const renderCall = def.renderCall!;
-    const theme = mkTheme();
     const ctx = mkToolCtx();
 
-    const component = renderCall({ pattern: "*.ts", limit: 100 }, theme, ctx);
+    const component = renderCall(
+      { pattern: "*.ts", limit: 100 },
+      mkColorTheme(),
+      ctx,
+    );
     const text = component.render(120).join("\n");
-    expect(text).toContain("(limit 100)");
+    expect(text).toContain("dim: (limit 100)");
   });
 
   it("renders incomplete partial args without throwing", () => {
@@ -192,50 +203,31 @@ describe("find renderResult", () => {
 // --- grep ---
 
 describe("grep renderCall", () => {
-  it("renders pattern", () => {
+  it("renders pattern as accent", () => {
     const def = setupGrepTool();
     const renderCall = def.renderCall!;
-    const theme = mkTheme();
     const ctx = mkToolCtx();
 
-    const component = renderCall({ pattern: "TODO" }, theme, ctx);
+    const component = renderCall({ pattern: "TODO" }, mkColorTheme(), ctx);
     const text = component.render(120).join("\n");
     expect(text).toContain("Grep");
-    expect(text).toContain("TODO");
+    expect(text).toContain("accent:TODO");
   });
 
-  it("renders glob filter", () => {
+  it("renders additional parameters as dim", () => {
     const def = setupGrepTool();
     const renderCall = def.renderCall!;
-    const theme = mkTheme();
     const ctx = mkToolCtx();
 
-    const component = renderCall({ pattern: "TODO", glob: "*.ts" }, theme, ctx);
+    const component = renderCall(
+      { pattern: "TODO", glob: "*.ts", context: 3, limit: 500 },
+      mkColorTheme(),
+      ctx,
+    );
     const text = component.render(120).join("\n");
-    expect(text).toContain("TODO");
-    expect(text).toContain("*.ts");
-  });
-
-  it("renders context lines", () => {
-    const def = setupGrepTool();
-    const renderCall = def.renderCall!;
-    const theme = mkTheme();
-    const ctx = mkToolCtx();
-
-    const component = renderCall({ pattern: "TODO", context: 3 }, theme, ctx);
-    const text = component.render(120).join("\n");
-    expect(text).toContain("±3");
-  });
-
-  it("renders limit suffix", () => {
-    const def = setupGrepTool();
-    const renderCall = def.renderCall!;
-    const theme = mkTheme();
-    const ctx = mkToolCtx();
-
-    const component = renderCall({ pattern: "TODO", limit: 500 }, theme, ctx);
-    const text = component.render(120).join("\n");
-    expect(text).toContain("(limit 500)");
+    expect(text).toContain("dim: *.ts");
+    expect(text).toContain("dim: ±3");
+    expect(text).toContain("dim: (limit 500)");
   });
 
   it("renders incomplete partial args without throwing", () => {

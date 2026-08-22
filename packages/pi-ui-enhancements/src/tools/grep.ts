@@ -26,9 +26,6 @@ const GREP_CONFIG: ListResultConfig = {
   singularLabel: "line",
   pluralLabel: "lines",
   moreLabel: "more lines",
-  details: {
-    limitKey: "matchLimitReached",
-  },
   preprocess: (text) => {
     const body = text.includes("\n\n[")
       ? text.slice(0, text.lastIndexOf("\n\n["))
@@ -50,13 +47,13 @@ export function patchGrepTool(pi: ExtensionAPI): Handle {
       const renderArgs = args as GrepToolInput;
       const title = theme.fg("toolTitle", theme.bold("Grep "));
       const glob = renderArgs.glob
-        ? theme.fg("muted", ` ${sanitizeDisplayText(renderArgs.glob)}`)
+        ? theme.fg("dim", ` ${sanitizeDisplayText(renderArgs.glob)}`)
         : "";
       const context = renderArgs.context
-        ? theme.fg("muted", ` ±${renderArgs.context}`)
+        ? theme.fg("dim", ` ±${renderArgs.context}`)
         : "";
       const limit = renderArgs.limit
-        ? theme.fg("muted", ` (limit ${renderArgs.limit})`)
+        ? theme.fg("dim", ` (limit ${renderArgs.limit})`)
         : "";
       const pathPrefix = renderArgs.path ? " in " : "";
 
@@ -89,7 +86,7 @@ export function patchGrepTool(pi: ExtensionAPI): Handle {
           ? truncateToWidth(rawPattern, patternBudget, "...")
           : rawPattern;
 
-      const pattern = theme.fg("success", patternDisplay);
+      const pattern = theme.fg("accent", patternDisplay);
       const pathDisplay = renderArgs.path
         ? `${pathPrefix}${renderPath(renderArgs.path, theme, toolCtx.cwd, pathBudget)}`
         : "";

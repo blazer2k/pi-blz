@@ -56,10 +56,13 @@ describe("parseDiffStats", () => {
 });
 
 describe("edit renderResult", () => {
-  it("collapsed result shows diff stats", () => {
+  it("collapsed result shows stats in dedicated diff colors", () => {
     const def = setupEditTool();
     const renderResult = def.renderResult!;
-    const theme = mkTheme();
+    const theme = {
+      ...mkTheme(),
+      fg: (color: string, text: string) => `${color}:${text}`,
+    } as Theme;
     const ctx = mkToolCtx();
 
     const diff = `--- a/test.ts
@@ -81,9 +84,9 @@ describe("edit renderResult", () => {
     );
 
     const output = component.render(120).join("\n");
-    expect(output).toContain("truncated • +2 -1");
-    expect(output).toContain("+2");
-    expect(output).toContain("-1");
+    expect(output).toContain("truncated");
+    expect(output).toContain("toolDiffAdded:+2");
+    expect(output).toContain("toolDiffRemoved:-1");
     expect(output).toContain("to expand");
   });
 
