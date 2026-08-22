@@ -32,7 +32,7 @@ function getAsciiHeaderSettings(config: Config): SettingItem[] {
     {
       id: "asciiHeaderFont",
       label: "Header font",
-      description: "Font for ASCII art header",
+      description: "Font for ASCII header",
       currentValue: String(config.asciiHeaderFont),
       submenu: (currentValue, done) => {
         const items: SelectItem[] = ALLOWED_FONTS.map((font) => ({
@@ -135,7 +135,8 @@ function getToolRenderingSettings(config: Config): SettingItem[] {
     {
       id: "maxExpandedEntries",
       label: "Max expanded entries",
-      description: "Maximum number of lines to show when expanding tool output",
+      description:
+        "Maximum number of lines to show when expanding tool output (-1 to show all)",
       currentValue: String(config.maxExpandedEntries),
       values: ["-1", "10", "20", "50", "100"],
     },
@@ -187,7 +188,7 @@ export function registerConfigCommand(
   onOpen: () => void,
   onClose: () => void,
 ) {
-  pi.registerCommand("ui", {
+  pi.registerCommand("ui-settings", {
     description: "Open UI settings menu",
     handler: async (_args, ctx) => {
       if (ctx.mode !== "tui") {
@@ -202,9 +203,6 @@ export function registerConfigCommand(
 
           const container = new Container();
           container.addChild(new DynamicBorder());
-          container.addChild(
-            new Text(theme.fg("accent", theme.bold("UI configuration")), 1, 1),
-          );
 
           const config = getConfig();
 
@@ -217,7 +215,7 @@ export function registerConfigCommand(
 
           const settingsList = new SettingsList(
             items,
-            5,
+            10,
             settingsListTheme,
             (id, newValue) => {
               try {
@@ -232,6 +230,7 @@ export function registerConfigCommand(
             () => {
               done(undefined);
             },
+            { enableSearch: true },
           );
 
           container.addChild(settingsList);

@@ -35,7 +35,7 @@ pi -e ./packages/pi-ui-enhancements/src/index.ts
 
 ## Configuration
 
-Run `/ui` in pi to open the settings menu.
+Run `/ui-settings` in pi to open the settings menu. The list is searchable: type to filter settings.
 
 ### Available Settings
 
