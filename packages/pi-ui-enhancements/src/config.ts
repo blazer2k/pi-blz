@@ -157,13 +157,15 @@ const validator = Compile(ConfigSchema);
 
 let config: Config = { ...defaultConfig };
 
-function isIntegerConfigValue(key: ConfigKey, value: unknown): boolean {
-  if (
-    key !== "maxCallWidth" &&
-    key !== "maxExpandedEntries" &&
-    key !== "bashMaxCollapsedLines"
-  )
-    return true;
+const INTEGER_CONFIG_KEYS: ReadonlySet<ConfigKey> = new Set([
+  "maxCallWidth",
+  "maxExpandedEntries",
+  "bashMaxCollapsedLines",
+]);
+
+// Keys not in INTEGER_CONFIG_KEYS have no integer constraint, so the gate passes.
+function isIntegerConstrainedValue(key: ConfigKey, value: unknown): boolean {
+  if (!INTEGER_CONFIG_KEYS.has(key)) return true;
   return typeof value === "number" && Number.isInteger(value);
 }
 
@@ -175,7 +177,7 @@ function validateConfig(raw: unknown): Config {
 
   for (const key of Object.keys(defaultConfig) as ConfigKey[]) {
     if (!(key in input)) continue;
-    if (!isIntegerConfigValue(key, input[key])) continue;
+    if (!isIntegerConstrainedValue(key, input[key])) continue;
 
     const candidate = { ...validated, [key]: input[key] };
     if (validator.Check(candidate)) {
@@ -290,7 +292,7 @@ export function saveConfig(id: ConfigKey, value: string): void {
   const parsed = parseConfigValue(id, value);
 
   const updated = { ...config, [id]: parsed };
-  if (!isIntegerConfigValue(id, parsed)) {
+  if (!isIntegerConstrainedValue(id, parsed)) {
     throw new Error(`Invalid config update: ${id}=${value}`);
   }
   if (!validator.Check(updated)) {
