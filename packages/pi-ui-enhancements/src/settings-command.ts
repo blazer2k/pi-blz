@@ -126,6 +126,14 @@ function getToolRenderingSettings(config: Config): SettingItem[] {
       values: ["false", "true"],
     },
     {
+      id: "indicatorStyle",
+      label: "Indicator style",
+      description:
+        "Symbol style of the blinking status indicator next to tool calls",
+      currentValue: String(config.indicatorStyle),
+      values: ["dot", "circle", "diamond"],
+    },
+    {
       id: "maxCallWidth",
       label: "Max call width",
       description: "Maximum width for tool call and output lines",

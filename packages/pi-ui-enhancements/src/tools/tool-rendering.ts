@@ -52,6 +52,31 @@ export type FormatResultFn = (
   theme: Theme,
 ) => string;
 
+export type BlinkIndicator = {
+  unfilled: string;
+  filled: string;
+};
+
+export function BLINK_INDICATOR(): BlinkIndicator {
+  switch (getConfig().indicatorStyle) {
+    case "dot":
+      return {
+        unfilled: "◦",
+        filled: "•",
+      };
+    case "circle":
+      return {
+        unfilled: "○",
+        filled: "●",
+      };
+    case "diamond":
+      return {
+        unfilled: "◇",
+        filled: "◆",
+      };
+  }
+}
+
 export function MAX_CALL_WIDTH(): number {
   return getConfig().maxCallWidth;
 }
@@ -77,8 +102,9 @@ export function isBlinkOn(): boolean {
 }
 
 export function getStatusSymbol(isDone: boolean, blinkOn: boolean): string {
-  if (isDone) return "●";
-  return blinkOn ? "●" : "○";
+  const { filled, unfilled } = BLINK_INDICATOR();
+  if (isDone || blinkOn) return filled;
+  return unfilled;
 }
 
 export function buildResultStatusParts(

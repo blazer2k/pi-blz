@@ -21,12 +21,14 @@ import {
   getCallRenderParts,
   getResultText,
   getStatusColor,
+  getStatusSymbol,
   normalizeOutput,
   renderPath,
   safeTruncateToWidth,
   sanitizeDisplayText,
   updateResultState,
 } from "./tool-rendering";
+import { saveConfig } from "../config";
 import { mkTheme } from "../test-helpers";
 
 const opts: ToolRenderResultOptions = { expanded: false, isPartial: false };
@@ -394,6 +396,22 @@ describe("tool call blink rendering", () => {
     expect(getStatusColor(false, false)).toBe("dim");
     expect(getStatusColor(true, true)).toBe("success");
     expect(getStatusColor(true, false)).toBe("success");
+  });
+
+  it("renders configured indicator style symbols", () => {
+    try {
+      saveConfig("indicatorStyle", "dot");
+      expect(getStatusSymbol(true, false)).toBe("•");
+      expect(getStatusSymbol(false, true)).toBe("•");
+      expect(getStatusSymbol(false, false)).toBe("◦");
+
+      saveConfig("indicatorStyle", "diamond");
+      expect(getStatusSymbol(true, false)).toBe("◆");
+      expect(getStatusSymbol(false, true)).toBe("◆");
+      expect(getStatusSymbol(false, false)).toBe("◇");
+    } finally {
+      saveConfig("indicatorStyle", "circle");
+    }
   });
 });
 
