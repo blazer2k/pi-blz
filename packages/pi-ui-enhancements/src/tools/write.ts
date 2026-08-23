@@ -9,7 +9,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import {
-  buildHint,
+  buildExpansionHint,
   buildResultStatusParts,
   countLines,
   extractTextContent,
@@ -39,7 +39,7 @@ function formatWriteResult(
 ): string {
   const textContent = extractTextContent(result);
 
-  const hint = buildHint(theme);
+  const hint = buildExpansionHint(theme, "expand");
 
   if (state.isError) {
     return formatSimpleErrorResult(textContent, state, options, theme);
@@ -89,7 +89,9 @@ function formatWriteResult(
       );
     }
 
-    renderedLines.unshift(theme.fg("dim", "├─ ") + metadata);
+    renderedLines.unshift(
+      theme.fg("dim", "├─ ") + metadata + buildExpansionHint(theme, "collapse"),
+    );
 
     return renderedLines.join("\n");
   }

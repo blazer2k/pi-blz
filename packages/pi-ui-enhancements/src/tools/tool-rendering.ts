@@ -242,12 +242,16 @@ export function clearBlinkTimers(): void {
   activeToolTimers.clear();
 }
 
-export function buildHint(theme: Theme): string {
-  return (
-    theme.fg("dim", " (") +
-    theme.fg("dim", keyText("app.tools.expand")) +
-    theme.fg("dim", " to expand)")
-  );
+export function buildExpansionHint(
+  theme: Theme,
+  action: "expand" | "collapse",
+): string {
+  if (!getConfig().showExpansionHint) return "";
+  const key = theme.fg("dim", keyText("app.tools.expand"));
+  if (action === "expand") {
+    return theme.fg("dim", " (") + key + theme.fg("dim", " to expand)");
+  }
+  return theme.fg("muted", " • ") + key + theme.fg("dim", " to collapse");
 }
 
 function getOpenOsc8Terminator(
@@ -412,10 +416,18 @@ export function formatSimpleErrorResult(
       theme.fg("muted", " • "),
     );
     if (options.expanded) {
-      return theme.fg("dim", "├─ ") + status + "\n" + formatted;
+      return (
+        theme.fg("dim", "├─ ") +
+        status +
+        buildExpansionHint(theme, "collapse") +
+        "\n" +
+        formatted
+      );
     }
 
-    const suffix = errorBody.truncated ? buildHint(theme) : "";
+    const suffix = errorBody.truncated
+      ? buildExpansionHint(theme, "expand")
+      : "";
     return (
       theme.fg("dim", "╰─ ") +
       status +
@@ -430,7 +442,7 @@ export function formatSimpleErrorResult(
     return formatted;
   }
 
-  const suffix = errorBody.truncated ? buildHint(theme) : "";
+  const suffix = errorBody.truncated ? buildExpansionHint(theme, "expand") : "";
   return theme.fg("dim", "╰─ ") + theme.fg("error", bodyText) + suffix;
 }
 
@@ -667,12 +679,16 @@ export function formatListResult(
   const summary = summaryParts.join(theme.fg("muted", " • "));
 
   if (!options.expanded) {
-    return theme.fg("dim", "╰─ ") + summary + buildHint(theme);
+    return (
+      theme.fg("dim", "╰─ ") + summary + buildExpansionHint(theme, "expand")
+    );
   }
 
   const visible = items.slice(0, MAX_EXPANDED_ENTRIES());
   const remaining = Math.max(0, total - MAX_EXPANDED_ENTRIES());
-  const lines: string[] = [theme.fg("dim", "├─ ") + summary];
+  const lines: string[] = [
+    theme.fg("dim", "├─ ") + summary + buildExpansionHint(theme, "collapse"),
+  ];
 
   visible.forEach((item, index) => {
     const isLast = index === visible.length - 1 && remaining === 0;

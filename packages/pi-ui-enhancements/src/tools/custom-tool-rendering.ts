@@ -19,7 +19,6 @@ import {
   type BaseRenderState,
   MAX_CALL_WIDTH,
   MAX_EXPANDED_ENTRIES,
-  buildHint,
   buildResultStatusParts,
   extractTextContent,
   formatSimpleErrorResult,
@@ -369,7 +368,6 @@ function buildGenericResult(
     );
   }
 
-  const hint = buildHint(theme);
   const lines = normalized.split("\n");
   const total = lines.length;
   const summary = `${total} ${total === 1 ? "line" : "lines"}`;
@@ -378,7 +376,7 @@ function buildGenericResult(
   const metadata = metadataParts.join(theme.fg("muted", " • "));
 
   if (!options.expanded) {
-    return theme.fg("dim", "╰─ ") + metadata + hint;
+    return theme.fg("dim", "╰─ ") + metadata;
   }
 
   const visible = lines.slice(0, MAX_EXPANDED_ENTRIES());

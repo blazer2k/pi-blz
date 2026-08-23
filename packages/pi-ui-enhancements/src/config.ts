@@ -61,6 +61,7 @@ export interface Config {
   maxCallWidth: number;
   maxExpandedEntries: number;
   bashMaxCollapsedLines: number;
+  showExpansionHint: boolean;
 
   // Editor
   roundedEditorColor: "thinking" | "dim" | "muted";
@@ -85,6 +86,7 @@ const defaultConfig: Config = {
   maxCallWidth: 80,
   maxExpandedEntries: 20,
   bashMaxCollapsedLines: 5,
+  showExpansionHint: true,
   roundedEditorColor: "thinking",
   roundedEditorShowThinkingLevel: true,
   roundedEditorShowCacheTokens: false,
@@ -128,6 +130,7 @@ const ConfigSchema = Type.Object(
       Type.Literal(5),
       Type.Literal(10),
     ]),
+    showExpansionHint: Type.Boolean(),
     roundedEditorColor: Type.Union([
       Type.Literal("thinking"),
       Type.Literal("dim"),
@@ -275,6 +278,8 @@ function parseConfigValue(id: ConfigKey, value: string): Config[ConfigKey] {
       return Number(value);
     case "bashMaxCollapsedLines":
       return Number(value);
+    case "showExpansionHint":
+      return value === "true";
     case "roundedEditorColor":
       return value as Config["roundedEditorColor"];
     case "roundedEditorShowThinkingLevel":

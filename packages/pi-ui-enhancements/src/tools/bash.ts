@@ -15,7 +15,7 @@ import {
   type BaseRenderState,
   MAX_CALL_WIDTH,
   MAX_COLLAPSED_LINES,
-  buildHint,
+  buildExpansionHint,
   buildResultStatusParts,
   countLines,
   extractTextContent,
@@ -174,7 +174,10 @@ function formatBashResult(
     ? rawTextContent
     : stripBashTruncationNotice(rawTextContent, details);
 
-  const hint = buildHint(theme);
+  const hint = buildExpansionHint(
+    theme,
+    options.expanded ? "collapse" : "expand",
+  );
   const elapsedMs =
     details?.durationMs ??
     (state.startedAt === undefined
@@ -210,7 +213,7 @@ function formatBashResult(
         true,
       );
       const summaryLine = summary
-        ? theme.fg("dim", outputLines.text ? "├─ " : "╰─ ") + summary
+        ? theme.fg("dim", outputLines.text ? "├─ " : "╰─ ") + summary + hint
         : undefined;
       return [summaryLine, outputLines.text]
         .filter((line): line is string => Boolean(line))
@@ -272,7 +275,7 @@ function formatBashResult(
     return (
       theme.fg("dim", "╰─ ") +
       parts.join(theme.fg("muted", " • ")) +
-      (needsHint ? hint : "")
+      (options.expanded || needsHint ? hint : "")
     );
   }
 
@@ -378,11 +381,17 @@ function formatBashResult(
       .filter(Boolean)
       .join(theme.fg("muted", " • "));
 
-    return theme.fg("dim", "╰─ ") + (inlineParts || summary);
+    return (
+      theme.fg("dim", "╰─ ") +
+      (inlineParts || summary) +
+      (options.expanded ? hint : "")
+    );
   }
 
   return [
-    theme.fg("dim", outputLines.text ? "├─ " : "╰─ ") + summary,
+    theme.fg("dim", outputLines.text ? "├─ " : "╰─ ") +
+      summary +
+      (showExpanded ? hint : ""),
     outputLines.text,
   ]
     .filter((line): line is string => Boolean(line))

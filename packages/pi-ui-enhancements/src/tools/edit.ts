@@ -14,7 +14,7 @@ import {
 } from "./tool-registration";
 import type { Handle } from "../types";
 import {
-  buildHint,
+  buildExpansionHint,
   buildRenderResult,
   buildResultStatusParts,
   extractTextContent,
@@ -81,7 +81,7 @@ function formatEditResult(
   const stats = parts.join(" ");
   if (stats) metadataParts.push(stats);
   const metadata = metadataParts.join(theme.fg("muted", " • "));
-  const hint = buildHint(theme);
+  const hint = buildExpansionHint(theme, "expand");
 
   if (!options.expanded) {
     return theme.fg("dim", "╰─ ") + metadata + hint;
@@ -99,7 +99,9 @@ function formatEditResult(
     }).text;
   });
   if (metadata) {
-    renderedLines.unshift(theme.fg("dim", "├─ ") + metadata);
+    renderedLines.unshift(
+      theme.fg("dim", "├─ ") + metadata + buildExpansionHint(theme, "collapse"),
+    );
   }
   return renderedLines.join("\n");
 }

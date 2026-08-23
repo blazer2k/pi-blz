@@ -315,6 +315,67 @@ describe("bash renderResult", () => {
     expect(output).toContain("done");
   });
 
+  it("expanded result shows collapse hint, disabled hides both hints", () => {
+    const def = setupBashTool();
+    const renderResult = def.renderResult!;
+    const theme = mkTheme();
+    const tenLines = Array.from(
+      { length: 10 },
+      (_, i) => `L${String(i + 1).padStart(2, "0")}`,
+    ).join("\n");
+
+    const expanded = renderResult(
+      {
+        content: [{ type: "text", text: tenLines }],
+        details: { durationMs: 50 },
+      },
+      { expanded: true, isPartial: false },
+      theme,
+      mkToolCtx({ expanded: true }),
+    );
+    expect(expanded.render(120).join("\n")).toContain("to collapse");
+
+    const expandedSingleLine = renderResult(
+      {
+        content: [{ type: "text", text: "done" }],
+        details: { durationMs: 50 },
+      },
+      { expanded: true, isPartial: false },
+      theme,
+      mkToolCtx({ expanded: true }),
+    );
+    expect(expandedSingleLine.render(120).join("\n")).toContain("to collapse");
+
+    saveConfig("showExpansionHint", "false");
+    try {
+      const collapsed = renderResult(
+        {
+          content: [{ type: "text", text: tenLines }],
+          details: { durationMs: 50 },
+        },
+        { expanded: false, isPartial: false },
+        theme,
+        mkToolCtx(),
+      );
+      expect(collapsed.render(120).join("\n")).not.toContain("to expand");
+
+      const expandedDisabled = renderResult(
+        {
+          content: [{ type: "text", text: tenLines }],
+          details: { durationMs: 50 },
+        },
+        { expanded: true, isPartial: false },
+        theme,
+        mkToolCtx({ expanded: true }),
+      );
+      expect(expandedDisabled.render(120).join("\n")).not.toContain(
+        "to collapse",
+      );
+    } finally {
+      saveConfig("showExpansionHint", "true");
+    }
+  });
+
   it("keeps tree prefixes on wrapped expanded output", () => {
     const def = setupBashTool();
     const renderResult = def.renderResult!;

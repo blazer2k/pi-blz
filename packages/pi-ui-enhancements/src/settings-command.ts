@@ -156,6 +156,13 @@ function getToolRenderingSettings(config: Config): SettingItem[] {
       currentValue: String(config.bashMaxCollapsedLines),
       values: ["0", "1", "5", "10"],
     },
+    {
+      id: "showExpansionHint",
+      label: "Show expansion hint",
+      description: "Show expand/collapse keybinding hints in tool metadata",
+      currentValue: String(config.showExpansionHint),
+      values: ["false", "true"],
+    },
   ] satisfies SettingItem[];
 }
 

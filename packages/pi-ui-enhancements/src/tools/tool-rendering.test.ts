@@ -9,7 +9,7 @@ import {
   type BaseRenderState,
   type ListResultConfig,
   type ResultStatusState,
-  buildHint,
+  buildExpansionHint,
   buildResultStatusParts,
   clearBlinkTimers,
   countLines,
@@ -265,11 +265,29 @@ describe("result status rendering", () => {
   });
 });
 
-describe("buildHint", () => {
-  it("returns expand hint", () => {
-    const theme = mkTheme();
-    const hint = buildHint(theme);
-    expect(hint).toContain("to expand");
+describe("buildExpansionHint", () => {
+  it("returns a parenthesized expand hint", () => {
+    const hint = buildExpansionHint(mkTheme(), "expand");
+    expect(hint).toStartWith(" (");
+    expect(hint).toContain("to expand)");
+  });
+
+  it("returns collapse hint with a separator and no parens", () => {
+    const hint = buildExpansionHint(mkTheme(), "collapse");
+    expect(hint).toStartWith(" • ");
+    expect(hint).toContain("to collapse");
+    expect(hint).not.toContain("(");
+  });
+
+  it("returns empty hints when showExpansionHint is disabled", () => {
+    saveConfig("showExpansionHint", "false");
+    try {
+      const theme = mkTheme();
+      expect(buildExpansionHint(theme, "expand")).toBe("");
+      expect(buildExpansionHint(theme, "collapse")).toBe("");
+    } finally {
+      saveConfig("showExpansionHint", "true");
+    }
   });
 });
 
