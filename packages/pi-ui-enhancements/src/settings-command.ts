@@ -140,6 +140,14 @@ function getToolRenderingSettings(config: Config): SettingItem[] {
       currentValue: String(config.maxExpandedEntries),
       values: ["-1", "10", "20", "50", "100"],
     },
+    {
+      id: "bashMaxCollapsedLines",
+      label: "Bash max collapsed lines",
+      description:
+        "Maximum number of bash output lines to show when collapsed (0 shows metadata only)",
+      currentValue: String(config.bashMaxCollapsedLines),
+      values: ["0", "1", "5", "10"],
+    },
   ] satisfies SettingItem[];
 }
 

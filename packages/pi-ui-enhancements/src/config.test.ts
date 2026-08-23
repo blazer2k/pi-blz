@@ -63,4 +63,26 @@ describe("config numeric values", () => {
     expect(getConfig().maxCallWidth).toBe(80);
     expect(getConfig().maxExpandedEntries).toBe(20);
   });
+
+  it("validates bashMaxCollapsedLines against allowed values", () => {
+    expect(getConfig().bashMaxCollapsedLines).toBe(5);
+
+    for (const value of ["0", "1", "10"]) {
+      saveConfig("bashMaxCollapsedLines", value);
+      expect(getConfig().bashMaxCollapsedLines).toBe(Number(value));
+    }
+
+    expect(() => saveConfig("bashMaxCollapsedLines", "7")).toThrow(
+      "Invalid config update",
+    );
+
+    writeFileSync(
+      process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH!,
+      JSON.stringify({ bashMaxCollapsedLines: 7 }),
+    );
+    loadConfig();
+    expect(getConfig().bashMaxCollapsedLines).toBe(5);
+
+    saveConfig("bashMaxCollapsedLines", "5");
+  });
 });

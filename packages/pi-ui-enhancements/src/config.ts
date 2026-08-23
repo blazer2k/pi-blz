@@ -57,8 +57,10 @@ export interface Config {
   patchedBuiltInTools: "essential" | "all";
   patchCustomTools: boolean;
   capitalizeToolNames: boolean;
+  indicatorStyle: "dot" | "circle" | "diamond";
   maxCallWidth: number;
   maxExpandedEntries: number;
+  bashMaxCollapsedLines: number;
 
   // Editor
   roundedEditorColor: "thinking" | "dim" | "muted";
@@ -79,8 +81,10 @@ const defaultConfig: Config = {
   patchedBuiltInTools: "essential",
   patchCustomTools: true,
   capitalizeToolNames: true,
+  indicatorStyle: "circle",
   maxCallWidth: 80,
   maxExpandedEntries: 20,
+  bashMaxCollapsedLines: 5,
   roundedEditorColor: "thinking",
   roundedEditorShowThinkingLevel: true,
   roundedEditorShowCacheTokens: false,
@@ -111,8 +115,19 @@ const ConfigSchema = Type.Object(
     ]),
     patchCustomTools: Type.Boolean(),
     capitalizeToolNames: Type.Boolean(),
+    indicatorStyle: Type.Union([
+      Type.Literal("dot"),
+      Type.Literal("circle"),
+      Type.Literal("diamond"),
+    ]),
     maxCallWidth: Type.Number({ minimum: 40, maximum: 200 }),
     maxExpandedEntries: Type.Number({ minimum: -1, maximum: 100 }),
+    bashMaxCollapsedLines: Type.Union([
+      Type.Literal(0),
+      Type.Literal(1),
+      Type.Literal(5),
+      Type.Literal(10),
+    ]),
     roundedEditorColor: Type.Union([
       Type.Literal("thinking"),
       Type.Literal("dim"),
@@ -143,7 +158,12 @@ const validator = Compile(ConfigSchema);
 let config: Config = { ...defaultConfig };
 
 function isIntegerConfigValue(key: ConfigKey, value: unknown): boolean {
-  if (key !== "maxCallWidth" && key !== "maxExpandedEntries") return true;
+  if (
+    key !== "maxCallWidth" &&
+    key !== "maxExpandedEntries" &&
+    key !== "bashMaxCollapsedLines"
+  )
+    return true;
   return typeof value === "number" && Number.isInteger(value);
 }
 
@@ -245,9 +265,13 @@ function parseConfigValue(id: ConfigKey, value: string): Config[ConfigKey] {
       return value === "true";
     case "capitalizeToolNames":
       return value === "true";
+    case "indicatorStyle":
+      return value as Config["indicatorStyle"];
     case "maxCallWidth":
       return Number(value);
     case "maxExpandedEntries":
+      return Number(value);
+    case "bashMaxCollapsedLines":
       return Number(value);
     case "roundedEditorColor":
       return value as Config["roundedEditorColor"];

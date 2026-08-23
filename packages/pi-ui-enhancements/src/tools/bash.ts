@@ -14,6 +14,7 @@ import {
 import {
   type BaseRenderState,
   MAX_CALL_WIDTH,
+  MAX_COLLAPSED_LINES,
   buildHint,
   buildResultStatusParts,
   countLines,
@@ -63,6 +64,7 @@ function buildBashMetadataParts(
   args: {
     durationSummary?: string;
     remainingLines?: number;
+    visibleLines?: number;
     callTruncated?: boolean;
     lineTruncated?: boolean;
     toolTruncated?: boolean;
@@ -81,10 +83,13 @@ function buildBashMetadataParts(
   );
   if ((args.remainingLines ?? 0) > 0) {
     const remainingLines = args.remainingLines ?? 0;
+    const suffix = remainingLines === 1 ? "line" : "lines";
     parts.push(
       theme.fg(
         "muted",
-        `${remainingLines} more ${remainingLines === 1 ? "line" : "lines"}`,
+        args.visibleLines === 0
+          ? `${remainingLines} ${suffix}`
+          : `${remainingLines} more ${suffix}`,
       ),
     );
     needsHint = true;
@@ -216,12 +221,13 @@ function formatBashResult(
     const lineCount = countLines(errorText);
 
     if (lineCount > 1) {
-      const visibleLineCount = Math.min(lineCount, 5);
+      const limit = MAX_COLLAPSED_LINES();
+      const visibleLineCount = limit === 0 ? 0 : Math.min(lineCount, limit);
       const remainingLines = Math.max(0, lineCount - visibleLineCount);
-      const output = normalizeOutput(errorText)
-        .split("\n")
-        .slice(-5)
-        .join("\n");
+      const output =
+        limit === 0
+          ? ""
+          : normalizeOutput(errorText).split("\n").slice(-limit).join("\n");
       const outputLines = formatOutputLines(
         output,
         theme,
@@ -233,6 +239,7 @@ function formatBashResult(
         {
           durationSummary,
           remainingLines,
+          visibleLines: visibleLineCount,
           callTruncated: state.callTruncated,
           lineTruncated: outputLines.truncated,
           toolTruncated: state.truncated === true,
@@ -269,14 +276,21 @@ function formatBashResult(
     );
   }
 
+  const limit = MAX_COLLAPSED_LINES();
   const lineCount = countLines(textContent);
   const showExpanded = options.expanded && lineCount > 1;
-  const visibleLineCount = showExpanded ? lineCount : Math.min(lineCount, 5);
+  const visibleLineCount = showExpanded
+    ? lineCount
+    : limit === 0
+      ? 0
+      : Math.min(lineCount, limit);
   const remainingLines = Math.max(0, lineCount - visibleLineCount);
 
   const output = showExpanded
     ? normalizeOutput(textContent)
-    : normalizeOutput(textContent).split("\n").slice(-5).join("\n");
+    : limit === 0
+      ? ""
+      : normalizeOutput(textContent).split("\n").slice(-limit).join("\n");
   const outputLines = formatOutputLines(
     output,
     theme,
@@ -289,6 +303,7 @@ function formatBashResult(
     {
       durationSummary,
       remainingLines,
+      visibleLines: visibleLineCount,
       callTruncated: state.callTruncated,
       lineTruncated: outputLines.truncated,
       toolTruncated: state.truncated === true,
@@ -303,7 +318,8 @@ function formatBashResult(
       : theme.fg("muted", "output");
 
   if (lineCount <= 1) {
-    const inlineOutput = normalizeOutput(textContent);
+    const inlineOutput =
+      options.expanded || limit > 0 ? normalizeOutput(textContent) : "";
     const maxLineWidth = getOutputWidth();
     const shouldTruncate =
       !options.expanded && visibleWidth(inlineOutput) > maxLineWidth;

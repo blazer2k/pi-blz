@@ -1,5 +1,6 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it } from "bun:test";
 import type { Theme } from "@earendil-works/pi-coding-agent";
+import { saveConfig } from "../config";
 import { patchBashTool } from "./bash";
 import { clearBlinkTimers } from "./tool-rendering";
 import { mkTheme, mkToolCtx, setupTool } from "../test-helpers";
@@ -192,6 +193,101 @@ describe("bash renderResult", () => {
     expect(output).toContain("│  L06");
     expect(output).toContain("╰─ L10");
     expect(output).toContain("5 more lines");
+  });
+
+  afterEach(() => {
+    saveConfig("bashMaxCollapsedLines", "5");
+  });
+
+  it("collapsed output shows metadata only when the limit is 0", () => {
+    saveConfig("bashMaxCollapsedLines", "0");
+    const def = setupBashTool();
+    const renderResult = def.renderResult!;
+    const theme = mkTheme();
+    const ctx = mkToolCtx();
+
+    const component = renderResult(
+      {
+        content: [
+          {
+            type: "text",
+            text: Array.from(
+              { length: 10 },
+              (_, i) => `L${String(i + 1).padStart(2, "0")}`,
+            ).join("\n"),
+          },
+        ],
+        details: { durationMs: 50 },
+      },
+      { expanded: false, isPartial: false },
+      theme,
+      ctx,
+    );
+
+    const output = component.render(120).join("\n");
+    expect(output).not.toContain("L01");
+    expect(output).not.toContain("L10");
+    expect(output).toContain("10 lines");
+  });
+
+  it("collapsed output shows only the last line when the limit is 1", () => {
+    saveConfig("bashMaxCollapsedLines", "1");
+    const def = setupBashTool();
+    const renderResult = def.renderResult!;
+    const theme = mkTheme();
+    const ctx = mkToolCtx();
+
+    const component = renderResult(
+      {
+        content: [
+          {
+            type: "text",
+            text: Array.from(
+              { length: 10 },
+              (_, i) => `L${String(i + 1).padStart(2, "0")}`,
+            ).join("\n"),
+          },
+        ],
+        details: { durationMs: 50 },
+      },
+      { expanded: false, isPartial: false },
+      theme,
+      ctx,
+    );
+
+    const output = component.render(120).join("\n");
+    expect(output).not.toContain("L09");
+    expect(output).toContain("╰─ L10");
+    expect(output).toContain("9 more lines");
+  });
+
+  it("collapsed errors show metadata only when the limit is 0", () => {
+    saveConfig("bashMaxCollapsedLines", "0");
+    const def = setupBashTool();
+    const renderResult = def.renderResult!;
+    const theme = mkTheme();
+    const ctx = mkToolCtx({ isError: true });
+
+    const component = renderResult(
+      {
+        content: [
+          {
+            type: "text",
+            text: "line one\nline two\nline three\nCommand exited with code 3",
+          },
+        ],
+        details: { durationMs: 50 },
+      },
+      { expanded: false, isPartial: false },
+      theme,
+      ctx,
+    );
+
+    const output = component.render(120).join("\n");
+    expect(output).not.toContain("line one");
+    expect(output).not.toContain("line three");
+    expect(output).not.toContain("Command exited with code 3");
+    expect(output).toContain("4 lines");
   });
 
   it("does not duplicate a truncated call in expanded results", () => {

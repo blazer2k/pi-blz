@@ -63,6 +63,10 @@ export function MAX_EXPANDED_ENTRIES(): number {
   return val === -1 ? Infinity : val;
 }
 
+export function MAX_COLLAPSED_LINES(): number {
+  return getConfig().bashMaxCollapsedLines;
+}
+
 const BLINK_INTERVAL_MS = 500;
 const activeBlinkTimers = new Set<NonNullable<BaseRenderState["blinkTimer"]>>();
 const activeToolTimers = new Set<ReturnType<typeof setInterval>>();
