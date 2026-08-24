@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { sep } from "node:path";
 import { describe, expect, it } from "bun:test";
-import { shortenPath } from "./path-utils";
+import { shortenPath } from "./path";
 
 describe("shortenPath", () => {
   it("shortens the home directory itself", () => {

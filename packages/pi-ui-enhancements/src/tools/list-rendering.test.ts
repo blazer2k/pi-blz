@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { mkTheme } from "../test-helpers";
+import { mkTheme } from "../testing/helpers";
 import { buildPatternPathCall, splitNativeListOutput } from "./list-rendering";
 
 describe("splitNativeListOutput", () => {

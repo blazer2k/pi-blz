@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { mkTheme } from "../../test-helpers";
+import { mkTheme } from "../../testing/helpers";
 import { getMaxExpandedEntries } from "../rendering/state";
 import type { BaseRenderState } from "../rendering/types";
 import { buildGenericResult } from "./result";

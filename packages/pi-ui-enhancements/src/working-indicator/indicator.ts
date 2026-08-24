@@ -3,9 +3,9 @@ import type {
   ExtensionContext,
   Theme,
 } from "@earendil-works/pi-coding-agent";
+import { getConfig } from "../config/store";
+import type { Handle } from "../shared/handle";
 import { RESET_FG, type Color, rgbFg, blend, resolveTheme } from "./colors";
-import type { Handle } from "./types";
-import { getConfig } from "./config";
 
 const LABEL = "Working";
 const INTERRUPT_MSG = "esc to interrupt";

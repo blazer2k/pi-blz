@@ -12,7 +12,7 @@ import {
   createCwdDeferredTool,
   registerPatchedTool,
 } from "./tool-registration";
-import type { Handle } from "../types";
+import type { Handle } from "../shared/handle";
 import {
   buildRenderResult,
   formatSimpleErrorResult,

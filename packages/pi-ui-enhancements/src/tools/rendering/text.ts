@@ -7,7 +7,7 @@ import {
   truncateToWidth,
   visibleWidth,
 } from "@earendil-works/pi-tui";
-import { shortenPath } from "../../path-utils";
+import { shortenPath } from "../../shared/path";
 import type { ToolTextResult } from "./types";
 
 function truncatePathMiddle(filePath: string, maxWidth: number): string {

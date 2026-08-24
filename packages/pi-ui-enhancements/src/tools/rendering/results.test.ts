@@ -14,7 +14,7 @@ import type {
   ListResultConfig,
   ResultStatusState,
 } from "./types";
-import { mkTheme } from "../../test-helpers";
+import { mkTheme } from "../../testing/helpers";
 
 const opts: ToolRenderResultOptions = { expanded: false, isPartial: false };
 const optsExpanded: ToolRenderResultOptions = {

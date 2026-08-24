@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
-import { saveConfig } from "../config";
+import { saveConfig } from "../config/store";
 import { patchBashTool } from "./bash";
 import { clearBlinkTimers } from "./rendering/state";
-import { mkTheme, mkToolCtx, setupTool } from "../test-helpers";
+import { mkTheme, mkToolCtx, setupTool } from "../testing/helpers";
 import { PI_0_84_3_OUTPUT } from "./test-fixtures/pi-0.84.3";
 
 function setupBashTool() {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { patchReadTool } from "./read";
-import { mkTheme, mkToolCtx, setupTool } from "../test-helpers";
+import { mkTheme, mkToolCtx, setupTool } from "../testing/helpers";
 import { PI_0_84_3_OUTPUT } from "./test-fixtures/pi-0.84.3";
 
 function setupReadTool() {

@@ -3,7 +3,7 @@ import {
   type RegisteredTool,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import type { Handle } from "../../types";
+import type { Handle } from "../../shared/handle";
 import {
   createWrappedDefinition,
   shouldWrapDefinition,

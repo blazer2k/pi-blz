@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { patchLsTool } from "./ls";
-import { mkTheme, mkToolCtx, setupTool } from "../test-helpers";
+import { mkTheme, mkToolCtx, setupTool } from "../testing/helpers";
 
 function setupLsTool() {
   return setupTool(patchLsTool);

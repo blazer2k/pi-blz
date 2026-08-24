@@ -22,7 +22,10 @@
     "access": "public"
   },
   "files": [
-    "src",
+    "src/**/*.ts",
+    "!src/**/*.test.ts",
+    "!src/testing/**",
+    "!src/tools/test-fixtures/**",
     "images",
     "README.md",
     "LICENSE"

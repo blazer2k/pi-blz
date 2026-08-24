@@ -3,10 +3,7 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import {
-  assembleRunDuration,
-  registerWorkingIndicator,
-} from "./working-indicator";
+import { assembleRunDuration, registerWorkingIndicator } from "./indicator";
 
 function mkIndicatorHarness() {
   const handlers: Record<string, Array<(...args: any[]) => void>> = {};

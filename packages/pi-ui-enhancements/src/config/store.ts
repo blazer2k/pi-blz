@@ -8,13 +8,7 @@ import {
   validateConfig,
   type Config,
   type ConfigKey,
-} from "./config/definition";
-
-export {
-  ALLOWED_FONTS,
-  type Config,
-  type ConfigKey,
-} from "./config/definition";
+} from "./definition";
 
 function getConfigPath(): string {
   if (process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH) {

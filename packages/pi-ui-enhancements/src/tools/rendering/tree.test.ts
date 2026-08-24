@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import type { ToolRenderResultOptions } from "@earendil-works/pi-coding-agent";
 import { clearBlinkTimers } from "./state";
 import { getCallRenderParts, getResultText } from "./tree";
-import { mkTheme } from "../../test-helpers";
+import { mkTheme } from "../../testing/helpers";
 
 const optsExpanded: ToolRenderResultOptions = {
   expanded: true,

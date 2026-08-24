@@ -1,29 +1,38 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-import { registerAsciiHeader } from "./ascii-header";
-import { registerRoundedEditor } from "./rounded-editor";
-import { patchTools } from "./tools";
-import { patchCustomToolRendering } from "./tools/custom-tools";
-import { clearBlinkTimers } from "./tools/rendering/state";
-import type { Handle } from "./types";
-import { registerWorkingIndicator } from "./working-indicator";
+import { registerConfigCommand } from "./config/command";
 import {
+  clearOnConfigChange,
   getConfig,
   loadConfig,
   setOnConfigChange,
-  clearOnConfigChange,
-} from "./config";
-import { registerConfigCommand } from "./settings-command";
-
-let handles: Handle[] = [];
+} from "./config/store";
+import { registerRoundedEditor } from "./editor/registration";
+import { registerAsciiHeader } from "./header/header";
+import type { Handle } from "./shared/handle";
+import { patchTools } from "./tools/built-ins";
+import { patchCustomToolRendering } from "./tools/custom-tools/patch-manager";
+import { clearBlinkTimers } from "./tools/rendering/state";
+import { registerWorkingIndicator } from "./working-indicator/indicator";
 
 function hasTui(ctx: { hasUI: boolean; mode?: string }): boolean {
   return ctx.mode === "tui" || (ctx.mode === undefined && ctx.hasUI);
 }
 
+function disposeHandles(handles: readonly Handle[], description: string): void {
+  for (const handle of handles) {
+    try {
+      handle.dispose();
+    } catch (error) {
+      console.error(`Failed to dispose ${description} handle:`, error);
+    }
+  }
+}
+
 export default function (pi: ExtensionAPI) {
   loadConfig();
-  patchTools(pi);
+  const builtInToolHandles = patchTools(pi);
+  let uiHandles: Handle[] = [];
 
   const activeToolCallIds = new Set<string>();
   const isToolCallActive = (toolCallId: string) =>
@@ -90,7 +99,7 @@ export default function (pi: ExtensionAPI) {
     syncCustomToolRenderingPatch();
 
     if (hasTui(ctx)) {
-      handles.push(
+      uiHandles.push(
         registerAsciiHeader(pi, ctx, (fn) => {
           headerReregister = fn;
         }),
@@ -100,7 +109,7 @@ export default function (pi: ExtensionAPI) {
         registerWorkingIndicator(pi, ctx),
       );
       ctx.ui.setHiddenThinkingLabel("(think)");
-      handles.push({
+      uiHandles.push({
         dispose() {
           ctx.ui.setHiddenThinkingLabel();
         },
@@ -112,14 +121,9 @@ export default function (pi: ExtensionAPI) {
     activeToolCallIds.clear();
     clearBlinkTimers();
 
-    for (const h of handles) {
-      try {
-        h.dispose();
-      } catch (error) {
-        console.error("Failed to dispose UI enhancement handle:", error);
-      }
-    }
-    handles = [];
+    disposeHandles(uiHandles, "UI enhancement");
+    uiHandles = [];
+    disposeHandles(builtInToolHandles, "built-in tool");
 
     try {
       customToolRenderingHandle?.dispose();

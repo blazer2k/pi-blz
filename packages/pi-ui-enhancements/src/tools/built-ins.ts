@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { getConfig } from "../config";
-import type { Handle } from "../types";
+import { getConfig } from "../config/store";
+import type { Handle } from "../shared/handle";
 import { patchBashTool } from "./bash";
 import { patchLsTool } from "./ls";
 import { patchFindTool } from "./find";

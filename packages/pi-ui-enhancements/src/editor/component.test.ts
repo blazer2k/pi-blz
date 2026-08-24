@@ -5,7 +5,7 @@ import type {
   KeybindingsManager,
 } from "@earendil-works/pi-coding-agent";
 import type { EditorTheme, TUI } from "@earendil-works/pi-tui";
-import { mkTheme } from "../test-helpers";
+import { mkTheme } from "../testing/helpers";
 import { RoundedEditor } from "./component";
 
 function createEditor(command = "hello") {

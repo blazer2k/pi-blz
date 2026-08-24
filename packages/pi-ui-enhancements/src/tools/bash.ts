@@ -2,7 +2,7 @@ import {
   createBashToolDefinition,
   type ExtensionAPI,
 } from "@earendil-works/pi-coding-agent";
-import type { Handle } from "../types";
+import type { Handle } from "../shared/handle";
 import { renderBashCall } from "./bash/call";
 import { formatBashResult } from "./bash/result";
 import type {

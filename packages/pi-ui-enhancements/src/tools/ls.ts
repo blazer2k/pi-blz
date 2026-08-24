@@ -4,7 +4,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { createLsToolDefinition } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
-import type { Handle } from "../types";
+import type { Handle } from "../shared/handle";
 import {
   createCwdDeferredTool,
   registerPatchedTool,

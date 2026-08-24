@@ -5,8 +5,8 @@ import { describe, expect, it, beforeEach, afterEach } from "bun:test";
 import { ExtensionRunner } from "@earendil-works/pi-coding-agent";
 import type { Theme, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import { getConfig, loadConfig, saveConfig } from "../../config";
-import { cleanRunnerProto, mkTheme, mkToolCtx } from "../../test-helpers";
+import { getConfig, loadConfig, saveConfig } from "../../config/store";
+import { cleanRunnerProto, mkTheme, mkToolCtx } from "../../testing/helpers";
 import { clearBlinkTimers } from "../rendering/state";
 import { patchCustomToolRendering } from "./patch-manager";
 

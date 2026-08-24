@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { patchFindTool } from "./find";
-import { mkTheme, mkToolCtx, setupTool } from "../test-helpers";
+import { mkTheme, mkToolCtx, setupTool } from "../testing/helpers";
 
 function setupFindTool() {
   return setupTool(patchFindTool);

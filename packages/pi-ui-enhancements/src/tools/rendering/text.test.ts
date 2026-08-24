@@ -10,7 +10,7 @@ import {
   sanitizeDisplayText,
   sanitizeMultilineDisplayText,
 } from "./text";
-import { mkTheme } from "../../test-helpers";
+import { mkTheme } from "../../testing/helpers";
 
 describe("normalizeOutput", () => {
   it("removes only one trailing newline", () => {

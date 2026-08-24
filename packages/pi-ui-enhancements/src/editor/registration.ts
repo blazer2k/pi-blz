@@ -2,25 +2,10 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { RoundedEditor } from "./editor/component";
-import { formatStatusLine } from "./editor/frame";
-import { getTotalUsage } from "./editor/usage";
-import type { Handle } from "./types";
-
-export {
-  formatStatusLine,
-  frameEditorLines,
-  getRightBorderGlyph,
-  type BorderFn,
-  type EditorFrameData,
-  type ScrollIndicators,
-} from "./editor/frame";
-export {
-  adaptNativeEditorLayout,
-  type NativeEditorLayout,
-} from "./editor/native-layout";
-export { buildEditorFrameData, type EditorStatusInput } from "./editor/status";
-export { formatTokens, getTotalUsage } from "./editor/usage";
+import type { Handle } from "../shared/handle";
+import { RoundedEditor } from "./component";
+import { formatStatusLine } from "./frame";
+import { getTotalUsage } from "./usage";
 
 type RoundedEditorRuntime = {
   invalidateUsage: (() => void) | null;

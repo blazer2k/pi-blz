@@ -3,7 +3,7 @@ import type {
   FindToolInput,
 } from "@earendil-works/pi-coding-agent";
 import { createFindToolDefinition } from "@earendil-works/pi-coding-agent";
-import type { Handle } from "../types";
+import type { Handle } from "../shared/handle";
 import {
   createCwdDeferredTool,
   registerPatchedTool,

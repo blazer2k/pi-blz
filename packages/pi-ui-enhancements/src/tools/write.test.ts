@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { getConfig } from "../config";
+import { getConfig } from "../config/store";
 import { patchWriteTool } from "./write";
-import { mkTheme, mkToolCtx, setupTool } from "../test-helpers";
+import { mkTheme, mkToolCtx, setupTool } from "../testing/helpers";
 
 function setupWriteTool() {
   return setupTool(patchWriteTool);

@@ -5,7 +5,8 @@ import {
   type KeybindingsManager,
 } from "@earendil-works/pi-coding-agent";
 import type { EditorTheme, TUI } from "@earendil-works/pi-tui";
-import { getConfig, type Config } from "../config";
+import type { Config } from "../config/definition";
+import { getConfig } from "../config/store";
 import { frameEditorLines, type BorderFn } from "./frame";
 import { buildEditorFrameData } from "./status";
 import type { SessionUsage } from "./usage";

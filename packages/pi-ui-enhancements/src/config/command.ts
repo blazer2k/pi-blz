@@ -4,8 +4,9 @@ import {
   type ExtensionAPI,
 } from "@earendil-works/pi-coding-agent";
 import { Container, SettingsList } from "@earendil-works/pi-tui";
-import { getConfig, saveConfig, type ConfigKey } from "./config";
-import { getSettingItems } from "./config/settings";
+import type { ConfigKey } from "./definition";
+import { getSettingItems } from "./settings";
+import { getConfig, saveConfig } from "./store";
 
 export function registerConfigCommand(
   pi: ExtensionAPI,

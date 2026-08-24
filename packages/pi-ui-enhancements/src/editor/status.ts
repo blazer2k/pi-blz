@@ -1,5 +1,5 @@
-import type { Config } from "../config";
-import { shortenPath } from "../path-utils";
+import type { Config } from "../config/definition";
+import { shortenPath } from "../shared/path";
 import type { EditorFrameData } from "./frame";
 import { formatTokens, type SessionUsage } from "./usage";
 

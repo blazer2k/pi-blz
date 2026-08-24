@@ -4,9 +4,13 @@ import type {
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { ExtensionRunner } from "@earendil-works/pi-coding-agent";
-import { mkTheme, mkToolCtx } from "./test-helpers";
+import {
+  cleanRunnerProto,
+  CUSTOM_TOOL_PATCH_STATE,
+  mkTheme,
+  mkToolCtx,
+} from "./testing/helpers";
 import ext from "./index";
-import { cleanRunnerProto, CUSTOM_TOOL_PATCH_STATE } from "./test-helpers";
 
 beforeEach(cleanRunnerProto);
 afterEach(cleanRunnerProto);

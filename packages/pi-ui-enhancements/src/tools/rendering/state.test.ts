@@ -11,8 +11,8 @@ import {
 } from "./state";
 import { formatTreeLine, getCallRenderParts } from "./tree";
 import type { BaseRenderState } from "./types";
-import { saveConfig } from "../../config";
-import { mkTheme } from "../../test-helpers";
+import { saveConfig } from "../../config/store";
+import { mkTheme } from "../../testing/helpers";
 
 describe("updateResultState", () => {
   it("returns true only when state changes", () => {

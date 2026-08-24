@@ -4,7 +4,7 @@ import type {
   ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
-import { getConfig } from "../../config";
+import { getConfig } from "../../config/store";
 import {
   buildResultStatusParts,
   getMaxCallWidth,

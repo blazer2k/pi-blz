@@ -1,7 +1,11 @@
 import { describe, expect, it } from "bun:test";
-import { getConfig, type ConfigKey } from "../config";
-import { applyConfigUpdate, getDefaultConfig } from "./definition";
+import {
+  applyConfigUpdate,
+  getDefaultConfig,
+  type ConfigKey,
+} from "./definition";
 import { getSettingItems } from "./settings";
+import { getConfig } from "./store";
 
 describe("getSettingItems", () => {
   it("defines every config key exactly once", () => {

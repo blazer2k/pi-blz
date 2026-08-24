@@ -9,9 +9,9 @@ import {
   mkTheme,
   mkToolCtx,
   setupTool,
-} from "../../test-helpers";
+} from "../../testing/helpers";
 import { patchBashTool } from "../bash";
-import { patchCustomToolRendering } from "../custom-tools";
+import { patchCustomToolRendering } from "../custom-tools/patch-manager";
 import { patchEditTool } from "../edit";
 import { patchFindTool } from "../find";
 import { patchReadTool } from "../read";

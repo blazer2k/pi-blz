@@ -1,5 +1,5 @@
 import { keyText, type Theme } from "@earendil-works/pi-coding-agent";
-import { getConfig } from "../../config";
+import { getConfig } from "../../config/store";
 import type { BaseRenderState, BlinkIndicator } from "./types";
 
 export function getBlinkIndicator(): BlinkIndicator {

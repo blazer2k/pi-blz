@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { getConfig, loadConfig, saveConfig } from "./config";
+import { getConfig, loadConfig, saveConfig } from "./store";
 
 let configDir: string;
 let previousConfigPath: string | undefined;

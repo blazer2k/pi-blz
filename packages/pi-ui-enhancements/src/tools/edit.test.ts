@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeAll, afterAll } from "bun:test";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { patchEditTool, parseDiffStats } from "./edit";
-import { mkTheme, mkToolCtx, setupTool } from "../test-helpers";
+import { mkTheme, mkToolCtx, setupTool } from "../testing/helpers";
 
 function setupEditTool() {
   return setupTool(patchEditTool);

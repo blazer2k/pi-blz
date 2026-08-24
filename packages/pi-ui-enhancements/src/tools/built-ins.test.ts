@@ -3,8 +3,8 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadConfig, saveConfig } from "../config";
-import { patchTools } from ".";
+import { loadConfig, saveConfig } from "../config/store";
+import { patchTools } from "./built-ins";
 
 let configDir: string;
 let previousConfigPath: string | undefined;

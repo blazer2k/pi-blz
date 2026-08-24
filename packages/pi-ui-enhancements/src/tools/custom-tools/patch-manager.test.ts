@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { describe, expect, it, beforeEach, afterEach } from "bun:test";
 import { ExtensionRunner } from "@earendil-works/pi-coding-agent";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
-import { loadConfig, saveConfig } from "../../config";
-import { cleanRunnerProto, mkTheme, mkToolCtx } from "../../test-helpers";
+import { loadConfig, saveConfig } from "../../config/store";
+import { cleanRunnerProto, mkTheme, mkToolCtx } from "../../testing/helpers";
 import { clearBlinkTimers } from "../rendering/state";
 import { patchCustomToolRendering } from "./patch-manager";
 
@@ -100,19 +100,6 @@ describe("patchCustomToolRendering", () => {
     );
   });
 
-  it("dispose restores original prototype method", () => {
-    const original = function () {
-      return [];
-    };
-    proto.getAllRegisteredTools = original;
-
-    const handle = patchCustomToolRendering();
-    expect(proto.getAllRegisteredTools).not.toBe(original);
-
-    handle.dispose();
-    expect(proto.getAllRegisteredTools).toBe(original);
-  });
-
   it("dispose restores the complete original property descriptor", () => {
     const original = function () {
       return [];
@@ -129,6 +116,7 @@ describe("patchCustomToolRendering", () => {
     );
 
     const handle = patchCustomToolRendering();
+    expect(proto.getAllRegisteredTools).not.toBe(original);
     handle.dispose();
 
     expect(

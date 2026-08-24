@@ -6,8 +6,8 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import figlet from "figlet";
-import { getConfig } from "./config";
-import type { Handle } from "./types";
+import { getConfig } from "../config/store";
+import type { Handle } from "../shared/handle";
 
 export interface AsciiHeaderConfig {
   enabled: boolean;

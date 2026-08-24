@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { initTheme, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { mkTheme } from "./test-helpers";
-import { registerConfigCommand } from "./settings-command";
+import { mkTheme } from "../testing/helpers";
+import { registerConfigCommand } from "./command";
 
 type CommandDefinition = Parameters<ExtensionAPI["registerCommand"]>[1];
 

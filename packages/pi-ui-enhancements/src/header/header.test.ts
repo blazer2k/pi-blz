@@ -6,7 +6,7 @@ import {
   type AsciiHeaderData,
   buildAsciiHeader,
   buildAsciiHeaderData,
-} from "./ascii-header";
+} from "./header";
 
 const theme = {
   fg: (_color: string, text: string) => text,

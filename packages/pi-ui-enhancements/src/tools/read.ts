@@ -3,7 +3,7 @@ import {
   type ExtensionAPI,
   type ReadToolInput,
 } from "@earendil-works/pi-coding-agent";
-import type { Handle } from "../types";
+import type { Handle } from "../shared/handle";
 import { renderReadCall } from "./read/call";
 import { formatReadResult } from "./read/result";
 import {

@@ -25,7 +25,7 @@ import {
   setExpandableCallText,
 } from "./rendering/tree";
 import type { BaseRenderState } from "./rendering/types";
-import type { Handle } from "../types";
+import type { Handle } from "../shared/handle";
 import {
   createCwdDeferredTool,
   registerPatchedTool,

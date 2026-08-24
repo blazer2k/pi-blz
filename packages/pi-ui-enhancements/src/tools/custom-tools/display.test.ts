@@ -4,7 +4,7 @@ import {
   hyperlink,
   setCapabilities,
 } from "@earendil-works/pi-tui";
-import { mkTheme } from "../../test-helpers";
+import { mkTheme } from "../../testing/helpers";
 import {
   applyArgumentHyperlinks,
   buildGenericCallHeader,
