@@ -6,7 +6,7 @@ import type {
 import { ExtensionRunner } from "@earendil-works/pi-coding-agent";
 import { mkTheme, mkToolCtx } from "./test-helpers";
 import ext from "./index";
-import { cleanRunnerProto, PROTOTYPE_PATCHED } from "./test-helpers";
+import { cleanRunnerProto, CUSTOM_TOOL_PATCH_STATE } from "./test-helpers";
 
 beforeEach(cleanRunnerProto);
 afterEach(cleanRunnerProto);
@@ -184,7 +184,7 @@ describe("extension lifecycle", () => {
       string | symbol,
       unknown
     >;
-    expect(proto[PROTOTYPE_PATCHED]).toBeUndefined();
+    expect(proto[CUSTOM_TOOL_PATCH_STATE]).toBeUndefined();
   });
 
   it("session_shutdown clears tool timers on later sessions", () => {

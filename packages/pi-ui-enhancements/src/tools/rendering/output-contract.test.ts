@@ -9,14 +9,14 @@ import {
   mkTheme,
   mkToolCtx,
   setupTool,
-} from "../test-helpers";
-import { patchBashTool } from "./bash";
-import { patchCustomToolRendering } from "./custom-tool-rendering";
-import { patchEditTool } from "./edit";
-import { patchFindTool } from "./find";
-import { patchReadTool } from "./read";
-import { clearBlinkTimers } from "./tool-rendering";
-import { patchWriteTool } from "./write";
+} from "../../test-helpers";
+import { patchBashTool } from "../bash";
+import { patchCustomToolRendering } from "../custom-tools";
+import { patchEditTool } from "../edit";
+import { patchFindTool } from "../find";
+import { patchReadTool } from "../read";
+import { patchWriteTool } from "../write";
+import { clearBlinkTimers } from "./state";
 
 type Renderable = { render(width: number): string[] };
 type ToolResult = {
@@ -30,9 +30,9 @@ beforeAll(async () => {
   // keyText() resolves Pi's own TUI instance, which is nested in the installed
   // Pi package in this workspace.
   const piTui =
-    await import("../../../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-tui/dist/index.js");
+    await import("../../../../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-tui/dist/index.js");
   const piKeybindings =
-    await import("../../../../node_modules/@earendil-works/pi-coding-agent/dist/core/keybindings.js");
+    await import("../../../../../node_modules/@earendil-works/pi-coding-agent/dist/core/keybindings.js");
   const previous = piTui.getKeybindings();
   piTui.setKeybindings(new piKeybindings.KeybindingsManager());
   restorePiKeybindings = () => piTui.setKeybindings(previous);

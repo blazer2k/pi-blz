@@ -1,6 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { buildExpansionHint, formatTreeLine } from "../tool-rendering";
+import { buildExpansionHint } from "../rendering/state";
+import { formatTreeLine } from "../rendering/tree";
 import { buildBashMetadataParts, joinMetadata } from "./metadata";
 import type { BashSuccessView } from "./model";
 import {

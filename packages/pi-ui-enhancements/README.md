@@ -80,6 +80,8 @@ When another footer replaces this extension's footer, Pi disposes the previous f
 
 By default, the extension monkey-patches `ExtensionRunner.prototype.getAllRegisteredTools` to intercept third-party tool definitions and wrap their output in the same compact format. Built-in tools and tools with `renderShell: "self"` are left alone.
 
+The compatibility layer tracks each extension instance independently and restores Pi's original method only while it still owns the prototype slot. Unexpected registry shapes leave Pi's values unchanged, renderer failures use generic output, and each compatibility problem is reported once instead of interrupting tool execution. A prototype patch installed later by another extension is never overwritten during cleanup.
+
 Custom tool call labels are capitalized by default while preserving the tool's own `renderCall()` layout when possible. For example, `mcp` becomes `Mcp`.
 
 If you prefer third-party tools to render natively, disable `patchCustomTools` in the settings menu. If you prefer lowercase custom tool labels, disable `capitalizeToolNames`.

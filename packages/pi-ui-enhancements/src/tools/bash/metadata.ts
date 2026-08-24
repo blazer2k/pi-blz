@@ -2,7 +2,7 @@ import type {
   Theme,
   ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
-import { buildResultStatusParts } from "../tool-rendering";
+import { buildResultStatusParts } from "../rendering/state";
 import { formatDuration } from "./output";
 import type { BashDetailsWithTiming, BashRenderState } from "./types";
 

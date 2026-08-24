@@ -2,7 +2,7 @@ import {
   type BashToolDetails,
   type BashToolInput as NativeBashToolInput,
 } from "@earendil-works/pi-coding-agent";
-import type { BaseRenderState } from "../tool-rendering";
+import type { BaseRenderState } from "../rendering/types";
 
 export type BashToolInput = NativeBashToolInput;
 

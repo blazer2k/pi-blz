@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { saveConfig } from "../config";
 import { patchBashTool } from "./bash";
-import { clearBlinkTimers } from "./tool-rendering";
+import { clearBlinkTimers } from "./rendering/state";
 import { mkTheme, mkToolCtx, setupTool } from "../test-helpers";
 import { PI_0_84_3_OUTPUT } from "./test-fixtures/pi-0.84.3";
 

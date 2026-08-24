@@ -4,11 +4,9 @@ import {
   visibleWidth,
   type Text,
 } from "@earendil-works/pi-tui";
-import {
-  getCallRenderParts,
-  getMaxCallWidth,
-  sanitizeMultilineDisplayText,
-} from "../tool-rendering";
+import { getMaxCallWidth } from "../rendering/state";
+import { sanitizeMultilineDisplayText } from "../rendering/text";
+import { getCallRenderParts } from "../rendering/tree";
 import type { BashRenderState, BashToolInput } from "./types";
 
 type BashCallContext = {

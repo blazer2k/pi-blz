@@ -15,17 +15,20 @@ import {
 import type { Handle } from "../types";
 import {
   buildRenderResult,
+  formatSimpleErrorResult,
+} from "./rendering/results";
+import {
   buildResultStatusParts,
   buildToolExpansionHint,
-  extractTextContent,
-  formatSimpleErrorResult,
+  getMaxCallWidth,
+} from "./rendering/state";
+import { extractTextContent, renderPath } from "./rendering/text";
+import {
   formatTreeLine,
   getCallRenderParts,
-  getMaxCallWidth,
-  renderPath,
   setExpandableCallText,
-  type BaseRenderState,
-} from "./tool-rendering";
+} from "./rendering/tree";
+import type { BaseRenderState } from "./rendering/types";
 
 export function parseDiffStats(diff: string): {
   added: number;

@@ -1,4 +1,4 @@
-import { normalizeOutput } from "../tool-rendering";
+import { normalizeOutput } from "../rendering/text";
 import type { BashDetailsWithTiming } from "./types";
 
 const BASH_STATUS_PATTERN =

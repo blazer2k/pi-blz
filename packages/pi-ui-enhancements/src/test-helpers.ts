@@ -36,18 +36,8 @@ export function setupTool(
   return definition!;
 }
 
-export const PROTOTYPE_PATCHED = Symbol.for(
-  "pi-ui-enhancements.prototypePatched",
-);
-export const PATCH_REF_COUNT = Symbol.for("pi-ui-enhancements.patchRefCount");
-export const ORIGINAL_GET_ALL_TOOLS = Symbol.for(
-  "pi-ui-enhancements.originalGetAllTools",
-);
-export const PATCHED_GET_ALL_TOOLS = Symbol.for(
-  "pi-ui-enhancements.patchedGetAllTools",
-);
-export const WRAPPED_DEFINITION_CACHE = Symbol.for(
-  "pi-ui-enhancements.wrappedDefinitionCache",
+export const CUSTOM_TOOL_PATCH_STATE = Symbol.for(
+  "@blazer2k/pi-ui-enhancements/custom-tools/patch-state/v1",
 );
 
 export function mkToolCtx(overrides: Record<string, unknown> = {}) {
@@ -73,12 +63,15 @@ export function cleanRunnerProto() {
     string | symbol,
     unknown
   >;
-  if (proto[ORIGINAL_GET_ALL_TOOLS]) {
-    proto.getAllRegisteredTools = proto[ORIGINAL_GET_ALL_TOOLS];
+  const state = proto[CUSTOM_TOOL_PATCH_STATE] as
+    | { originalDescriptor?: PropertyDescriptor }
+    | undefined;
+  if (state?.originalDescriptor) {
+    Object.defineProperty(
+      proto,
+      "getAllRegisteredTools",
+      state.originalDescriptor,
+    );
   }
-  delete proto[ORIGINAL_GET_ALL_TOOLS];
-  delete proto[PATCHED_GET_ALL_TOOLS];
-  delete proto[WRAPPED_DEFINITION_CACHE];
-  delete proto[PATCH_REF_COUNT];
-  delete proto[PROTOTYPE_PATCHED];
+  delete proto[CUSTOM_TOOL_PATCH_STATE];
 }

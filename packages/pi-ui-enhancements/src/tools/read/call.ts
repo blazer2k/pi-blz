@@ -16,13 +16,10 @@ import {
   visibleWidth,
   type Text,
 } from "@earendil-works/pi-tui";
-import {
-  type BaseRenderState,
-  getCallRenderParts,
-  getMaxCallWidth,
-  renderPath,
-  setExpandableCallText,
-} from "../tool-rendering";
+import { getMaxCallWidth } from "../rendering/state";
+import { renderPath } from "../rendering/text";
+import { getCallRenderParts, setExpandableCallText } from "../rendering/tree";
+import type { BaseRenderState } from "../rendering/types";
 
 const COMPACT_RESOURCE_FILE_NAMES = new Set([
   "AGENTS.md",

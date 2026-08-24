@@ -10,7 +10,7 @@ import {
   createCwdDeferredTool,
   registerPatchedTool,
 } from "./tool-registration";
-import { buildRenderResult } from "./tool-rendering";
+import { buildRenderResult } from "./rendering/results";
 
 export function patchReadTool(pi: ExtensionAPI): Handle {
   const tool = createCwdDeferredTool(createReadToolDefinition);

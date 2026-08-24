@@ -3,7 +3,7 @@ import type {
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import type { Handle } from "../types";
-import { clearBlinkTimers } from "./tool-rendering";
+import { clearBlinkTimers } from "./rendering/state";
 
 // Loose tool type: concrete tool definitions (with their own parameter,
 // details, and state generics) are all assignable to it, while any remains

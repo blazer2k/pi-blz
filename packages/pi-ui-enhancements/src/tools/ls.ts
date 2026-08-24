@@ -9,28 +9,19 @@ import {
   createCwdDeferredTool,
   registerPatchedTool,
 } from "./tool-registration";
-import {
-  type BaseRenderState,
-  type ListResultConfig,
-  buildRenderResult,
-  formatListResult,
-  getCallRenderParts,
-  getMaxCallWidth,
-  renderPath,
-  setExpandableCallText,
-} from "./tool-rendering";
+import { splitNativeListOutput } from "./list-rendering";
+import { buildRenderResult, formatListResult } from "./rendering/results";
+import { getMaxCallWidth } from "./rendering/state";
+import { renderPath } from "./rendering/text";
+import { getCallRenderParts, setExpandableCallText } from "./rendering/tree";
+import type { BaseRenderState, ListResultConfig } from "./rendering/types";
 
 const LS_CONFIG: ListResultConfig = {
   emptyMessage: "(empty directory)",
   singularLabel: "entry",
   pluralLabel: "entries",
   moreLabel: "more entries",
-  preprocess: (text) => {
-    const body = text.includes("\n\n[")
-      ? text.slice(0, text.lastIndexOf("\n\n["))
-      : text;
-    return body.split("\n").filter((entry) => entry.length > 0);
-  },
+  preprocess: splitNativeListOutput,
 };
 
 export function patchLsTool(pi: ExtensionAPI): Handle {

@@ -1,9 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import {
-  formatTreeLine,
-  getMaxCallWidth,
-  normalizeOutput,
-} from "../tool-rendering";
+import { getMaxCallWidth } from "../rendering/state";
+import { normalizeOutput } from "../rendering/text";
+import { formatTreeLine } from "../rendering/tree";
 
 // "● " (status symbol + space) + "├─ " (tree connector) + 1 buffer.
 const TREE_PREFIX_WIDTH = 6;

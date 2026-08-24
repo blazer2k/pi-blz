@@ -1,10 +1,10 @@
 import type { ToolRenderResultOptions } from "@earendil-works/pi-coding-agent";
+import { formatErrorBody } from "../rendering/results";
 import {
   countLines,
   extractTextContent,
-  formatErrorBody,
   normalizeOutput,
-} from "../tool-rendering";
+} from "../rendering/text";
 import { getDurationSummary } from "./metadata";
 import { parseBashErrorText, stripBashTruncationNotice } from "./native-output";
 import type {

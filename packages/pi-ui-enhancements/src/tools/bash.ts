@@ -15,12 +15,12 @@ import {
   registerPatchedTool,
 } from "./tool-registration";
 import {
-  getResultText,
   invalidateIfChanged,
   registerToolTimer,
   unregisterToolTimer,
   updateResultState,
-} from "./tool-rendering";
+} from "./rendering/state";
+import { getResultText } from "./rendering/tree";
 
 const DURATION_UPDATE_INTERVAL_MS = 250;
 

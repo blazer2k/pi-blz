@@ -22,19 +22,11 @@ import {
   sanitizeRenderedText,
 } from "./display";
 import { buildGenericResult } from "./result";
+import type { CustomToolRenderingReporter } from "./types";
 
-const BUILTIN_TOOLS = new Set([
-  "read",
-  "write",
-  "edit",
-  "bash",
-  "powershell",
-  "ls",
-  "find",
-  "grep",
-]);
-
-export const WRAPPED_TOOL = Symbol.for("pi-ui-enhancements.wrappedTool");
+export const WRAPPED_TOOL = Symbol.for(
+  "@blazer2k/pi-ui-enhancements/custom-tools/wrapped/v1",
+);
 
 type CustomRenderState = BaseRenderState & {
   callComponent?: Component;
@@ -54,12 +46,13 @@ function getCustomState(state: unknown): CustomRenderState {
 export function shouldWrapDefinition(
   definition: ToolDefinition & { [WRAPPED_TOOL]?: boolean },
 ): boolean {
-  return (
-    !definition[WRAPPED_TOOL] &&
-    !BUILTIN_TOOLS.has(definition.name) &&
-    definition.renderShell !== "self"
-  );
+  return !definition[WRAPPED_TOOL] && definition.renderShell !== "self";
 }
+
+type DefinitionAdapterOptions = {
+  isToolCallActive: (toolCallId: string) => boolean;
+  reportIssue: CustomToolRenderingReporter;
+};
 
 function renderComponentLines(component: Component): string[] {
   return component
@@ -91,12 +84,12 @@ function formatEmptyResult(
 function createCallRenderer(
   definition: ToolDefinition,
   originalRenderCall: ToolDefinition["renderCall"],
-  isToolCallActive: (toolCallId: string) => boolean,
+  options: DefinitionAdapterOptions,
 ): NonNullable<ToolDefinition["renderCall"]> {
   return (args, theme, toolContext) => {
     const state = getCustomState(toolContext.state);
     const { text, prefix } = getCallRenderParts(state, theme, toolContext, {
-      animate: isToolCallActive(toolContext.toolCallId),
+      animate: options.isToolCallActive(toolContext.toolCallId),
     });
     const config = getConfig();
     const maxWidth = getMaxCallWidth();
@@ -124,8 +117,13 @@ function createCallRenderer(
           ),
         );
         return text;
-      } catch {
+      } catch (error) {
         state.callComponent = undefined;
+        options.reportIssue({
+          stage: "renderCall",
+          toolName: definition.name,
+          error,
+        });
       }
     }
 
@@ -146,7 +144,9 @@ function createCallRenderer(
 }
 
 function createResultRenderer(
+  definition: ToolDefinition,
   originalRenderResult: ToolDefinition["renderResult"],
+  reportIssue: CustomToolRenderingReporter,
 ): NonNullable<ToolDefinition["renderResult"]> {
   return (result, options, theme, toolContext) => {
     const state = getCustomState(toolContext.state);
@@ -171,7 +171,12 @@ function createResultRenderer(
         ...toolContext,
         lastComponent: state.resultComponent,
       });
-    } catch {
+    } catch (error) {
+      reportIssue({
+        stage: "renderResult",
+        toolName: definition.name,
+        error,
+      });
       text.setText(buildGenericResult(result, state, options, theme));
       return text;
     }
@@ -200,17 +205,17 @@ function createResultRenderer(
 
 export function createWrappedDefinition<T extends ToolDefinition>(
   definition: T,
-  isToolCallActive: (toolCallId: string) => boolean,
+  options: DefinitionAdapterOptions,
 ): T {
   return {
     ...definition,
     [WRAPPED_TOOL]: true,
     renderShell: "self",
-    renderCall: createCallRenderer(
+    renderCall: createCallRenderer(definition, definition.renderCall, options),
+    renderResult: createResultRenderer(
       definition,
-      definition.renderCall,
-      isToolCallActive,
+      definition.renderResult,
+      options.reportIssue,
     ),
-    renderResult: createResultRenderer(definition.renderResult),
   } as T;
 }

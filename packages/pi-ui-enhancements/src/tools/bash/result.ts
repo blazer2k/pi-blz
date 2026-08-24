@@ -2,7 +2,7 @@ import type {
   Theme,
   ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
-import { getMaxCollapsedLines } from "../tool-rendering";
+import { getMaxCollapsedLines } from "../rendering/state";
 import { renderCommandError, renderUnknownError } from "./error-result";
 import { buildBashResultView } from "./model";
 import { renderBashSuccess } from "./success-result";

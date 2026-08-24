@@ -3,8 +3,8 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { registerAsciiHeader } from "./ascii-header";
 import { registerRoundedEditor } from "./rounded-editor";
 import { patchTools } from "./tools";
-import { patchCustomToolRendering } from "./tools/custom-tool-rendering";
-import { clearBlinkTimers } from "./tools/tool-rendering";
+import { patchCustomToolRendering } from "./tools/custom-tools";
+import { clearBlinkTimers } from "./tools/rendering/state";
 import type { Handle } from "./types";
 import { registerWorkingIndicator } from "./working-indicator";
 import {

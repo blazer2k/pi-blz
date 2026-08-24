@@ -1,5 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { buildExpansionHint } from "../tool-rendering";
+import { buildExpansionHint } from "../rendering/state";
 import { buildBashMetadataParts, joinMetadata } from "./metadata";
 import type { BashCommandErrorView, BashUnknownErrorView } from "./model";
 import {

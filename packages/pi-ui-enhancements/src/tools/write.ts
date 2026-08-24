@@ -8,23 +8,23 @@ import {
   type WriteToolInput,
 } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
+import { formatSimpleErrorResult } from "./rendering/results";
 import {
   buildResultStatusParts,
   buildToolExpansionHint,
-  countLines,
-  extractTextContent,
-  formatSimpleErrorResult,
+  getMaxCallWidth,
+  getMaxExpandedEntries,
+  invalidateIfChanged,
+  updateResultState,
+} from "./rendering/state";
+import { countLines, extractTextContent, renderPath } from "./rendering/text";
+import {
   formatTreeLine,
   getCallRenderParts,
   getResultText,
-  invalidateIfChanged,
-  getMaxCallWidth,
-  getMaxExpandedEntries,
-  renderPath,
   setExpandableCallText,
-  updateResultState,
-  type BaseRenderState,
-} from "./tool-rendering";
+} from "./rendering/tree";
+import type { BaseRenderState } from "./rendering/types";
 import type { Handle } from "../types";
 import {
   createCwdDeferredTool,

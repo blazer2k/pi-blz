@@ -3,17 +3,18 @@ import type {
   ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
 import {
-  type ResultStatusState,
   buildResultStatusParts,
   buildToolExpansionHint,
+  getMaxCallWidth,
+} from "../rendering/state";
+import { formatSimpleErrorResult } from "../rendering/results";
+import {
   countLines,
   extractTextContent,
-  formatSimpleErrorResult,
-  formatTreeLine,
-  getMaxCallWidth,
   sanitizeDisplayText,
-} from "../tool-rendering";
-import type { ToolTextResult } from "../rendering/types";
+} from "../rendering/text";
+import { formatTreeLine } from "../rendering/tree";
+import type { ResultStatusState, ToolTextResult } from "../rendering/types";
 
 function stripReadContinuationNotice(text: string): string {
   const normalized = text.endsWith("\n") ? text.slice(0, -1) : text;
