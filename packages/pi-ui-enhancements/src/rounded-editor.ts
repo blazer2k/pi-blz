@@ -141,7 +141,7 @@ function buildBottomLine(
     parts.push(theme.fg("text", `(${data.thinkingLevel})`));
   }
 
-  const bottomLeft = ` ${parts.join(" ")} `;
+  let bottomLeft = ` ${parts.join(" ")} `;
 
   let coloredPct: string;
 
@@ -174,26 +174,32 @@ function buildBottomLine(
   stats.push(coloredPct);
 
   let bottomRight = ` ${stats.join(" ")} `;
-  let left = bottomLeft;
-  let bw = visibleWidth(left);
-  let rw = visibleWidth(bottomRight);
+  let leftWidth = visibleWidth(bottomLeft);
+  let rightWidth = visibleWidth(bottomRight);
   const available = Math.max(1, width - 5);
 
-  if (bw + rw > available) {
-    const rightBudget = Math.min(rw, Math.max(1, Math.floor(available / 2)));
+  if (leftWidth + rightWidth > available) {
+    const rightBudget = Math.min(
+      rightWidth,
+      Math.max(1, Math.floor(available / 2)),
+    );
     const leftBudget = Math.max(1, available - rightBudget);
-    left = truncateToWidth(left, leftBudget, theme.fg("text", "..."));
-    bottomRight = truncateToWidth(
-      bottomRight,
-      Math.max(1, available - visibleWidth(left)),
+    bottomLeft = truncateToWidth(
+      bottomLeft,
+      leftBudget,
       theme.fg("text", "..."),
     );
-    bw = visibleWidth(left);
-    rw = visibleWidth(bottomRight);
+    bottomRight = truncateToWidth(
+      bottomRight,
+      Math.max(1, available - visibleWidth(bottomLeft)),
+      theme.fg("text", "..."),
+    );
+    leftWidth = visibleWidth(bottomLeft);
+    rightWidth = visibleWidth(bottomRight);
   }
 
-  const botGap = Math.max(1, width - 4 - bw - rw);
-  return `${border("╰─")}${left}${border("─".repeat(botGap))}${bottomRight}${border("─╯")}`;
+  const gapWidth = Math.max(1, width - 4 - leftWidth - rightWidth);
+  return `${border("╰─")}${bottomLeft}${border("─".repeat(gapWidth))}${bottomRight}${border("─╯")}`;
 }
 
 function removeSeparatorLine(
