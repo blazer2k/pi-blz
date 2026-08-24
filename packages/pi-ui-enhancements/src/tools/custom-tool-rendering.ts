@@ -1,6 +1,3 @@
-import { homedir } from "node:os";
-import { isAbsolute, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 import {
   ExtensionRunner,
   type RegisteredTool,
@@ -8,29 +5,26 @@ import {
   type ToolDefinition,
   type ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
-import {
-  getCapabilities,
-  hyperlink,
-  type Component,
-} from "@earendil-works/pi-tui";
+import type { Component } from "@earendil-works/pi-tui";
 import { getConfig } from "../config";
 import type { Handle } from "../types";
 import {
-  type BaseRenderState,
-  MAX_CALL_WIDTH,
-  MAX_EXPANDED_ENTRIES,
+  applyArgumentHyperlinks,
+  buildGenericCallHeader,
+  capitalizeFirstVisibleChar,
+  sanitizeRenderedText,
+} from "./custom-rendering/display";
+import { buildGenericResult } from "./custom-rendering/result";
+import {
   buildResultStatusParts,
-  extractTextContent,
-  formatSimpleErrorResult,
-  formatTreeLine,
-  getCallRenderParts,
-  getResultText,
+  getMaxCallWidth,
   invalidateIfChanged,
-  normalizeOutput,
-  safeTruncateToWidth,
-  sanitizeDisplayText,
   updateResultState,
-} from "./tool-rendering";
+} from "./rendering/state";
+import { extractTextContent, safeTruncateToWidth } from "./rendering/text";
+import { formatSimpleErrorResult } from "./rendering/results";
+import { getCallRenderParts, getResultText } from "./rendering/tree";
+import type { BaseRenderState } from "./rendering/types";
 
 const BUILTIN_TOOLS = new Set([
   "read",
@@ -54,7 +48,6 @@ const WRAPPED_TOOL = Symbol.for("pi-ui-enhancements.wrappedTool");
 const WRAPPED_DEFINITION_CACHE = Symbol.for(
   "pi-ui-enhancements.wrappedDefinitionCache",
 );
-const MIN_LINK_PREFIX_LENGTH = 24;
 
 type PatchedRunnerPrototype = ExtensionRunner & {
   [PROTOTYPE_PATCHED]?: boolean;
@@ -81,272 +74,24 @@ function getCustomState(state: unknown): CustomRenderState {
 
 function shouldWrapTool(
   definition: ToolDefinition & { [WRAPPED_TOOL]?: boolean },
-) {
-  if (definition[WRAPPED_TOOL]) return false;
-  if (BUILTIN_TOOLS.has(definition.name)) return false;
-  if (definition.renderShell === "self") return false;
-  return true;
-}
-
-function sanitizeRenderedText(value: string): string {
-  let output = "";
-  let index = 0;
-
-  while (index < value.length) {
-    const char = value[index];
-
-    if (char === "\u001B") {
-      if (value[index + 1] === "[") {
-        let end = index + 2;
-        while (end < value.length && !/[\x40-\x7E]/.test(value[end]!)) {
-          end++;
-        }
-        if (end < value.length) {
-          const sequence = value.slice(index, end + 1);
-          const body = sequence.slice(2, -1);
-          if (sequence.endsWith("m") && /^[\d;:]*$/.test(body)) {
-            output += sequence;
-          }
-          index = end + 1;
-          continue;
-        }
-      }
-
-      if (value[index + 1] === "]" || value[index + 1] === "_") {
-        const belEnd = value.indexOf("\u0007", index + 2);
-        const stEnd = value.indexOf("\u001B\\", index + 2);
-        const usesBel = belEnd !== -1 && (stEnd === -1 || belEnd < stEnd);
-        const end = usesBel ? belEnd : stEnd;
-        index = end === -1 ? value.length : end + (usesBel ? 1 : 2);
-        continue;
-      }
-
-      index++;
-      continue;
-    }
-
-    const code = char?.codePointAt(0);
-    if (
-      code !== undefined &&
-      (code === 0x09 || code === 0x0a || code === 0x0d || code > 0x1f) &&
-      (code < 0xfff9 || code > 0xfffb)
-    ) {
-      output += char;
-    }
-    index++;
-  }
-
-  return output.replace(/\r/g, "").replace(/[\n\t]+/g, " ");
-}
-
-function getEscapeSequenceEnd(text: string, start: number): number {
-  const next = text[start + 1];
-
-  if (next === "[") {
-    for (let i = start + 2; i < text.length; i++) {
-      if (/[\x40-\x7E]/.test(text[i]!)) return i;
-    }
-    return start;
-  }
-
-  if (next === "]" || next === "_") {
-    const belEnd = text.indexOf("\u0007", start + 2);
-    const stEnd = text.indexOf("\u001B\\", start + 2);
-    if (belEnd === -1 && stEnd === -1) return start;
-    if (belEnd !== -1 && (stEnd === -1 || belEnd < stEnd)) return belEnd;
-    return stEnd + 1;
-  }
-
-  return start;
-}
-
-function capitalizeFirstVisibleChar(text: string): string {
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i]!;
-
-    if (char === "\u001B") {
-      i = getEscapeSequenceEnd(text, i);
-      continue;
-    }
-
-    if (/\s/.test(char)) continue;
-
-    const upper = char.toUpperCase();
-    if (upper !== char) {
-      return text.slice(0, i) + upper + text.slice(i + char.length);
-    }
-    break;
-  }
-  return text;
-}
-
-function buildGenericCallHeader(
-  args: Record<string, unknown>,
-  label: string,
-  theme: Theme,
-): string {
-  const parts: string[] = [];
-
-  for (const [key, value] of Object.entries(args ?? {})) {
-    if (value == null) continue;
-    if (typeof value === "string" && value.length > 80) continue;
-    if (typeof value === "object") continue;
-    parts.push(
-      `${sanitizeDisplayText(key)}=${sanitizeDisplayText(JSON.stringify(value))}`,
-    );
-  }
-
-  const preview = parts.slice(0, 3).join(" ");
-  const raw =
-    theme.fg("toolTitle", theme.bold(label)) +
-    (preview ? ` ${theme.fg("accent", preview)}` : "");
-
-  return safeTruncateToWidth(raw, MAX_CALL_WIDTH(), theme.fg("accent", "..."));
-}
-
-type LinkTarget = {
-  display: string;
-  url: string;
-};
-
-function collectStringValues(
-  value: unknown,
-  output: Set<string>,
-  depth = 0,
-): void {
-  if (depth > 5 || value == null) return;
-
-  if (typeof value === "string") {
-    output.add(value);
-    return;
-  }
-
-  if (Array.isArray(value)) {
-    for (const item of value) collectStringValues(item, output, depth + 1);
-    return;
-  }
-
-  if (typeof value === "object") {
-    for (const item of Object.values(value)) {
-      collectStringValues(item, output, depth + 1);
-    }
-  }
-}
-
-function getUrlTarget(value: string): string | undefined {
-  try {
-    const url = new URL(value);
-    return ["http:", "https:", "file:"].includes(url.protocol)
-      ? url.href
-      : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function getPathTarget(value: string, cwd: string): string | undefined {
-  if (/\s/.test(value)) return undefined;
-
-  const expanded = value.startsWith("~/")
-    ? resolve(homedir(), value.slice(2))
-    : value;
-
-  if (isAbsolute(expanded)) return pathToFileURL(expanded).href;
-  if (value.startsWith("./") || value.startsWith("../")) {
-    return pathToFileURL(resolve(cwd, value)).href;
-  }
-
-  return undefined;
-}
-
-function getLinkTargets(args: unknown, cwd: string): LinkTarget[] {
-  const values = new Set<string>();
-  collectStringValues(args, values);
-
-  return [...values]
-    .map((display) => {
-      const url = getUrlTarget(display) ?? getPathTarget(display, cwd);
-      return url ? { display, url } : undefined;
-    })
-    .filter((target): target is LinkTarget => target !== undefined)
-    .sort((a, b) => b.display.length - a.display.length);
-}
-
-function getLongestVisibleTargetPrefix(
-  text: string,
-  target: LinkTarget,
-): string | undefined {
-  const maxLength = Math.min(target.display.length, text.length);
-
-  for (let length = maxLength; length >= MIN_LINK_PREFIX_LENGTH; length--) {
-    const prefix = target.display.slice(0, length);
-    if (text.includes(prefix)) return prefix;
-  }
-
-  return undefined;
-}
-
-type LinkReplacement = {
-  start: number;
-  end: number;
-  display: string;
-  url: string;
-};
-
-function overlapsExistingReplacement(
-  replacements: LinkReplacement[],
-  start: number,
-  end: number,
 ): boolean {
-  return replacements.some(
-    (replacement) => start < replacement.end && end > replacement.start,
+  return (
+    !definition[WRAPPED_TOOL] &&
+    !BUILTIN_TOOLS.has(definition.name) &&
+    definition.renderShell !== "self"
   );
 }
 
-function applyArgumentHyperlinks(
-  text: string,
-  args: unknown,
-  cwd: string,
-): string {
-  if (!getCapabilities().hyperlinks || text.includes("\u001B]8;")) return text;
-
-  const replacements: LinkReplacement[] = [];
-
-  for (const target of getLinkTargets(args, cwd)) {
-    const display = text.includes(target.display)
-      ? target.display
-      : getLongestVisibleTargetPrefix(text, target);
-
-    if (!display) continue;
-
-    const start = text.indexOf(display);
-    const end = start + display.length;
-    if (start === -1 || overlapsExistingReplacement(replacements, start, end)) {
-      continue;
-    }
-
-    replacements.push({ start, end, display, url: target.url });
-  }
-
-  if (replacements.length === 0) return text;
-
-  replacements.sort((a, b) => a.start - b.start);
-
-  let linked = "";
-  let cursor = 0;
-  for (const replacement of replacements) {
-    linked += text.slice(cursor, replacement.start);
-    linked += hyperlink(replacement.display, replacement.url);
-    cursor = replacement.end;
-  }
-  linked += text.slice(cursor);
-
-  return linked;
+function renderComponentLines(component: Component): string[] {
+  return component
+    .render(getMaxCallWidth())
+    .map((line) => line.trimEnd())
+    .filter((line) => line.length > 0);
 }
 
-function buildGenericResult(
+function formatEmptyResult(
   result: { content: Array<{ type: string; text?: string }> },
-  state: BaseRenderState,
+  state: CustomRenderState,
   options: ToolRenderResultOptions,
   theme: Theme,
 ): string {
@@ -359,49 +104,119 @@ function buildGenericResult(
     );
   }
 
-  const normalized = normalizeOutput(extractTextContent(result));
-  if (!normalized) {
-    const metadataParts = buildResultStatusParts(state, theme);
-    metadataParts.push(theme.fg("muted", "(no output)"));
-    return (
-      theme.fg("dim", "╰─ ") + metadataParts.join(theme.fg("muted", " • "))
+  const metadata = buildResultStatusParts(state, theme);
+  metadata.push(theme.fg("muted", "(no output)"));
+  return theme.fg("dim", "╰─ ") + metadata.join(theme.fg("muted", " • "));
+}
+
+function createCallRenderer(
+  definition: ToolDefinition,
+  originalRenderCall: ToolDefinition["renderCall"],
+  isToolCallActive: (toolCallId: string) => boolean,
+): NonNullable<ToolDefinition["renderCall"]> {
+  return (args, theme, toolContext) => {
+    const state = getCustomState(toolContext.state);
+    const { text, prefix } = getCallRenderParts(state, theme, toolContext, {
+      animate: isToolCallActive(toolContext.toolCallId),
+    });
+    const config = getConfig();
+    const maxWidth = getMaxCallWidth();
+
+    if (originalRenderCall) {
+      try {
+        const component = originalRenderCall(args, theme, {
+          ...toolContext,
+          lastComponent: state.callComponent,
+        });
+        state.callComponent = component;
+
+        let innerText = sanitizeRenderedText(
+          renderComponentLines(component).join(" "),
+        );
+        if (config.capitalizeToolNames) {
+          innerText = capitalizeFirstVisibleChar(innerText);
+        }
+        innerText = applyArgumentHyperlinks(innerText, args, toolContext.cwd);
+        text.setText(
+          safeTruncateToWidth(
+            prefix + innerText,
+            maxWidth,
+            theme.fg("accent", "..."),
+          ),
+        );
+        return text;
+      } catch {
+        state.callComponent = undefined;
+      }
+    }
+
+    const label =
+      config.capitalizeToolNames && definition.label
+        ? capitalizeFirstVisibleChar(definition.label)
+        : definition.label;
+    const header = buildGenericCallHeader(
+      args as Record<string, unknown>,
+      label,
+      theme,
     );
-  }
-
-  const lines = normalized.split("\n");
-  const total = lines.length;
-  const summary = `${total} ${total === 1 ? "line" : "lines"}`;
-  const metadataParts = buildResultStatusParts(state, theme);
-  metadataParts.push(theme.fg("muted", summary));
-  const metadata = metadataParts.join(theme.fg("muted", " • "));
-
-  if (!options.expanded) {
-    return theme.fg("dim", "╰─ ") + metadata;
-  }
-
-  const visible = lines.slice(0, MAX_EXPANDED_ENTRIES());
-  const remaining = Math.max(0, total - MAX_EXPANDED_ENTRIES());
-  const rendered: string[] = [theme.fg("dim", "├─ ") + metadata];
-
-  visible.forEach((line, index) => {
-    const isLast = index === visible.length - 1 && remaining === 0;
-    rendered.push(
-      formatTreeLine(line, {
-        theme,
-        prefix: isLast ? "╰─ " : "│  ",
-        width: MAX_CALL_WIDTH() - 1,
-        mode: "preserve",
-      }).text,
+    text.setText(
+      safeTruncateToWidth(prefix + header, maxWidth, theme.fg("accent", "...")),
     );
-  });
+    return text;
+  };
+}
 
-  if (remaining > 0) {
-    rendered.push(
-      theme.fg("dim", "╰─ ") + theme.fg("muted", `${remaining} more lines`),
-    );
-  }
+function createResultRenderer(
+  originalRenderResult: ToolDefinition["renderResult"],
+): NonNullable<ToolDefinition["renderResult"]> {
+  return (result, options, theme, toolContext) => {
+    const state = getCustomState(toolContext.state);
+    const text = getResultText(state, options, toolContext.lastComponent);
+    const details = result.details as
+      | { truncation?: { truncated?: boolean } }
+      | undefined;
+    const changed = updateResultState(state, {
+      truncated: details?.truncation?.truncated === true,
+      isError: toolContext.isError,
+    });
+    invalidateIfChanged(changed, toolContext.invalidate);
 
-  return rendered.join("\n");
+    if (!originalRenderResult) {
+      text.setText(buildGenericResult(result, state, options, theme));
+      return text;
+    }
+
+    let component: Component;
+    try {
+      component = originalRenderResult(result, options, theme, {
+        ...toolContext,
+        lastComponent: state.resultComponent,
+      });
+    } catch {
+      text.setText(buildGenericResult(result, state, options, theme));
+      return text;
+    }
+    state.resultComponent = component;
+
+    const innerLines = renderComponentLines(component);
+    if (innerLines.length === 0) {
+      text.setText(formatEmptyResult(result, state, options, theme));
+      return text;
+    }
+
+    const renderedLines = innerLines.map((line, index) => {
+      const prefix = index === innerLines.length - 1 ? "╰─ " : "│  ";
+      return theme.fg("dim", prefix) + line;
+    });
+    if (state.truncated) {
+      const status = buildResultStatusParts(state, theme).join(
+        theme.fg("muted", " • "),
+      );
+      renderedLines.unshift(theme.fg("dim", "├─ ") + status);
+    }
+    text.setText(renderedLines.join("\n"));
+    return text;
+  };
 }
 
 function wrapDefinition<T extends ToolDefinition>(
@@ -410,9 +225,9 @@ function wrapDefinition<T extends ToolDefinition>(
 ): T {
   if (!shouldWrapTool(definition)) return definition;
 
-  const proto = ExtensionRunner.prototype as PatchedRunnerPrototype;
-  proto[WRAPPED_DEFINITION_CACHE] ??= new WeakMap();
-  const cached = proto[WRAPPED_DEFINITION_CACHE].get(definition);
+  const prototype = ExtensionRunner.prototype as PatchedRunnerPrototype;
+  prototype[WRAPPED_DEFINITION_CACHE] ??= new WeakMap();
+  const cached = prototype[WRAPPED_DEFINITION_CACHE].get(definition);
   if (cached) return cached as T;
 
   const originalRenderCall = definition.renderCall;
@@ -422,138 +237,15 @@ function wrapDefinition<T extends ToolDefinition>(
     ...definition,
     [WRAPPED_TOOL]: true,
     renderShell: "self",
-    renderCall(args, theme, toolCtx) {
-      const state = getCustomState(toolCtx.state);
-      const { text, prefix } = getCallRenderParts(state, theme, toolCtx, {
-        animate: isToolCallActive(toolCtx.toolCallId),
-      });
-      const cfg = getConfig();
-
-      if (originalRenderCall) {
-        try {
-          const inner = originalRenderCall(args, theme, {
-            ...toolCtx,
-            lastComponent: state.callComponent,
-          });
-          state.callComponent = inner;
-
-          const renderedLines = inner
-            .render(MAX_CALL_WIDTH())
-            .map((line) => line.trimEnd())
-            .filter((line) => line.length > 0);
-          const rawText = renderedLines.join(" ");
-
-          let innerText = sanitizeRenderedText(rawText);
-          if (cfg.capitalizeToolNames) {
-            innerText = capitalizeFirstVisibleChar(innerText);
-          }
-          const linkedInnerText = applyArgumentHyperlinks(
-            innerText,
-            args,
-            toolCtx.cwd,
-          );
-          text.setText(
-            safeTruncateToWidth(
-              prefix + linkedInnerText,
-              MAX_CALL_WIDTH(),
-              theme.fg("accent", "..."),
-            ),
-          );
-          return text;
-        } catch {
-          state.callComponent = undefined;
-        }
-      }
-
-      const label =
-        cfg.capitalizeToolNames && definition.label
-          ? capitalizeFirstVisibleChar(definition.label)
-          : definition.label;
-      text.setText(
-        safeTruncateToWidth(
-          prefix +
-            buildGenericCallHeader(
-              args as Record<string, unknown>,
-              label,
-              theme,
-            ),
-          MAX_CALL_WIDTH(),
-          theme.fg("accent", "..."),
-        ),
-      );
-      return text;
-    },
-    renderResult(result, options, theme, toolCtx) {
-      const state = getCustomState(toolCtx.state);
-      const text = getResultText(state, options, toolCtx.lastComponent);
-
-      const details = result.details as
-        | { truncation?: { truncated?: boolean } }
-        | undefined;
-      const changed = updateResultState(state, {
-        truncated: details?.truncation?.truncated === true,
-        isError: toolCtx.isError,
-      });
-      invalidateIfChanged(changed, toolCtx.invalidate);
-
-      if (!originalRenderResult) {
-        text.setText(buildGenericResult(result, state, options, theme));
-        return text;
-      }
-
-      let inner: Component;
-      try {
-        inner = originalRenderResult(result, options, theme, {
-          ...toolCtx,
-          lastComponent: state.resultComponent,
-        });
-      } catch {
-        text.setText(buildGenericResult(result, state, options, theme));
-        return text;
-      }
-      state.resultComponent = inner;
-
-      const innerLines = inner
-        .render(MAX_CALL_WIDTH())
-        .map((line) => line.trimEnd())
-        .filter((line) => line.length > 0);
-      if (innerLines.length === 0) {
-        if (state.isError) {
-          text.setText(
-            formatSimpleErrorResult(
-              extractTextContent(result),
-              state,
-              options,
-              theme,
-            ),
-          );
-        } else {
-          const metadataParts = buildResultStatusParts(state, theme);
-          metadataParts.push(theme.fg("muted", "(no output)"));
-          text.setText(
-            theme.fg("dim", "╰─ ") +
-              metadataParts.join(theme.fg("muted", " • ")),
-          );
-        }
-        return text;
-      }
-
-      const renderedLines = innerLines.map((line, index) => {
-        const prefix = index === innerLines.length - 1 ? "╰─ " : "│  ";
-        return theme.fg("dim", prefix) + line;
-      });
-      if (state.truncated) {
-        const status = buildResultStatusParts(state, theme).join(
-          theme.fg("muted", " • "),
-        );
-        renderedLines.unshift(theme.fg("dim", "├─ ") + status);
-      }
-      text.setText(renderedLines.join("\n"));
-      return text;
-    },
+    renderCall: createCallRenderer(
+      definition,
+      originalRenderCall,
+      isToolCallActive,
+    ),
+    renderResult: createResultRenderer(originalRenderResult),
   };
 
-  proto[WRAPPED_DEFINITION_CACHE].set(definition, wrapped);
+  prototype[WRAPPED_DEFINITION_CACHE].set(definition, wrapped);
   return wrapped as T;
 }
 
@@ -566,67 +258,54 @@ function wrapRegisteredTool(
 }
 
 function disposeCustomToolRenderingPatch(): void {
-  const current = ExtensionRunner.prototype as PatchedRunnerPrototype;
-  const nextRefCount = Math.max(0, (current[PATCH_REF_COUNT] ?? 1) - 1);
-  current[PATCH_REF_COUNT] = nextRefCount;
+  const prototype = ExtensionRunner.prototype as PatchedRunnerPrototype;
+  const nextRefCount = Math.max(0, (prototype[PATCH_REF_COUNT] ?? 1) - 1);
+  prototype[PATCH_REF_COUNT] = nextRefCount;
 
   if (nextRefCount > 0) return;
 
   if (
-    current[ORIGINAL_GET_ALL_TOOLS] &&
-    current.getAllRegisteredTools === current[PATCHED_GET_ALL_TOOLS]
+    prototype[ORIGINAL_GET_ALL_TOOLS] &&
+    prototype.getAllRegisteredTools === prototype[PATCHED_GET_ALL_TOOLS]
   ) {
-    current.getAllRegisteredTools = current[ORIGINAL_GET_ALL_TOOLS];
+    prototype.getAllRegisteredTools = prototype[ORIGINAL_GET_ALL_TOOLS];
   }
-  delete current[ORIGINAL_GET_ALL_TOOLS];
-  delete current[PATCHED_GET_ALL_TOOLS];
-  delete current[WRAPPED_DEFINITION_CACHE];
-  delete current[PATCH_REF_COUNT];
-  delete current[PROTOTYPE_PATCHED];
+  delete prototype[ORIGINAL_GET_ALL_TOOLS];
+  delete prototype[PATCHED_GET_ALL_TOOLS];
+  delete prototype[WRAPPED_DEFINITION_CACHE];
+  delete prototype[PATCH_REF_COUNT];
+  delete prototype[PROTOTYPE_PATCHED];
 }
 
 export function patchCustomToolRendering(
   isToolCallActive: (toolCallId: string) => boolean = () => false,
 ): Handle {
-  const proto = ExtensionRunner.prototype as PatchedRunnerPrototype;
+  const prototype = ExtensionRunner.prototype as PatchedRunnerPrototype;
 
-  if (proto[PROTOTYPE_PATCHED]) {
-    proto[PATCH_REF_COUNT] = (proto[PATCH_REF_COUNT] ?? 1) + 1;
-    return {
-      dispose() {
-        disposeCustomToolRenderingPatch();
-      },
-    };
+  if (prototype[PROTOTYPE_PATCHED]) {
+    prototype[PATCH_REF_COUNT] = (prototype[PATCH_REF_COUNT] ?? 1) + 1;
+    return { dispose: disposeCustomToolRenderingPatch };
   }
 
-  const original = proto.getAllRegisteredTools;
-  if (typeof original !== "function") {
-    return { dispose() {} };
-  }
+  const original = prototype.getAllRegisteredTools;
+  if (typeof original !== "function") return { dispose() {} };
 
-  proto[PROTOTYPE_PATCHED] = true;
-  proto[PATCH_REF_COUNT] = 1;
-  proto[ORIGINAL_GET_ALL_TOOLS] = original;
-  proto[WRAPPED_DEFINITION_CACHE] = new WeakMap();
+  prototype[PROTOTYPE_PATCHED] = true;
+  prototype[PATCH_REF_COUNT] = 1;
+  prototype[ORIGINAL_GET_ALL_TOOLS] = original;
+  prototype[WRAPPED_DEFINITION_CACHE] = new WeakMap();
 
   const patchedGetAllRegisteredTools =
     function getAllRegisteredToolsWithUiPatch(this: ExtensionRunner) {
       const current = ExtensionRunner.prototype as PatchedRunnerPrototype;
       const tools = original.call(this);
-      if ((current[PATCH_REF_COUNT] ?? 0) <= 0) {
-        return tools;
-      }
-      if (!Array.isArray(tools)) {
+      if ((current[PATCH_REF_COUNT] ?? 0) <= 0 || !Array.isArray(tools)) {
         return tools;
       }
       return tools.map((tool) => wrapRegisteredTool(tool, isToolCallActive));
     };
-  proto[PATCHED_GET_ALL_TOOLS] = patchedGetAllRegisteredTools;
-  proto.getAllRegisteredTools = patchedGetAllRegisteredTools;
+  prototype[PATCHED_GET_ALL_TOOLS] = patchedGetAllRegisteredTools;
+  prototype.getAllRegisteredTools = patchedGetAllRegisteredTools;
 
-  return {
-    dispose() {
-      disposeCustomToolRenderingPatch();
-    },
-  };
+  return { dispose: disposeCustomToolRenderingPatch };
 }
