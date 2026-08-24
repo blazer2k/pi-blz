@@ -22,7 +22,6 @@ import {
 } from "./tool-registration";
 import {
   type BaseRenderState,
-  MAX_CALL_WIDTH,
   buildRenderResult,
   buildResultStatusParts,
   buildToolExpansionHint,
@@ -31,6 +30,7 @@ import {
   formatSimpleErrorResult,
   formatTreeLine,
   getCallRenderParts,
+  getMaxCallWidth,
   renderPath,
   sanitizeDisplayText,
   setExpandableCallText,
@@ -216,7 +216,7 @@ function formatReadResult(
     const reason = formatTreeLine(imageMarker.reason, {
       theme,
       prefix: "╰─ ",
-      width: MAX_CALL_WIDTH() - 1,
+      width: getMaxCallWidth() - 1,
       mode: "preserve",
       color: "muted",
     }).text;
@@ -268,12 +268,12 @@ export function patchReadTool(pi: ExtensionAPI): Handle {
             classification,
             renderArgs,
             theme,
-            Math.max(1, MAX_CALL_WIDTH() - visibleWidth(prefix)),
+            Math.max(1, getMaxCallWidth() - visibleWidth(prefix)),
           );
       } else {
         const pathWidth = Math.max(
           1,
-          MAX_CALL_WIDTH() - visibleWidth(prefix + title + lineRange),
+          getMaxCallWidth() - visibleWidth(prefix + title + lineRange),
         );
         collapsedText =
           prefix +

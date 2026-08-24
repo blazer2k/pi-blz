@@ -13,8 +13,6 @@ import {
 } from "./tool-registration";
 import {
   type BaseRenderState,
-  MAX_CALL_WIDTH,
-  MAX_COLLAPSED_LINES,
   buildExpansionHint,
   buildResultStatusParts,
   countLines,
@@ -22,6 +20,8 @@ import {
   formatErrorBody,
   formatTreeLine,
   getCallRenderParts,
+  getMaxCallWidth,
+  getMaxCollapsedLines,
   getResultText,
   invalidateIfChanged,
   normalizeOutput,
@@ -57,7 +57,7 @@ function formatDuration(ms: number): string {
 const TREE_PREFIX_WIDTH = 6;
 
 function getOutputWidth(): number {
-  return Math.max(1, MAX_CALL_WIDTH() - TREE_PREFIX_WIDTH);
+  return Math.max(1, getMaxCallWidth() - TREE_PREFIX_WIDTH);
 }
 
 function buildBashMetadataParts(
@@ -278,7 +278,7 @@ function formatBashResult(
       return theme.fg("dim", "╰─ ") + summary + expansionHint;
     }
 
-    const limit = MAX_COLLAPSED_LINES();
+    const limit = getMaxCollapsedLines();
     const errorLineCount = countLines(parsedError.output);
     const collapsedVisibleLineCount =
       limit === 0 ? 0 : Math.min(errorLineCount, limit);
@@ -347,7 +347,7 @@ function formatBashResult(
   }
 
   const bashOutput = normalizeOutput(textContent).replace(/\n+$/g, "");
-  const limit = MAX_COLLAPSED_LINES();
+  const limit = getMaxCollapsedLines();
   const lineCount = countLines(bashOutput);
   const showExpanded = options.expanded && lineCount > 1;
   const visibleLineCount = showExpanded
@@ -538,7 +538,7 @@ export function patchBashTool(pi: ExtensionAPI): Handle {
         visibleWidth("Bash ") +
         visibleWidth("$ ") +
         visibleWidth(inlineTimeoutSuffix);
-      const commandBudget = Math.max(1, MAX_CALL_WIDTH() - staticWidth);
+      const commandBudget = Math.max(1, getMaxCallWidth() - staticWidth);
       const commandTruncated = visibleWidth(collapsedCommand) > commandBudget;
       state.callExpandable = commandTruncated || command.includes("\n");
 

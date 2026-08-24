@@ -21,7 +21,7 @@ import {
   formatSimpleErrorResult,
   formatTreeLine,
   getCallRenderParts,
-  MAX_CALL_WIDTH,
+  getMaxCallWidth,
   renderPath,
   setExpandableCallText,
   type BaseRenderState,
@@ -103,7 +103,7 @@ function formatEditResult(
     return formatTreeLine(line, {
       theme,
       prefix,
-      width: MAX_CALL_WIDTH() - 1,
+      width: getMaxCallWidth() - 1,
       mode: "preserve",
     }).text;
   });
@@ -128,7 +128,7 @@ export function patchEditTool(pi: ExtensionAPI): Handle {
       const fullPath = renderPath(renderArgs.path, theme, toolCtx.cwd);
       const pathWidth = Math.max(
         1,
-        MAX_CALL_WIDTH() - visibleWidth(prefix + title),
+        getMaxCallWidth() - visibleWidth(prefix + title),
       );
       const collapsedText =
         prefix +

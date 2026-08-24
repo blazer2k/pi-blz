@@ -12,10 +12,10 @@ import {
 import {
   type BaseRenderState,
   type ListResultConfig,
-  MAX_CALL_WIDTH,
   buildRenderResult,
   formatListResult,
   getCallRenderParts,
+  getMaxCallWidth,
   renderPath,
   setExpandableCallText,
 } from "./tool-rendering";
@@ -51,7 +51,7 @@ export function patchLsTool(pi: ExtensionAPI): Handle {
       const path = renderArgs.path || ".";
       const pathWidth = Math.max(
         1,
-        MAX_CALL_WIDTH() - visibleWidth(prefix + title + limit),
+        getMaxCallWidth() - visibleWidth(prefix + title + limit),
       );
       const collapsedText =
         prefix +

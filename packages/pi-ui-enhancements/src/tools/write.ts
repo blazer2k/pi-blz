@@ -18,8 +18,8 @@ import {
   getCallRenderParts,
   getResultText,
   invalidateIfChanged,
-  MAX_CALL_WIDTH,
-  MAX_EXPANDED_ENTRIES,
+  getMaxCallWidth,
+  getMaxExpandedEntries,
   renderPath,
   setExpandableCallText,
   updateResultState,
@@ -57,7 +57,7 @@ function formatWriteResult(
 
   if (options.expanded) {
     const lang = args.path ? getLanguageFromPath(args.path) : undefined;
-    const maxPreviewLines = MAX_EXPANDED_ENTRIES();
+    const maxPreviewLines = getMaxExpandedEntries();
     const previewLineCount = Number.isFinite(maxPreviewLines)
       ? maxPreviewLines
       : Infinity;
@@ -81,7 +81,7 @@ function formatWriteResult(
       return formatTreeLine(line, {
         theme,
         prefix,
-        width: MAX_CALL_WIDTH() - 1,
+        width: getMaxCallWidth() - 1,
         mode: "preserve",
       }).text;
     });
@@ -116,7 +116,7 @@ export function patchWriteTool(pi: ExtensionAPI): Handle {
       const fullPath = renderPath(renderArgs.path, theme, toolCtx.cwd);
       const pathWidth = Math.max(
         1,
-        MAX_CALL_WIDTH() - visibleWidth(prefix + title),
+        getMaxCallWidth() - visibleWidth(prefix + title),
       );
       let collapsedText =
         prefix +

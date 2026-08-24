@@ -13,10 +13,10 @@ import {
 import {
   type BaseRenderState,
   type ListResultConfig,
-  MAX_CALL_WIDTH,
   buildRenderResult,
   formatListResult,
   getCallRenderParts,
+  getMaxCallWidth,
   renderPath,
   sanitizeDisplayText,
   setExpandableCallText,
@@ -65,7 +65,7 @@ export function patchGrepTool(pi: ExtensionAPI): Handle {
 
       const MIN_PATTERN = 4; // "..." + 1
       const MIN_PATH = 4;
-      const remaining = Math.max(0, MAX_CALL_WIDTH() - overhead);
+      const remaining = Math.max(0, getMaxCallWidth() - overhead);
 
       let patternBudget = remaining;
       let pathBudget = 0;
