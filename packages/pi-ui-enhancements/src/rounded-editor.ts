@@ -8,11 +8,11 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { EditorTheme, TUI } from "@earendil-works/pi-tui";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { getConfig } from "./config";
+import { getConfig, type Config } from "./config";
 import { shortenPath } from "./path-utils";
 import type { Handle } from "./types";
 
-type BorderFn = (c: string) => string;
+export type BorderFn = (c: string) => string;
 
 export type ScrollIndicators = {
   hiddenAbove: boolean;
@@ -105,6 +105,159 @@ export function getTotalUsage(ctx: ExtensionContext): {
 }
 
 type FooterTheme = { fg(color: string, text: string): string };
+
+export interface EditorFrameData {
+  cwd: string;
+  modelId: string;
+  thinkingLevel: string | null;
+  pct: string;
+  pctValue: number | null;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  totalCost: number;
+  showCacheTokens: boolean;
+  showCost: boolean;
+}
+
+function buildTopLine(width: number, cwd: string, border: BorderFn): string {
+  const cwdBudget = Math.max(1, width - 5);
+  const cwdDisplay = truncateToWidth(cwd, cwdBudget, "...");
+  const topRight = ` ${border(cwdDisplay)} `;
+  const topGap = Math.max(1, width - 3 - visibleWidth(topRight));
+  return `${border("╭")}${border("─".repeat(topGap))}${topRight}${border("─╮")}`;
+}
+
+function buildBottomLine(
+  width: number,
+  data: EditorFrameData,
+  theme: FooterTheme,
+  border: BorderFn,
+): string {
+  const parts: string[] = [theme.fg("text", data.modelId)];
+
+  if (data.thinkingLevel) {
+    parts.push(theme.fg("text", `(${data.thinkingLevel})`));
+  }
+
+  const bottomLeft = ` ${parts.join(" ")} `;
+
+  let coloredPct: string;
+
+  // pi's default behaviour
+  if (data.pctValue !== null && data.pctValue > 90) {
+    coloredPct = theme.fg("error", data.pct);
+  } else if (data.pctValue !== null && data.pctValue > 70) {
+    coloredPct = theme.fg("warning", data.pct);
+  } else {
+    coloredPct = theme.fg("text", data.pct);
+  }
+
+  const stats: string[] = [];
+
+  if (data.inputTokens > 0) {
+    stats.push(theme.fg("accent", `↑${formatTokens(data.inputTokens)}`));
+  }
+  if (data.outputTokens > 0) {
+    stats.push(theme.fg("accent", `↓${formatTokens(data.outputTokens)}`));
+  }
+  if (data.showCacheTokens && data.cacheReadTokens > 0) {
+    stats.push(theme.fg("accent", `R${formatTokens(data.cacheReadTokens)}`));
+  }
+  if (data.showCacheTokens && data.cacheWriteTokens > 0) {
+    stats.push(theme.fg("accent", `W${formatTokens(data.cacheWriteTokens)}`));
+  }
+  if (data.showCost && data.totalCost > 0) {
+    stats.push(theme.fg("accent", `$${data.totalCost.toFixed(2)}`));
+  }
+  stats.push(coloredPct);
+
+  let bottomRight = ` ${stats.join(" ")} `;
+  let left = bottomLeft;
+  let bw = visibleWidth(left);
+  let rw = visibleWidth(bottomRight);
+  const available = Math.max(1, width - 5);
+
+  if (bw + rw > available) {
+    const rightBudget = Math.min(rw, Math.max(1, Math.floor(available / 2)));
+    const leftBudget = Math.max(1, available - rightBudget);
+    left = truncateToWidth(left, leftBudget, theme.fg("text", "..."));
+    bottomRight = truncateToWidth(
+      bottomRight,
+      Math.max(1, available - visibleWidth(left)),
+      theme.fg("text", "..."),
+    );
+    bw = visibleWidth(left);
+    rw = visibleWidth(bottomRight);
+  }
+
+  const botGap = Math.max(1, width - 4 - bw - rw);
+  return `${border("╰─")}${left}${border("─".repeat(botGap))}${bottomRight}${border("─╯")}`;
+}
+
+function removeSeparatorLine(
+  lines: string[],
+  innerWidth: number,
+): ScrollIndicators | null {
+  const hiddenAbove = lines[0]?.includes("↑") ?? false;
+  const plain = (line: string) => line.replace(/\x1b\[[0-9;]*m/g, "");
+
+  for (let i = lines.length - 1; i > 0; i--) {
+    const stripped = plain(lines[i]!);
+    if (
+      stripped.startsWith("─") &&
+      [...stripped].filter((c) => c === "─").length >= innerWidth / 2
+    ) {
+      const scroll = {
+        hiddenAbove,
+        hiddenBelow: lines[i]!.includes("↓"),
+        contentLineCount: i - 1,
+      };
+      lines.splice(i, 1);
+      return scroll.hiddenAbove || scroll.hiddenBelow ? scroll : null;
+    }
+  }
+
+  return null;
+}
+
+function frameInterior(
+  lines: string[],
+  width: number,
+  innerWidth: number,
+  border: BorderFn,
+  scroll: ScrollIndicators | null,
+): void {
+  if (width < 3) return;
+
+  const leftBorder = border("│");
+  for (let i = 1; i < lines.length - 1; i++) {
+    const line = lines[i]!;
+    const pad = Math.max(0, innerWidth - visibleWidth(line));
+    const rightBorder = border(getRightBorderGlyph(i - 1, scroll));
+    lines[i] = `${leftBorder}${line}${" ".repeat(pad)}${rightBorder}`;
+  }
+}
+
+export function frameEditorLines(
+  nativeLines: readonly string[],
+  width: number,
+  data: EditorFrameData,
+  theme: FooterTheme,
+  border: BorderFn,
+): string[] {
+  const lines = [...nativeLines];
+  if (lines.length < 2) return lines;
+
+  const innerWidth = Math.max(1, width - 2);
+  const scroll = removeSeparatorLine(lines, innerWidth);
+  lines[0] = buildTopLine(width, data.cwd, border);
+  lines.push(buildBottomLine(width, data, theme, border));
+  frameInterior(lines, width, innerWidth, border, scroll);
+
+  return lines.map((line) => truncateToWidth(line, Math.max(0, width), ""));
+}
 
 // Mirrors pi's native footer: sort by key, strip line/tabs/CR, collapse and
 // trim spaces, then truncate to the terminal width. Keeps the line safe for
@@ -225,7 +378,7 @@ class RoundedEditor extends CustomEditor {
     super(tui, theme, kb, { paddingX: 0 });
   }
 
-  private buildStatusInfo() {
+  private buildStatusInfo(config: Config) {
     const modelId = this.ctx.model?.id ?? "?";
     const modelCW = this.ctx.model?.contextWindow
       ? formatTokens(this.ctx.model.contextWindow)
@@ -239,7 +392,7 @@ class RoundedEditor extends CustomEditor {
     const rawLevel = this.pi.getThinkingLevel();
     let thinkingLevel: string | null = null;
     if (
-      getConfig().roundedEditorShowThinkingLevel &&
+      config.roundedEditorShowThinkingLevel &&
       this.ctx.model?.reasoning &&
       rawLevel &&
       rawLevel !== "off"
@@ -253,143 +406,14 @@ class RoundedEditor extends CustomEditor {
 
     let cwd = shortenPath(this.ctx.cwd);
 
-    const branch = getConfig().roundedEditorShowBranch
-      ? this.getGitBranch()
-      : null;
+    const branch = config.roundedEditorShowBranch ? this.getGitBranch() : null;
     if (branch) cwd = `${cwd} (${branch})`;
 
     return { modelId, pct, pctValue, thinkingLevel, cwd };
   }
 
-  private buildTopLine(width: number, cwd: string, border: BorderFn): string {
-    const cwdBudget = Math.max(1, width - 5);
-    const cwdDisplay = truncateToWidth(cwd, cwdBudget, "...");
-    const topRight = ` ${border(cwdDisplay)} `;
-    const topGap = Math.max(1, width - 3 - visibleWidth(topRight));
-    return `${border("╭")}${border("─".repeat(topGap))}${topRight}${border("─╮")}`;
-  }
-
-  private buildBottomLine(
-    width: number,
-    modelId: string,
-    thinkingLevel: string | null,
-    pct: string,
-    pctValue: number | null,
-    inputTokens: number,
-    outputTokens: number,
-    cacheReadTokens: number,
-    cacheWriteTokens: number,
-    totalCost: number,
-    border: BorderFn,
-  ): string {
-    const theme = this.ctx.ui.theme;
-    const parts: string[] = [theme.fg("text", modelId)];
-
-    if (thinkingLevel) {
-      parts.push(theme.fg("text", `(${thinkingLevel})`));
-    }
-
-    const bottomLeft = ` ${parts.join(" ")} `;
-
-    let coloredPct: string;
-
-    // pi's default behaviour
-    if (pctValue !== null && pctValue > 90) {
-      coloredPct = theme.fg("error", pct);
-    } else if (pctValue !== null && pctValue > 70) {
-      coloredPct = theme.fg("warning", pct);
-    } else {
-      coloredPct = theme.fg("text", pct);
-    }
-
-    const stats: string[] = [];
-
-    if (inputTokens > 0) {
-      stats.push(theme.fg("accent", `↑${formatTokens(inputTokens)}`));
-    }
-    if (outputTokens > 0) {
-      stats.push(theme.fg("accent", `↓${formatTokens(outputTokens)}`));
-    }
-    const cfg = getConfig();
-    if (cfg.roundedEditorShowCacheTokens && cacheReadTokens > 0) {
-      stats.push(theme.fg("accent", `R${formatTokens(cacheReadTokens)}`));
-    }
-    if (cfg.roundedEditorShowCacheTokens && cacheWriteTokens > 0) {
-      stats.push(theme.fg("accent", `W${formatTokens(cacheWriteTokens)}`));
-    }
-    if (cfg.roundedEditorShowCost && totalCost > 0) {
-      stats.push(theme.fg("accent", `$${totalCost.toFixed(2)}`));
-    }
-    stats.push(coloredPct);
-
-    let bottomRight = ` ${stats.join(" ")} `;
-    let left = bottomLeft;
-    let bw = visibleWidth(left);
-    let rw = visibleWidth(bottomRight);
-    const available = Math.max(1, width - 5);
-
-    if (bw + rw > available) {
-      const rightBudget = Math.min(rw, Math.max(1, Math.floor(available / 2)));
-      const leftBudget = Math.max(1, available - rightBudget);
-      left = truncateToWidth(left, leftBudget, theme.fg("text", "..."));
-      bottomRight = truncateToWidth(
-        bottomRight,
-        Math.max(1, available - visibleWidth(left)),
-        theme.fg("text", "..."),
-      );
-      bw = visibleWidth(left);
-      rw = visibleWidth(bottomRight);
-    }
-
-    const botGap = Math.max(1, width - 4 - bw - rw);
-    return `${border("╰─")}${left}${border("─".repeat(botGap))}${bottomRight}${border("─╯")}`;
-  }
-
-  private removeSeparatorLine(
-    lines: string[],
-    innerWidth: number,
-  ): ScrollIndicators | null {
-    const hiddenAbove = lines[0]?.includes("↑") ?? false;
-    const plain = (line: string) => line.replace(/\x1b\[[0-9;]*m/g, "");
-
-    for (let i = lines.length - 1; i > 0; i--) {
-      const stripped = plain(lines[i]!);
-      if (
-        stripped.startsWith("─") &&
-        [...stripped].filter((c) => c === "─").length >= innerWidth / 2
-      ) {
-        const scroll = {
-          hiddenAbove,
-          hiddenBelow: lines[i]!.includes("↓"),
-          contentLineCount: i - 1,
-        };
-        lines.splice(i, 1);
-        return scroll.hiddenAbove || scroll.hiddenBelow ? scroll : null;
-      }
-    }
-
-    return null;
-  }
-
-  private frameInterior(
-    lines: string[],
-    width: number,
-    innerWidth: number,
-    border: BorderFn,
-    scroll: ScrollIndicators | null,
-  ): void {
-    if (width >= 3) {
-      const leftBorder = border("│");
-      for (let i = 1; i < lines.length - 1; i++) {
-        const line = lines[i]!;
-        const pad = Math.max(0, innerWidth - visibleWidth(line));
-        const rightBorder = border(getRightBorderGlyph(i - 1, scroll));
-        lines[i] = `${leftBorder}${line}${" ".repeat(pad)}${rightBorder}`;
-      }
-    }
-  }
-
   override render(width: number): string[] {
+    const config = getConfig();
     const {
       inputTokens,
       outputTokens,
@@ -398,7 +422,7 @@ class RoundedEditor extends CustomEditor {
       totalCost,
     } = this.getCurrentUsage();
     const { modelId, pct, pctValue, thinkingLevel, cwd } =
-      this.buildStatusInfo();
+      this.buildStatusInfo(config);
 
     const innerWidth = Math.max(1, width - 2);
     const lines = super.render(innerWidth);
@@ -411,7 +435,7 @@ class RoundedEditor extends CustomEditor {
     if (isBashMode) {
       border = this.ctx.ui.theme.getBashModeBorderColor();
     } else {
-      const color = getConfig().roundedEditorColor;
+      const color = config.roundedEditorColor;
       if (color === "thinking") {
         border = this.ctx.ui.theme.getThinkingBorderColor(
           this.pi.getThinkingLevel() ?? "off",
@@ -422,16 +446,11 @@ class RoundedEditor extends CustomEditor {
       }
     }
 
-    // Capture scroll state before replacing pi's borders
-    const scroll = this.removeSeparatorLine(lines, innerWidth);
-
-    // Top line
-    lines[0] = this.buildTopLine(width, cwd, border);
-
-    // Bottom line
-    lines.push(
-      this.buildBottomLine(
-        width,
+    return frameEditorLines(
+      lines,
+      width,
+      {
+        cwd,
         modelId,
         thinkingLevel,
         pct,
@@ -441,13 +460,11 @@ class RoundedEditor extends CustomEditor {
         cacheReadTokens,
         cacheWriteTokens,
         totalCost,
-        border,
-      ),
+        showCacheTokens: config.roundedEditorShowCacheTokens,
+        showCost: config.roundedEditorShowCost,
+      },
+      this.ctx.ui.theme,
+      border,
     );
-
-    // Left/right lines
-    this.frameInterior(lines, width, innerWidth, border, scroll);
-
-    return lines.map((line) => truncateToWidth(line, Math.max(0, width), ""));
   }
 }
