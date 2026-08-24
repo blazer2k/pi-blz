@@ -1,0 +1,80 @@
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import {
+  truncateToWidth,
+  visibleWidth,
+  type Text,
+} from "@earendil-works/pi-tui";
+import {
+  getCallRenderParts,
+  getMaxCallWidth,
+  sanitizeMultilineDisplayText,
+} from "../tool-rendering";
+import type { BashRenderState, BashToolInput } from "./types";
+
+type BashCallContext = {
+  state: unknown;
+  executionStarted?: boolean;
+  isPartial?: boolean;
+  expanded: boolean;
+  invalidate: () => void;
+};
+
+export function renderBashCall(
+  args: BashToolInput,
+  theme: Theme,
+  toolContext: BashCallContext,
+): Text {
+  const state = toolContext.state as BashRenderState;
+  const { text, prefix } = getCallRenderParts(state, theme, toolContext);
+
+  if (toolContext.executionStarted && state.startedAt === undefined) {
+    state.startedAt = Date.now();
+    state.endedAt = undefined;
+  }
+
+  const command =
+    typeof args.command === "string"
+      ? sanitizeMultilineDisplayText(args.command)
+      : "...";
+  const collapsedCommand = command.replace(/\s+/g, " ").trim();
+  const timeoutText = args.timeout ? `(timeout ${args.timeout}s)` : "";
+  const inlineTimeoutSuffix = timeoutText
+    ? theme.fg("dim", ` ${timeoutText}`)
+    : "";
+  const staticWidth =
+    visibleWidth(prefix) +
+    visibleWidth("Bash ") +
+    visibleWidth("$ ") +
+    visibleWidth(inlineTimeoutSuffix);
+  const commandBudget = Math.max(1, getMaxCallWidth() - staticWidth);
+  const commandTruncated = visibleWidth(collapsedCommand) > commandBudget;
+  state.callExpandable = commandTruncated || command.includes("\n");
+
+  const visibleCommand = toolContext.expanded
+    ? command
+    : truncateToWidth(
+        collapsedCommand,
+        commandBudget,
+        theme.fg("accent", "..."),
+      );
+  const commandDisplay =
+    theme.fg("dim", "$ ") +
+    visibleCommand
+      .split("\n")
+      .map((line) => theme.bold(theme.fg("accent", line)))
+      .join("\n");
+  const finalCommandLine = visibleCommand.split("\n").at(-1) ?? "";
+  const expandedCommandBudget =
+    commandBudget + visibleWidth(inlineTimeoutSuffix);
+  const timeoutOnOwnLine =
+    toolContext.expanded &&
+    timeoutText.length > 0 &&
+    visibleWidth(finalCommandLine + ` ${timeoutText}`) > expandedCommandBudget;
+
+  const timeoutDisplay = timeoutOnOwnLine
+    ? `\n${theme.fg("dim", timeoutText)}`
+    : inlineTimeoutSuffix;
+  const title = theme.fg("toolTitle", theme.bold("Bash "));
+  text.setText(prefix + title + commandDisplay + timeoutDisplay);
+  return text;
+}
