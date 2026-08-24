@@ -2,6 +2,10 @@
 // Renderer parsing tests should use these values so an upstream wording change
 // fails in one clearly named compatibility boundary.
 export const PI_0_84_3_OUTPUT = {
+  editor: {
+    scrolledTop: "─── ↑ 2 more ─────",
+    scrolledBottom: "─── ↓ 3 more ─────",
+  },
   read: {
     moreLines: "[5 more lines in file. Use offset=7 to continue.]",
     showingLines: "[Showing lines 1-2 of 10. Use offset=3 to continue.]",

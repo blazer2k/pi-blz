@@ -51,10 +51,10 @@ describe("frameEditorLines", () => {
 
   it("moves pi's scroll indicators onto the right border", () => {
     const nativeLines = [
-      `${"─".repeat(9)} ↑`,
+      "─── ↑ 2 more ─────",
       "first".padEnd(18),
       "second".padEnd(18),
-      `${"─".repeat(9)} ↓`,
+      "─── ↓ 3 more ─────",
     ];
 
     const framed = frameEditorLines(
@@ -112,6 +112,14 @@ describe("frameEditorLines", () => {
         expect(visibleWidth(line)).toBeLessThanOrEqual(width);
       }
     }
+  });
+
+  it("falls back to native output when Pi's layout is unrecognized", () => {
+    const nativeLines = ["unexpected top", "content", "unexpected bottom"];
+
+    expect(
+      frameEditorLines(nativeLines, 20, frameData, footerTheme, plainBorder),
+    ).toEqual(nativeLines);
   });
 });
 
@@ -288,6 +296,7 @@ describe("registerRoundedEditor", () => {
     let editorFactory: Function = previousEditor;
     let footerFactory: Function | undefined;
     let footerCleared = false;
+    let footerClearCount = 0;
     let renderRequests = 0;
     let reregister: (() => void) | undefined;
     const ctx = {
@@ -308,6 +317,7 @@ describe("registerRoundedEditor", () => {
         setFooter: (factory: Function | undefined) => {
           footerFactory = factory;
           footerCleared = factory === undefined;
+          if (factory === undefined) footerClearCount++;
         },
       },
     } as unknown as ExtensionContext;
@@ -345,7 +355,10 @@ describe("registerRoundedEditor", () => {
     expect(editorFactory).not.toBe(previousEditor);
 
     handle.dispose();
+    handle.dispose();
+    reregister!();
     expect(editorFactory).toBe(previousEditor);
     expect(footerCleared).toBe(true);
+    expect(footerClearCount).toBe(1);
   });
 });

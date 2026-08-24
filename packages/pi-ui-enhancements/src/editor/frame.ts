@@ -1,13 +1,13 @@
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import {
+  adaptNativeEditorLayout,
+  type ScrollIndicators,
+} from "./native-layout";
 import { formatTokens } from "./usage";
 
-export type BorderFn = (text: string) => string;
+export type { ScrollIndicators } from "./native-layout";
 
-export type ScrollIndicators = {
-  hiddenAbove: boolean;
-  hiddenBelow: boolean;
-  contentLineCount: number;
-};
+export type BorderFn = (text: string) => string;
 
 export type FooterTheme = {
   fg(color: string, text: string): string;
@@ -121,33 +121,6 @@ function buildBottomLine(
   return `${border("╰─")}${bottomLeft}${border("─".repeat(gapWidth))}${bottomRight}${border("─╯")}`;
 }
 
-function removeSeparatorLine(
-  lines: string[],
-  innerWidth: number,
-): ScrollIndicators | null {
-  const hiddenAbove = lines[0]?.includes("↑") ?? false;
-  const plain = (line: string) => line.replace(/\x1b\[[0-9;]*m/g, "");
-
-  for (let index = lines.length - 1; index > 0; index--) {
-    const stripped = plain(lines[index]!);
-    const isSeparator =
-      stripped.startsWith("─") &&
-      [...stripped].filter((character) => character === "─").length >=
-        innerWidth / 2;
-    if (!isSeparator) continue;
-
-    const scroll = {
-      hiddenAbove,
-      hiddenBelow: lines[index]!.includes("↓"),
-      contentLineCount: index - 1,
-    };
-    lines.splice(index, 1);
-    return scroll.hiddenAbove || scroll.hiddenBelow ? scroll : null;
-  }
-
-  return null;
-}
-
 function frameInterior(
   lines: string[],
   width: number,
@@ -173,11 +146,17 @@ export function frameEditorLines(
   theme: FooterTheme,
   border: BorderFn,
 ): string[] {
-  const lines = [...nativeLines];
-  if (lines.length < 2) return lines;
+  if (nativeLines.length < 2) return [...nativeLines];
 
+  const nativeLayout = adaptNativeEditorLayout(nativeLines);
+  if (!nativeLayout.compatible) {
+    return nativeLayout.lines.map((line) =>
+      truncateToWidth(line, Math.max(0, width), ""),
+    );
+  }
+
+  const { lines, scroll } = nativeLayout;
   const innerWidth = Math.max(1, width - 2);
-  const scroll = removeSeparatorLine(lines, innerWidth);
   lines[0] = buildTopLine(width, data.cwd, border);
   lines.push(buildBottomLine(width, data, theme, border));
   frameInterior(lines, width, innerWidth, border, scroll);

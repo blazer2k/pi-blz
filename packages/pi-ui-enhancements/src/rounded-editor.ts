@@ -15,6 +15,11 @@ export {
   type EditorFrameData,
   type ScrollIndicators,
 } from "./editor/frame";
+export {
+  adaptNativeEditorLayout,
+  type NativeEditorLayout,
+} from "./editor/native-layout";
+export { buildEditorFrameData, type EditorStatusInput } from "./editor/status";
 export { formatTokens, getTotalUsage } from "./editor/usage";
 
 type RoundedEditorRuntime = {
@@ -45,6 +50,7 @@ export function registerRoundedEditor(
   let getGitBranch: () => string | null = () => null;
   let requestRender: (() => void) | null = null;
   let footerOwned = false;
+  let disposed = false;
   let cachedUsage = getTotalUsage(ctx);
 
   const invalidateUsage = () => {
@@ -90,12 +96,16 @@ export function registerRoundedEditor(
     );
   };
 
-  const applyEditor = () => ctx.ui.setEditorComponent(roundedEditorFactory);
+  const applyEditor = () => {
+    if (!disposed) ctx.ui.setEditorComponent(roundedEditorFactory);
+  };
   applyEditor();
   onReregister(applyEditor);
 
   return {
     dispose() {
+      if (disposed) return;
+      disposed = true;
       if (runtime.invalidateUsage === invalidateUsage) {
         runtime.invalidateUsage = null;
       }
@@ -103,7 +113,10 @@ export function registerRoundedEditor(
       if (ctx.ui.getEditorComponent() === roundedEditorFactory) {
         ctx.ui.setEditorComponent(previousEditorFactory);
       }
-      if (footerOwned) ctx.ui.setFooter(undefined);
+      if (footerOwned) {
+        footerOwned = false;
+        ctx.ui.setFooter(undefined);
+      }
     },
   };
 }

@@ -6,17 +6,9 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { EditorTheme, TUI } from "@earendil-works/pi-tui";
 import { getConfig, type Config } from "../config";
-import { shortenPath } from "../path-utils";
 import { frameEditorLines, type BorderFn } from "./frame";
-import { formatTokens, type SessionUsage } from "./usage";
-
-type StatusInfo = {
-  modelId: string;
-  thinkingLevel: string | null;
-  pct: string;
-  pctValue: number | null;
-  cwd: string;
-};
+import { buildEditorFrameData } from "./status";
+import type { SessionUsage } from "./usage";
 
 export class RoundedEditor extends CustomEditor {
   constructor(
@@ -31,36 +23,28 @@ export class RoundedEditor extends CustomEditor {
     super(tui, theme, kb, { paddingX: 0 });
   }
 
-  private buildStatusInfo(config: Config): StatusInfo {
-    const modelId = this.ctx.model?.id ?? "?";
-    const modelContextWindow = this.ctx.model?.contextWindow
-      ? formatTokens(this.ctx.model.contextWindow)
-      : "?";
-    const contextUsage = this.ctx.getContextUsage();
-    const pctValue = contextUsage?.percent ?? null;
-    const pct =
-      pctValue === null
-        ? `?%/${modelContextWindow}`
-        : `${pctValue.toFixed(1)}%/${modelContextWindow}`;
-    const thinkingLevel = this.getVisibleThinkingLevel(config);
+  private buildFrameData(config: Config) {
+    const thinkingLevel = this.pi.getThinkingLevel();
+    const supportedLevels = this.ctx.model?.thinkingLevelMap;
 
-    let cwd = shortenPath(this.ctx.cwd);
-    const branch = config.roundedEditorShowBranch ? this.getGitBranch() : null;
-    if (branch) cwd = `${cwd} (${branch})`;
-
-    return { modelId, pct, pctValue, thinkingLevel, cwd };
-  }
-
-  private getVisibleThinkingLevel(config: Config): string | null {
-    if (!config.roundedEditorShowThinkingLevel || !this.ctx.model?.reasoning) {
-      return null;
-    }
-
-    const level = this.pi.getThinkingLevel();
-    if (!level || level === "off") return null;
-
-    const supportedLevels = this.ctx.model.thinkingLevelMap;
-    return supportedLevels && supportedLevels[level] !== null ? level : null;
+    return buildEditorFrameData(
+      {
+        cwd: this.ctx.cwd,
+        modelId: this.ctx.model?.id,
+        modelContextWindow: this.ctx.model?.contextWindow,
+        modelSupportsReasoning: this.ctx.model?.reasoning === true,
+        activeThinkingLevel: thinkingLevel ?? null,
+        activeThinkingLevelSupported: Boolean(
+          thinkingLevel &&
+          supportedLevels &&
+          supportedLevels[thinkingLevel] !== null,
+        ),
+        contextPercent: this.ctx.getContextUsage()?.percent ?? null,
+        gitBranch: config.roundedEditorShowBranch ? this.getGitBranch() : null,
+        usage: this.getCurrentUsage(),
+      },
+      config,
+    );
   }
 
   private getBorder(config: Config): BorderFn {
@@ -86,12 +70,7 @@ export class RoundedEditor extends CustomEditor {
     return frameEditorLines(
       lines,
       width,
-      {
-        ...this.buildStatusInfo(config),
-        ...this.getCurrentUsage(),
-        showCacheTokens: config.roundedEditorShowCacheTokens,
-        showCost: config.roundedEditorShowCost,
-      },
+      this.buildFrameData(config),
       this.ctx.ui.theme,
       this.getBorder(config),
     );
