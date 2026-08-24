@@ -55,6 +55,38 @@ describe("parseDiffStats", () => {
   });
 });
 
+describe("edit renderCall", () => {
+  it("expands a truncated path and hints when there is no diff", () => {
+    const def = setupEditTool();
+    const state = {};
+    const path = `/tmp/${"segment/".repeat(12)}target.txt`;
+    const args = { path, oldText: "old", newText: "new" };
+    const collapsedCtx = mkToolCtx({ state, args });
+    const collapsed = def.renderCall!(args, mkTheme(), collapsedCtx)
+      .render(120)
+      .join("\n");
+    expect(collapsed).toContain("...");
+
+    const collapsedResult = def.renderResult!(
+      {
+        content: [{ type: "text", text: "edited" }],
+        details: {},
+      },
+      { expanded: false, isPartial: false },
+      mkTheme(),
+      collapsedCtx,
+    );
+    expect(collapsedResult.render(120).join("\n")).toContain("to expand");
+
+    const expandedCtx = mkToolCtx({ expanded: true, state, args });
+    const expanded = def.renderCall!(args, mkTheme(), expandedCtx)
+      .render(40)
+      .join("\n");
+    expect(expanded).toContain("segment");
+    expect(expanded).toContain("│  ");
+  });
+});
+
 describe("edit renderResult", () => {
   it("collapsed result shows stats in dedicated diff colors", () => {
     const def = setupEditTool();

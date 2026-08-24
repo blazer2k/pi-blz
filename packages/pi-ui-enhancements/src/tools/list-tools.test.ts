@@ -49,6 +49,46 @@ describe("ls renderCall", () => {
     expect(text).toContain("dim: (limit 50)");
   });
 
+  it("expands and wraps a truncated path with result hints", () => {
+    const def = setupLsTool();
+    const state = {};
+    const path = `/tmp/${"segment/".repeat(12)}target`;
+    const collapsedCtx = mkToolCtx({ state, args: { path } });
+    const collapsed = def.renderCall!({ path }, mkTheme(), collapsedCtx)
+      .render(120)
+      .join("\n");
+    expect(collapsed).toContain("...");
+
+    const collapsedResult = def.renderResult!(
+      {
+        content: [{ type: "text", text: "(empty directory)" }],
+        details: undefined,
+      },
+      { expanded: false, isPartial: false },
+      mkTheme(),
+      collapsedCtx,
+    );
+    expect(collapsedResult.render(120).join("\n")).toContain("to expand");
+
+    const expandedCtx = mkToolCtx({ expanded: true, state, args: { path } });
+    const expanded = def.renderCall!({ path }, mkTheme(), expandedCtx)
+      .render(40)
+      .join("\n");
+    expect(expanded).toContain("segment");
+    expect(expanded).toContain("│  ");
+
+    const expandedResult = def.renderResult!(
+      {
+        content: [{ type: "text", text: "(empty directory)" }],
+        details: undefined,
+      },
+      { expanded: true, isPartial: false },
+      mkTheme(),
+      expandedCtx,
+    );
+    expect(expandedResult.render(120).join("\n")).toContain("to collapse");
+  });
+
   it("defaults path to dot", () => {
     const def = setupLsTool();
     const renderCall = def.renderCall!;
@@ -147,6 +187,26 @@ describe("find renderCall", () => {
     expect(text).toContain("dim: (limit 100)");
   });
 
+  it("expands and wraps a truncated pattern", () => {
+    const def = setupFindTool();
+    const state = {};
+    const pattern = `prefix-${"x".repeat(100)}-pattern-tail`;
+    const args = { pattern, path: "/tmp" };
+    const collapsedCtx = mkToolCtx({ state, args });
+    const collapsed = def.renderCall!(args, mkTheme(), collapsedCtx)
+      .render(120)
+      .join("\n");
+    expect(collapsed).toContain("...");
+    expect(collapsed).not.toContain("pattern-tail");
+
+    const expandedCtx = mkToolCtx({ expanded: true, state, args });
+    const expanded = def.renderCall!(args, mkTheme(), expandedCtx)
+      .render(40)
+      .join("\n");
+    expect(expanded).toContain("pattern-tail");
+    expect(expanded).toContain("│  ");
+  });
+
   it("renders incomplete partial args without throwing", () => {
     const def = setupFindTool();
     const renderCall = def.renderCall!;
@@ -228,6 +288,26 @@ describe("grep renderCall", () => {
     expect(text).toContain("dim: *.ts");
     expect(text).toContain("dim: ±3");
     expect(text).toContain("dim: (limit 500)");
+  });
+
+  it("expands and wraps a truncated pattern", () => {
+    const def = setupGrepTool();
+    const state = {};
+    const pattern = `prefix-${"y".repeat(100)}-pattern-tail`;
+    const args = { pattern, path: "/tmp", glob: "*.ts", context: 2 };
+    const collapsedCtx = mkToolCtx({ state, args });
+    const collapsed = def.renderCall!(args, mkTheme(), collapsedCtx)
+      .render(120)
+      .join("\n");
+    expect(collapsed).toContain("...");
+    expect(collapsed).not.toContain("pattern-tail");
+
+    const expandedCtx = mkToolCtx({ expanded: true, state, args });
+    const expanded = def.renderCall!(args, mkTheme(), expandedCtx)
+      .render(40)
+      .join("\n");
+    expect(expanded).toContain("pattern-tail");
+    expect(expanded).toContain("│  ");
   });
 
   it("renders incomplete partial args without throwing", () => {

@@ -40,7 +40,48 @@ describe("read renderCall", () => {
     expect(text).toContain("dim::10-14");
   });
 
-  it("uses compact skill format for SKILL.md", () => {
+  it("expands a truncated path and adds call-driven result hints", () => {
+    const def = setupReadTool();
+    const state = {};
+    const path = `/tmp/${"segment/".repeat(12)}target.txt`;
+    const args = { path };
+    const collapsedCtx = mkToolCtx({ state, args });
+    const collapsed = def.renderCall!(args, mkTheme(), collapsedCtx)
+      .render(120)
+      .join("\n");
+    expect(collapsed).toContain("...");
+
+    const collapsedResult = def.renderResult!(
+      {
+        content: [{ type: "text", text: "line1\nline2" }],
+        details: undefined,
+      },
+      { expanded: false, isPartial: false },
+      mkTheme(),
+      collapsedCtx,
+    );
+    expect(collapsedResult.render(120).join("\n")).toContain("to expand");
+
+    const expandedCtx = mkToolCtx({ expanded: true, state, args });
+    const expanded = def.renderCall!(args, mkTheme(), expandedCtx)
+      .render(40)
+      .join("\n");
+    expect(expanded).toContain("segment");
+    expect(expanded).toContain("│  ");
+
+    const expandedResult = def.renderResult!(
+      {
+        content: [{ type: "text", text: "line1\nline2" }],
+        details: undefined,
+      },
+      { expanded: true, isPartial: false },
+      mkTheme(),
+      expandedCtx,
+    );
+    expect(expandedResult.render(120).join("\n")).toContain("to collapse");
+  });
+
+  it("uses compact skill format for SKILL.md and expands to its full path", () => {
     const def = setupReadTool();
     const renderCall = def.renderCall!;
     const theme = mkTheme();
@@ -52,6 +93,16 @@ describe("read renderCall", () => {
     const text = component.render(120).join("\n");
     expect(text).toContain("[skill]");
     expect(text).toContain("some-skill");
+
+    const expanded = renderCall({ path: skillPath }, theme, {
+      ...ctx,
+      expanded: true,
+    })
+      .render(50)
+      .join("\n");
+    expect(expanded).toContain("Read");
+    expect(expanded).toContain("SKILL.md");
+    expect(expanded).not.toContain("[skill]");
   });
 });
 

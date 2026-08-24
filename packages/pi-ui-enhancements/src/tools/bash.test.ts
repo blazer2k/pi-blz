@@ -413,7 +413,7 @@ describe("bash renderResult", () => {
     const renderResult = def.renderResult!;
     const theme = mkTheme();
     const state = {
-      callTruncated: true,
+      callExpandable: true,
       fullCommand: "echo a command that used to be duplicated",
     };
     const ctx = mkToolCtx({ expanded: true, state });

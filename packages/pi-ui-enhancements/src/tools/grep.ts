@@ -19,6 +19,7 @@ import {
   getCallRenderParts,
   renderPath,
   sanitizeDisplayText,
+  setExpandableCallText,
 } from "./tool-rendering";
 
 const GREP_CONFIG: ListResultConfig = {
@@ -81,19 +82,37 @@ export function patchGrepTool(pi: ExtensionAPI): Handle {
         typeof renderArgs.pattern === "string"
           ? sanitizeDisplayText(renderArgs.pattern)
           : "...";
-      const patternDisplay =
-        visibleWidth(rawPattern) > patternBudget
-          ? truncateToWidth(rawPattern, patternBudget, "...")
-          : rawPattern;
-
+      const patternTruncated = visibleWidth(rawPattern) > patternBudget;
+      const patternDisplay = patternTruncated
+        ? truncateToWidth(rawPattern, patternBudget, "...")
+        : rawPattern;
+      const fullPath = renderArgs.path
+        ? renderPath(renderArgs.path, theme, toolCtx.cwd)
+        : "";
+      const pathTruncated =
+        renderArgs.path !== undefined && visibleWidth(fullPath) > pathBudget;
       const pattern = theme.fg("accent", patternDisplay);
       const pathDisplay = renderArgs.path
         ? `${pathPrefix}${renderPath(renderArgs.path, theme, toolCtx.cwd, pathBudget)}`
         : "";
-
-      const content =
+      const collapsedText =
         prefix + title + pattern + pathDisplay + glob + context + limit;
-      text.setText(content);
+      const fullText =
+        prefix +
+        title +
+        theme.fg("accent", rawPattern) +
+        (renderArgs.path ? `${pathPrefix}${fullPath}` : "") +
+        glob +
+        context +
+        limit;
+
+      setExpandableCallText(text, state, {
+        expanded: toolCtx.expanded,
+        collapsedText,
+        fullText,
+        compactIsLossy: patternTruncated || pathTruncated,
+        ellipsis: theme.fg("accent", "..."),
+      });
       return text;
     },
     renderResult: buildRenderResult(

@@ -18,6 +18,7 @@ import {
   getCallRenderParts,
   renderPath,
   sanitizeDisplayText,
+  setExpandableCallText,
 } from "./tool-rendering";
 
 const FIND_CONFIG: ListResultConfig = {
@@ -72,18 +73,34 @@ export function patchFindTool(pi: ExtensionAPI): Handle {
         typeof renderArgs.pattern === "string"
           ? sanitizeDisplayText(renderArgs.pattern)
           : "...";
-      const patternDisplay =
-        visibleWidth(rawPattern) > patternBudget
-          ? truncateToWidth(rawPattern, patternBudget, "...")
-          : rawPattern;
-
+      const patternTruncated = visibleWidth(rawPattern) > patternBudget;
+      const patternDisplay = patternTruncated
+        ? truncateToWidth(rawPattern, patternBudget, "...")
+        : rawPattern;
+      const fullPath = renderArgs.path
+        ? renderPath(renderArgs.path, theme, toolCtx.cwd)
+        : "";
+      const pathTruncated =
+        renderArgs.path !== undefined && visibleWidth(fullPath) > pathBudget;
       const pattern = theme.fg("accent", patternDisplay);
       const pathDisplay = renderArgs.path
         ? `${pathPrefix}${renderPath(renderArgs.path, theme, toolCtx.cwd, pathBudget)}`
         : "";
+      const collapsedText = prefix + title + pattern + pathDisplay + limit;
+      const fullText =
+        prefix +
+        title +
+        theme.fg("accent", rawPattern) +
+        (renderArgs.path ? `${pathPrefix}${fullPath}` : "") +
+        limit;
 
-      const content = prefix + title + pattern + pathDisplay + limit;
-      text.setText(content);
+      setExpandableCallText(text, state, {
+        expanded: toolCtx.expanded,
+        collapsedText,
+        fullText,
+        compactIsLossy: patternTruncated || pathTruncated,
+        ellipsis: theme.fg("accent", "..."),
+      });
       return text;
     },
     renderResult: buildRenderResult((result, state, options, theme) =>

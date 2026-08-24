@@ -7,10 +7,10 @@ import {
   type ToolRenderResultOptions,
   type WriteToolInput,
 } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { visibleWidth } from "@earendil-works/pi-tui";
 import {
-  buildExpansionHint,
   buildResultStatusParts,
+  buildToolExpansionHint,
   countLines,
   extractTextContent,
   formatSimpleErrorResult,
@@ -21,6 +21,7 @@ import {
   MAX_CALL_WIDTH,
   MAX_EXPANDED_ENTRIES,
   renderPath,
+  setExpandableCallText,
   updateResultState,
   type BaseRenderState,
 } from "./tool-rendering";
@@ -39,20 +40,19 @@ function formatWriteResult(
 ): string {
   const textContent = extractTextContent(result);
 
-  const hint = buildExpansionHint(theme, "expand");
-
   if (state.isError) {
     return formatSimpleErrorResult(textContent, state, options, theme);
   }
 
   const lines = countLines(args.content);
+  const hint = buildToolExpansionHint(theme, state, options, lines > 0);
   const summary = `${lines} ${lines === 1 ? "line" : "lines"}`;
   const metadataParts = buildResultStatusParts(state, theme);
   metadataParts.push(theme.fg("muted", summary));
   const metadata = metadataParts.join(theme.fg("muted", " • "));
 
   if (lines === 0) {
-    return theme.fg("dim", "╰─ ") + metadata;
+    return theme.fg("dim", "╰─ ") + metadata + hint;
   }
 
   if (options.expanded) {
@@ -93,9 +93,7 @@ function formatWriteResult(
       );
     }
 
-    renderedLines.unshift(
-      theme.fg("dim", "├─ ") + metadata + buildExpansionHint(theme, "collapse"),
-    );
+    renderedLines.unshift(theme.fg("dim", "├─ ") + metadata + hint);
 
     return renderedLines.join("\n");
   }
@@ -114,34 +112,37 @@ export function patchWriteTool(pi: ExtensionAPI): Handle {
       const renderArgs = args as WriteToolInput;
       const { text, prefix } = getCallRenderParts(state, theme, toolCtx);
 
-      let callLine = prefix;
-
       const title = theme.fg("toolTitle", theme.bold("Write "));
+      const fullPath = renderPath(renderArgs.path, theme, toolCtx.cwd);
       const pathWidth = Math.max(
         1,
-        MAX_CALL_WIDTH() - visibleWidth(callLine + title),
+        MAX_CALL_WIDTH() - visibleWidth(prefix + title),
       );
-      callLine += title;
-      callLine += renderPath(renderArgs.path, theme, toolCtx.cwd, pathWidth);
+      let collapsedText =
+        prefix +
+        title +
+        renderPath(renderArgs.path, theme, toolCtx.cwd, pathWidth);
+      let fullText = prefix + title + fullPath;
 
-      let content = truncateToWidth(
-        callLine,
-        MAX_CALL_WIDTH(),
-        theme.fg("accent", "..."),
-      );
+      setExpandableCallText(text, state, {
+        expanded: toolCtx.expanded,
+        collapsedText,
+        fullText,
+        compactIsLossy: visibleWidth(fullPath) > pathWidth,
+        ellipsis: theme.fg("accent", "..."),
+      });
       if (toolCtx.isPartial && typeof renderArgs.content === "string") {
-        content +=
-          "\n" +
-          formatWriteResult(
-            { content: [] },
-            state,
-            { expanded: toolCtx.expanded, isPartial: toolCtx.isPartial },
-            theme,
-            renderArgs,
-          );
+        const partialResult = formatWriteResult(
+          { content: [] },
+          state,
+          { expanded: toolCtx.expanded, isPartial: toolCtx.isPartial },
+          theme,
+          renderArgs,
+        );
+        collapsedText += `\n${partialResult}`;
+        fullText += `\n${partialResult}`;
+        text.setText(toolCtx.expanded ? fullText : collapsedText);
       }
-
-      text.setText(content);
       return text;
     },
     renderResult(result, options, theme, toolCtx) {

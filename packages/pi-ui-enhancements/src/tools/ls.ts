@@ -3,7 +3,7 @@ import type {
   LsToolInput,
 } from "@earendil-works/pi-coding-agent";
 import { createLsToolDefinition } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { visibleWidth } from "@earendil-works/pi-tui";
 import type { Handle } from "../types";
 import {
   createCwdDeferredTool,
@@ -17,6 +17,7 @@ import {
   formatListResult,
   getCallRenderParts,
   renderPath,
+  setExpandableCallText,
 } from "./tool-rendering";
 
 const LS_CONFIG: ListResultConfig = {
@@ -42,31 +43,30 @@ export function patchLsTool(pi: ExtensionAPI): Handle {
       const state = toolCtx.state as BaseRenderState;
       const { text, prefix } = getCallRenderParts(state, theme, toolCtx);
 
-      let content = prefix;
-
       const renderArgs = args as LsToolInput;
       const title = theme.fg("toolTitle", theme.bold("Ls "));
       const limit = renderArgs.limit
         ? theme.fg("dim", ` (limit ${renderArgs.limit})`)
         : "";
+      const path = renderArgs.path || ".";
       const pathWidth = Math.max(
         1,
-        MAX_CALL_WIDTH() - visibleWidth(content + title + limit),
+        MAX_CALL_WIDTH() - visibleWidth(prefix + title + limit),
       );
-      const pathDisplay = renderPath(
-        renderArgs.path || ".",
-        theme,
-        toolCtx.cwd,
-        pathWidth,
-      );
+      const collapsedText =
+        prefix +
+        title +
+        renderPath(path, theme, toolCtx.cwd, pathWidth) +
+        limit;
+      const fullText =
+        prefix + title + renderPath(path, theme, toolCtx.cwd) + limit;
 
-      content += title;
-      content += pathDisplay;
-      content += limit;
-
-      text.setText(
-        truncateToWidth(content, MAX_CALL_WIDTH(), theme.fg("accent", "...")),
-      );
+      setExpandableCallText(text, state, {
+        expanded: toolCtx.expanded,
+        collapsedText,
+        fullText,
+        ellipsis: theme.fg("accent", "..."),
+      });
       return text;
     },
     renderResult: buildRenderResult((result, state, options, theme) =>

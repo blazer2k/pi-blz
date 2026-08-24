@@ -42,7 +42,6 @@ type BashRenderState = BaseRenderState & {
   endedAt?: number;
   durationTimer?: ReturnType<typeof setInterval>;
   durationMs?: number;
-  callTruncated?: boolean;
 };
 
 type BashDetailsWithTiming = BashToolDetails & {
@@ -66,7 +65,7 @@ function buildBashMetadataParts(
     durationSummary?: string;
     remainingLines?: number;
     visibleLines?: number;
-    callTruncated?: boolean;
+    callExpandable?: boolean;
     lineTruncated?: boolean;
     toolTruncated?: boolean;
     expanded?: boolean;
@@ -93,7 +92,7 @@ function buildBashMetadataParts(
     }
     needsHint = true;
   }
-  if (args.callTruncated && !args.expanded) {
+  if (args.callExpandable && !args.expanded) {
     needsHint = true;
   }
   if (args.lineTruncated) {
@@ -243,7 +242,7 @@ function formatBashResult(
       const metadata = parts.join(theme.fg("muted", " • "));
       const isExpandable =
         collapsedBody.truncated ||
-        state.callTruncated === true ||
+        state.callExpandable === true ||
         state.truncated === true;
       const expansionHint = isExpandable
         ? buildExpansionHint(
@@ -303,7 +302,7 @@ function formatBashResult(
     const isExpandable =
       remainingLines > 0 ||
       collapsedOutputLines.truncated ||
-      state.callTruncated === true ||
+      state.callExpandable === true ||
       state.truncated === true;
     const visibleOutput = options.expanded
       ? normalizeOutput(parsedError.output)
@@ -378,7 +377,7 @@ function formatBashResult(
       durationSummary,
       remainingLines,
       visibleLines: visibleLineCount,
-      callTruncated: state.callTruncated,
+      callExpandable: state.callExpandable,
       lineTruncated: outputLines.truncated,
       toolTruncated: state.truncated === true,
       expanded: options.expanded,
@@ -411,7 +410,7 @@ function formatBashResult(
       buildBashMetadataParts(
         {
           durationSummary,
-          callTruncated: state.callTruncated,
+          callExpandable: state.callExpandable,
           lineTruncated: shouldTruncate,
           toolTruncated: state.truncated === true,
           expanded: options.expanded,
@@ -541,7 +540,7 @@ export function patchBashTool(pi: ExtensionAPI): Handle {
         visibleWidth(inlineTimeoutSuffix);
       const commandBudget = Math.max(1, MAX_CALL_WIDTH() - staticWidth);
       const commandTruncated = visibleWidth(collapsedCommand) > commandBudget;
-      state.callTruncated = commandTruncated || command.includes("\n");
+      state.callExpandable = commandTruncated || command.includes("\n");
 
       const visibleCommand = toolCtx.expanded
         ? command

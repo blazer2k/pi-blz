@@ -24,6 +24,7 @@ export type BaseRenderState = {
   truncated?: boolean;
   isError?: boolean;
   expanded?: boolean;
+  callExpandable?: boolean;
   /** Captured blink phase shared between renderCall and renderResult */
   blinkOn?: boolean;
 };
@@ -255,6 +256,21 @@ export function buildExpansionHint(
   );
 }
 
+export function buildToolExpansionHint(
+  theme: Theme,
+  state: BaseRenderState,
+  options: { expanded: boolean },
+  resultExpandable: boolean,
+  placement: "suffix" | "standalone" = "suffix",
+): string {
+  if (!state.callExpandable && !resultExpandable) return "";
+  return buildExpansionHint(
+    theme,
+    options.expanded ? "collapse" : "expand",
+    placement,
+  );
+}
+
 function getOpenOsc8Terminator(
   text: string,
 ): "\u0007" | "\u001B\\" | undefined {
@@ -434,7 +450,8 @@ export function formatSimpleErrorResult(
   const status = state.truncated
     ? buildResultStatusParts(state, theme).join(theme.fg("muted", " • "))
     : "";
-  const isExpandable = state.truncated || collapsedBody.truncated;
+  const isExpandable =
+    state.callExpandable === true || state.truncated || collapsedBody.truncated;
 
   if (options.expanded) {
     if (!isExpandable) return formatted;
@@ -487,6 +504,32 @@ export function formatTreeLine(
     text: theme.fg("dim", prefix) + styledLine,
     truncated,
   };
+}
+
+export function setExpandableCallText(
+  text: Text,
+  state: BaseRenderState,
+  options: {
+    expanded: boolean;
+    collapsedText: string;
+    fullText: string;
+    compactIsLossy?: boolean;
+    ellipsis: string;
+  },
+): void {
+  state.callExpandable =
+    options.compactIsLossy === true ||
+    options.fullText.includes("\n") ||
+    visibleWidth(options.fullText) > MAX_CALL_WIDTH();
+  text.setText(
+    options.expanded
+      ? options.fullText
+      : safeTruncateToWidth(
+          options.collapsedText,
+          MAX_CALL_WIDTH(),
+          options.ellipsis,
+        ),
+  );
 }
 
 export function getCallRenderParts(
@@ -684,7 +727,11 @@ export function formatListResult(
   if (normalized === "" || normalized === config.emptyMessage) {
     const emptyParts = buildResultStatusParts(state, theme);
     emptyParts.push(theme.fg("muted", config.emptyMessage));
-    return theme.fg("dim", "╰─ ") + emptyParts.join(theme.fg("muted", " • "));
+    return (
+      theme.fg("dim", "╰─ ") +
+      emptyParts.join(theme.fg("muted", " • ")) +
+      buildToolExpansionHint(theme, state, options, false)
+    );
   }
 
   const items = config.preprocess(normalized);
@@ -698,14 +745,18 @@ export function formatListResult(
 
   if (!options.expanded) {
     return (
-      theme.fg("dim", "╰─ ") + summary + buildExpansionHint(theme, "expand")
+      theme.fg("dim", "╰─ ") +
+      summary +
+      buildToolExpansionHint(theme, state, options, true)
     );
   }
 
   const visible = items.slice(0, MAX_EXPANDED_ENTRIES());
   const remaining = Math.max(0, total - MAX_EXPANDED_ENTRIES());
   const lines: string[] = [
-    theme.fg("dim", "├─ ") + summary + buildExpansionHint(theme, "collapse"),
+    theme.fg("dim", "├─ ") +
+      summary +
+      buildToolExpansionHint(theme, state, options, true),
   ];
 
   visible.forEach((item, index) => {

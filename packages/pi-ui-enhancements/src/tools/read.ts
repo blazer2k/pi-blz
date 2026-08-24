@@ -25,6 +25,7 @@ import {
   MAX_CALL_WIDTH,
   buildRenderResult,
   buildResultStatusParts,
+  buildToolExpansionHint,
   countLines,
   extractTextContent,
   formatSimpleErrorResult,
@@ -32,6 +33,7 @@ import {
   getCallRenderParts,
   renderPath,
   sanitizeDisplayText,
+  setExpandableCallText,
 } from "./tool-rendering";
 
 const COMPACT_RESOURCE_FILE_NAMES = new Set([
@@ -198,6 +200,7 @@ function formatReadResult(
   }
 
   const metadataParts = buildResultStatusParts(state, theme);
+  const callHint = buildToolExpansionHint(theme, state, options, false);
   const imageMarker = getImageReadMarker(textContent);
 
   if (hasImage) {
@@ -207,7 +210,7 @@ function formatReadResult(
     );
   } else if (imageMarker) {
     metadataParts.push(theme.fg("warning", "Image unavailable"));
-    const summary = metadataParts.join(theme.fg("muted", " • "));
+    const summary = metadataParts.join(theme.fg("muted", " • ")) + callHint;
     if (!imageMarker.reason) return theme.fg("dim", "╰─ ") + summary;
 
     const reason = formatTreeLine(imageMarker.reason, {
@@ -229,7 +232,11 @@ function formatReadResult(
     );
   }
 
-  return theme.fg("dim", "╰─ ") + metadataParts.join(theme.fg("muted", " • "));
+  return (
+    theme.fg("dim", "╰─ ") +
+    metadataParts.join(theme.fg("muted", " • ")) +
+    callHint
+  );
 }
 
 export function patchReadTool(pi: ExtensionAPI): Handle {
@@ -242,44 +249,47 @@ export function patchReadTool(pi: ExtensionAPI): Handle {
       const state = toolCtx.state as BaseRenderState;
       const { text, prefix } = getCallRenderParts(state, theme, toolCtx);
 
-      let content = prefix;
-
       const renderArgs = args as ReadToolInput;
-
       const classification = getCompactReadClassification(
         renderArgs,
         toolCtx.cwd,
       );
+      const title = theme.fg("toolTitle", theme.bold("Read "));
+      const lineRange = formatReadLineRange(renderArgs, theme);
+      const fullPath = renderPath(renderArgs.path, theme, toolCtx.cwd);
+      const fullText = prefix + title + fullPath + lineRange;
 
+      let collapsedText: string;
+      let compactIsLossy = classification !== undefined;
       if (classification) {
-        content += formatCompactReadCall(
-          classification,
-          renderArgs,
-          theme,
-          Math.max(1, MAX_CALL_WIDTH() - visibleWidth(content)),
-        );
+        collapsedText =
+          prefix +
+          formatCompactReadCall(
+            classification,
+            renderArgs,
+            theme,
+            Math.max(1, MAX_CALL_WIDTH() - visibleWidth(prefix)),
+          );
       } else {
-        const title = theme.fg("toolTitle", theme.bold("Read "));
-        const lineRange = formatReadLineRange(renderArgs, theme);
         const pathWidth = Math.max(
           1,
-          MAX_CALL_WIDTH() - visibleWidth(content + title + lineRange),
+          MAX_CALL_WIDTH() - visibleWidth(prefix + title + lineRange),
         );
-        const pathDisplay = renderPath(
-          renderArgs.path,
-          theme,
-          toolCtx.cwd,
-          pathWidth,
-        );
-
-        content += title;
-        content += pathDisplay;
-        content += lineRange;
+        collapsedText =
+          prefix +
+          title +
+          renderPath(renderArgs.path, theme, toolCtx.cwd, pathWidth) +
+          lineRange;
+        compactIsLossy ||= visibleWidth(fullPath) > pathWidth;
       }
 
-      text.setText(
-        truncateToWidth(content, MAX_CALL_WIDTH(), theme.fg("accent", "...")),
-      );
+      setExpandableCallText(text, state, {
+        expanded: toolCtx.expanded,
+        collapsedText,
+        fullText,
+        compactIsLossy,
+        ellipsis: theme.fg("accent", "..."),
+      });
       return text;
     },
     renderResult: buildRenderResult(formatReadResult),

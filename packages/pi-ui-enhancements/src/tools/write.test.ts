@@ -25,6 +25,36 @@ describe("write renderCall", () => {
     expect(text).toContain("a.ts");
   });
 
+  it("expands a truncated path and hints even when content is empty", () => {
+    const def = setupWriteTool();
+    const state = {};
+    const path = `/tmp/${"segment/".repeat(12)}target.txt`;
+    const args = { path, content: "" };
+    const collapsedCtx = mkToolCtx({ state, args });
+    const collapsed = def.renderCall!(args, mkTheme(), collapsedCtx)
+      .render(120)
+      .join("\n");
+    expect(collapsed).toContain("...");
+
+    const collapsedResult = def.renderResult!(
+      {
+        content: [{ type: "text", text: "wrote 0 bytes" }],
+        details: undefined,
+      },
+      { expanded: false, isPartial: false },
+      mkTheme(),
+      collapsedCtx,
+    );
+    expect(collapsedResult.render(120).join("\n")).toContain("to expand");
+
+    const expandedCtx = mkToolCtx({ expanded: true, state, args });
+    const expanded = def.renderCall!(args, mkTheme(), expandedCtx)
+      .render(40)
+      .join("\n");
+    expect(expanded).toContain("segment");
+    expect(expanded).toContain("│  ");
+  });
+
   it("partial call includes preview/result summary", () => {
     const def = setupWriteTool();
     const renderCall = def.renderCall!;

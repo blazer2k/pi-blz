@@ -11,6 +11,7 @@ import {
   type ResultStatusState,
   buildExpansionHint,
   buildResultStatusParts,
+  buildToolExpansionHint,
   clearBlinkTimers,
   countLines,
   extractTextContent,
@@ -306,6 +307,16 @@ describe("buildExpansionHint", () => {
     expect(hint).toStartWith(" • ");
     expect(hint).toContain("to collapse");
     expect(hint).not.toContain("(");
+  });
+
+  it("uses call expandability when the result itself is static", () => {
+    const hint = buildToolExpansionHint(
+      mkTheme(),
+      { callExpandable: true },
+      { expanded: false },
+      false,
+    );
+    expect(hint).toContain("to expand");
   });
 
   it("returns empty hints when showExpansionHint is disabled", () => {
