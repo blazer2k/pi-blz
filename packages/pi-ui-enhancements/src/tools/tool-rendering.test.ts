@@ -26,6 +26,7 @@ import {
   renderPath,
   safeTruncateToWidth,
   sanitizeDisplayText,
+  sanitizeMultilineDisplayText,
   updateResultState,
 } from "./tool-rendering";
 import { saveConfig } from "../config";
@@ -87,7 +88,7 @@ describe("extractTextContent", () => {
   });
 });
 
-describe("sanitizeDisplayText", () => {
+describe("display sanitizers", () => {
   it("strips ANSI/OSC sequences and flattens whitespace", () => {
     expect(sanitizeDisplayText("a\x1b[31mred\x1b[0m\n\ttext")).toBe(
       "ared text",
@@ -95,6 +96,12 @@ describe("sanitizeDisplayText", () => {
     expect(
       sanitizeDisplayText("x\x1b]8;;https://e.test\x1b\\link\x1b]8;;\x1b\\y"),
     ).toBe("xlinky");
+  });
+
+  it("preserves safe newlines for expanded content", () => {
+    expect(sanitizeMultilineDisplayText("first\r\n\tsecond")).toBe(
+      "first\n second",
+    );
   });
 });
 
@@ -110,9 +117,8 @@ describe("formatErrorBody", () => {
   it("marks multi-line errors as truncated even when they fit", () => {
     const error = "line1\nline2\nline3";
     const { text, truncated } = formatErrorBody(error, opts, "...");
-    // multi-line errors always go through truncateToWidth path
     expect(truncated).toBe(true);
-    expect(text).toBe(error);
+    expect(text).toBe("line1 ...");
   });
 
   it("preserves full error when expanded", () => {
@@ -156,10 +162,32 @@ describe("formatSimpleErrorResult", () => {
     }
   });
 
-  it("labels empty errors", () => {
-    expect(
-      formatSimpleErrorResult("", { isError: true }, opts, mkTheme()),
-    ).toContain("╰─ error");
+  it("renders one-line collapsed previews and restores tree rows when expanded", () => {
+    const theme = mkTheme();
+    const state: BaseRenderState = { isError: true };
+    const error = "rg: regex parse error:\n    (?:[)\n       ^";
+
+    const collapsed = formatSimpleErrorResult(error, state, opts, theme);
+    expect(collapsed).toContain("╰─ rg: regex parse error: ...");
+    expect(collapsed).toContain("to expand");
+    expect(collapsed.split("\n")).toHaveLength(1);
+
+    const expanded = formatSimpleErrorResult(error, state, optsExpanded, theme);
+    expect(expanded).toContain("├─ ");
+    expect(expanded).toContain("to collapse");
+    expect(expanded).toContain("│      (?:[)");
+    expect(expanded).toContain("╰─        ^");
+  });
+
+  it("labels empty errors without offering expansion", () => {
+    const output = formatSimpleErrorResult(
+      "",
+      { isError: true },
+      opts,
+      mkTheme(),
+    );
+    expect(output).toContain("╰─ error");
+    expect(output).not.toContain("ctrl+o");
   });
 });
 
@@ -266,13 +294,14 @@ describe("result status rendering", () => {
 });
 
 describe("buildExpansionHint", () => {
-  it("returns a parenthesized expand hint", () => {
+  it("returns a bullet-prefixed expand hint without parens", () => {
     const hint = buildExpansionHint(mkTheme(), "expand");
-    expect(hint).toStartWith(" (");
-    expect(hint).toContain("to expand)");
+    expect(hint).toStartWith(" • ");
+    expect(hint).toContain("to expand");
+    expect(hint).not.toContain("(");
   });
 
-  it("returns collapse hint with a separator and no parens", () => {
+  it("returns a bullet-prefixed collapse hint without parens", () => {
     const hint = buildExpansionHint(mkTheme(), "collapse");
     expect(hint).toStartWith(" • ");
     expect(hint).toContain("to collapse");
@@ -325,6 +354,24 @@ describe("tree-aware text wrapping", () => {
 
     expect(lines.slice(1).every((line) => /^[│╰]/u.test(line))).toBe(true);
     clearBlinkTimers();
+  });
+
+  it("keeps dotted prefixes on wrapped hidden-lines rows", () => {
+    const text = getResultText({}, optsExpanded, undefined);
+    text.setText(
+      "├─ took 562ms • ctrl+o to expand\n┊  12345678901234567890 more lines\n│  visible tail line\n╰─ last line",
+    );
+
+    const lines = text
+      .render(28)
+      .map((line) => line.trimEnd().slice(1))
+      .filter(Boolean);
+
+    expect(lines.every((line) => /^[├│╰┊]/u.test(line))).toBe(true);
+    expect(
+      lines.filter((line) => line.startsWith("┊  ")).length,
+    ).toBeGreaterThanOrEqual(2);
+    expect(lines.at(-1)).toStartWith("╰─ ");
   });
 });
 

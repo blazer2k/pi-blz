@@ -51,6 +51,10 @@ function formatWriteResult(
   metadataParts.push(theme.fg("muted", summary));
   const metadata = metadataParts.join(theme.fg("muted", " • "));
 
+  if (lines === 0) {
+    return theme.fg("dim", "╰─ ") + metadata;
+  }
+
   if (options.expanded) {
     const lang = args.path ? getLanguageFromPath(args.path) : undefined;
     const maxPreviewLines = MAX_EXPANDED_ENTRIES();

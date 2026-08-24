@@ -245,13 +245,14 @@ export function clearBlinkTimers(): void {
 export function buildExpansionHint(
   theme: Theme,
   action: "expand" | "collapse",
+  placement: "suffix" | "standalone" = "suffix",
 ): string {
   if (!getConfig().showExpansionHint) return "";
-  const key = theme.fg("dim", keyText("app.tools.expand"));
-  if (action === "expand") {
-    return theme.fg("dim", " (") + key + theme.fg("dim", " to expand)");
-  }
-  return theme.fg("muted", " • ") + key + theme.fg("dim", " to collapse");
+  return (
+    (placement === "suffix" ? theme.fg("muted", " • ") : "") +
+    theme.fg("dim", keyText("app.tools.expand")) +
+    theme.fg("dim", action === "expand" ? " to expand" : " to collapse")
+  );
 }
 
 function getOpenOsc8Terminator(
@@ -331,6 +332,10 @@ function sanitizeTextOutput(value: string): string {
     .replace(/\r/g, "");
 }
 
+export function sanitizeMultilineDisplayText(value: string): string {
+  return sanitizeTextOutput(value).replace(/\t/g, " ");
+}
+
 export function sanitizeDisplayText(value: string): string {
   return sanitizeTextOutput(value).replace(/[\n\t]+/g, " ");
 }
@@ -369,16 +374,28 @@ export function formatErrorBody(
       truncated: false,
     };
   }
+  if (trimmed.length === 0) return { text: "", truncated: false };
 
   const maxLineWidth = getMaxErrorLineWidth();
-  const joined = trimmed.join("\n");
+  const firstLine = trimmed.find((line) => line.length > 0) ?? "";
 
-  if (trimmed.length === 1 && visibleWidth(joined) <= maxLineWidth) {
-    return { text: joined, truncated: false };
+  if (trimmed.length === 1 && visibleWidth(firstLine) <= maxLineWidth) {
+    return { text: firstLine, truncated: false };
+  }
+
+  if (trimmed.length > 1) {
+    return {
+      text: truncateToWidth(
+        `${firstLine}${firstLine ? " " : ""}${ellipsis}`,
+        maxLineWidth,
+        ellipsis,
+      ),
+      truncated: true,
+    };
   }
 
   return {
-    text: truncateToWidth(joined, maxLineWidth, ellipsis),
+    text: truncateToWidth(firstLine, maxLineWidth, ellipsis),
     truncated: true,
   };
 }
@@ -389,11 +406,14 @@ export function formatSimpleErrorResult(
   options: ToolRenderResultOptions,
   theme: Theme,
 ): string {
-  const errorBody = formatErrorBody(
+  const collapsedBody = formatErrorBody(
     textContent,
-    options,
+    { ...options, expanded: false },
     theme.fg("error", "..."),
   );
+  const errorBody = options.expanded
+    ? formatErrorBody(textContent, options, theme.fg("error", "..."))
+    : collapsedBody;
   const hasErrorBody = errorBody.text.length > 0;
   const bodyText = hasErrorBody ? errorBody.text : "error";
   const lines = bodyText.split("\n");
@@ -411,39 +431,37 @@ export function formatSimpleErrorResult(
     })
     .join("\n");
 
-  if (state.truncated) {
-    const status = buildResultStatusParts(state, theme).join(
-      theme.fg("muted", " • "),
-    );
-    if (options.expanded) {
-      return (
-        theme.fg("dim", "├─ ") +
-        status +
-        buildExpansionHint(theme, "collapse") +
-        "\n" +
-        formatted
-      );
-    }
-
-    const suffix = errorBody.truncated
-      ? buildExpansionHint(theme, "expand")
-      : "";
-    return (
-      theme.fg("dim", "╰─ ") +
-      status +
-      (hasErrorBody
-        ? theme.fg("muted", " • ") + theme.fg("error", bodyText)
-        : "") +
-      suffix
-    );
-  }
+  const status = state.truncated
+    ? buildResultStatusParts(state, theme).join(theme.fg("muted", " • "))
+    : "";
+  const isExpandable = state.truncated || collapsedBody.truncated;
 
   if (options.expanded) {
-    return formatted;
+    if (!isExpandable) return formatted;
+
+    const collapseHint = buildExpansionHint(
+      theme,
+      "collapse",
+      status ? "suffix" : "standalone",
+    );
+    if (!status && !collapseHint) return formatted;
+
+    return theme.fg("dim", "├─ ") + status + collapseHint + "\n" + formatted;
   }
 
-  const suffix = errorBody.truncated ? buildExpansionHint(theme, "expand") : "";
-  return theme.fg("dim", "╰─ ") + theme.fg("error", bodyText) + suffix;
+  const suffix = isExpandable ? buildExpansionHint(theme, "expand") : "";
+  if (!state.truncated) {
+    return theme.fg("dim", "╰─ ") + theme.fg("error", bodyText) + suffix;
+  }
+
+  return (
+    theme.fg("dim", "╰─ ") +
+    status +
+    (hasErrorBody
+      ? theme.fg("muted", " • ") + theme.fg("error", bodyText)
+      : "") +
+    suffix
+  );
 }
 
 export function formatTreeLine(
@@ -517,7 +535,7 @@ function wrapTreeText(
       const lineWidth = visibleWidth(line);
       const prefix = sliceByColumn(line, 0, 3);
       const visiblePrefix = stripAnsi(prefix);
-      const hasTreePrefix = /^[│├╰][─ ] /u.test(visiblePrefix);
+      const hasTreePrefix = /^[│├╰┊][─ ] /u.test(visiblePrefix);
 
       if (!hasTreePrefix && callContinuationPrefix) {
         const chunks = wrapTextWithAnsi(line, Math.max(1, width - 3));

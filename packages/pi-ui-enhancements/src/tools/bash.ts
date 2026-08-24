@@ -26,7 +26,7 @@ import {
   invalidateIfChanged,
   normalizeOutput,
   registerToolTimer,
-  sanitizeDisplayText,
+  sanitizeMultilineDisplayText,
   unregisterToolTimer,
   updateResultState,
 } from "./tool-rendering";
@@ -41,6 +41,7 @@ type BashRenderState = BaseRenderState & {
   startedAt?: number;
   endedAt?: number;
   durationTimer?: ReturnType<typeof setInterval>;
+  durationMs?: number;
   callTruncated?: boolean;
 };
 
@@ -82,16 +83,14 @@ function buildBashMetadataParts(
     ...buildResultStatusParts({ truncated: args.toolTruncated }, theme),
   );
   if ((args.remainingLines ?? 0) > 0) {
-    const remainingLines = args.remainingLines ?? 0;
-    const suffix = remainingLines === 1 ? "line" : "lines";
-    parts.push(
-      theme.fg(
-        "muted",
-        args.visibleLines === 0
-          ? `${remainingLines} ${suffix}`
-          : `${remainingLines} more ${suffix}`,
-      ),
-    );
+    // The hidden count is rendered as a "┊  N more lines" label line by the
+    // caller when tail lines are visible; keep it in metadata only when the
+    // tail is hidden entirely (limit = 0).
+    if (args.visibleLines === 0) {
+      const remainingLines = args.remainingLines ?? 0;
+      const suffix = remainingLines === 1 ? "line" : "lines";
+      parts.push(theme.fg("muted", `${remainingLines} ${suffix}`));
+    }
     needsHint = true;
   }
   if (args.callTruncated && !args.expanded) {
@@ -104,10 +103,29 @@ function buildBashMetadataParts(
   return { parts, needsHint };
 }
 
-function normalizeBashErrorText(text: string): string {
-  return normalizeOutput(text)
-    .replace(/^\(no output\)\n\n(?=Command exited with code \d+)/, "")
-    .replace(/\n{3,}(?=Command exited with code \d+)/, "\n");
+const BASH_STATUS_PATTERN =
+  /^(?:Command exited with code \d+|Command timed out after .+ seconds|Command aborted)$/;
+
+function parseBashErrorText(text: string): {
+  output: string;
+  status?: string;
+} {
+  const normalized = normalizeOutput(text).replace(
+    /^\(no output\)\n\n(?=Command (?:exited|timed out|aborted))/,
+    "",
+  );
+  const lines = normalized.split("\n");
+  const lastLine = lines.at(-1) ?? "";
+
+  if (!BASH_STATUS_PATTERN.test(lastLine)) {
+    return { output: normalized };
+  }
+
+  const output = lines.slice(0, -1).join("\n").trimEnd();
+  return {
+    output: output === "(no output)" ? "" : output,
+    status: lastLine,
+  };
 }
 
 function stripBashTruncationNotice(
@@ -131,13 +149,26 @@ function stripBashTruncationNotice(
   return normalized.slice(0, footerStart).trimEnd();
 }
 
+function formatHiddenLinesLabel(hiddenLines: number, theme: Theme): string {
+  return (
+    theme.fg("dim", "┊  ") +
+    theme.italic(
+      theme.fg(
+        "muted",
+        `${hiddenLines} more ${hiddenLines === 1 ? "line" : "lines"}`,
+      ),
+    )
+  );
+}
+
 function formatOutputLines(
   text: string,
   theme: Theme,
   color: "toolOutput" | "error" = "toolOutput",
   maxLineWidth?: number,
-  closeLastLine = false,
+  options: { closeLastLine?: boolean } = {},
 ): { text: string; truncated: boolean } {
+  const { closeLastLine = false } = options;
   const output = normalizeOutput(text);
   if (!output) return { text: "", truncated: false };
 
@@ -180,6 +211,7 @@ function formatBashResult(
   );
   const elapsedMs =
     details?.durationMs ??
+    state.durationMs ??
     (state.startedAt === undefined
       ? undefined
       : (state.endedAt ?? Date.now()) - state.startedAt);
@@ -189,98 +221,135 @@ function formatBashResult(
       : `${options.isPartial ? "elapsed" : "took"} ${formatDuration(elapsedMs)}`;
 
   if (state.isError) {
-    const errorBody = formatErrorBody(
-      normalizeBashErrorText(textContent),
-      options,
-      theme.fg("error", "..."),
-    );
+    const parsedError = parseBashErrorText(textContent);
 
-    if (options.expanded) {
+    if (!parsedError.status) {
+      const collapsedBody = formatErrorBody(
+        parsedError.output,
+        { ...options, expanded: false },
+        theme.fg("error", "..."),
+      );
+      const errorBody = options.expanded
+        ? formatErrorBody(parsedError.output, options, theme.fg("error", "..."))
+        : collapsedBody;
       const { parts } = buildBashMetadataParts(
         {
           toolTruncated: state.truncated === true,
           durationSummary,
-          expanded: true,
-        },
-        theme,
-      );
-      const summary = parts.join(theme.fg("muted", " • "));
-      const outputLines = formatOutputLines(
-        errorBody.text,
-        theme,
-        "error",
-        undefined,
-        true,
-      );
-      const summaryLine = summary
-        ? theme.fg("dim", outputLines.text ? "├─ " : "╰─ ") + summary + hint
-        : undefined;
-      return [summaryLine, outputLines.text]
-        .filter((line): line is string => Boolean(line))
-        .join("\n");
-    }
-
-    const errorText = normalizeBashErrorText(textContent);
-    const lineCount = countLines(errorText);
-
-    if (lineCount > 1) {
-      const limit = MAX_COLLAPSED_LINES();
-      const visibleLineCount = limit === 0 ? 0 : Math.min(lineCount, limit);
-      const remainingLines = Math.max(0, lineCount - visibleLineCount);
-      const output =
-        limit === 0
-          ? ""
-          : normalizeOutput(errorText).split("\n").slice(-limit).join("\n");
-      const outputLines = formatOutputLines(
-        output,
-        theme,
-        "error",
-        getOutputWidth(),
-        true,
-      );
-      const { parts, needsHint } = buildBashMetadataParts(
-        {
-          durationSummary,
-          remainingLines,
-          visibleLines: visibleLineCount,
-          callTruncated: state.callTruncated,
-          lineTruncated: outputLines.truncated,
-          toolTruncated: state.truncated === true,
           expanded: options.expanded,
         },
         theme,
       );
-      const summary =
-        parts.join(theme.fg("muted", " • ")) + (needsHint ? hint : "");
-      const summaryLine = summary
-        ? theme.fg("dim", outputLines.text ? "├─ " : "╰─ ") + summary
-        : undefined;
+      const metadata = parts.join(theme.fg("muted", " • "));
+      const isExpandable =
+        collapsedBody.truncated ||
+        state.callTruncated === true ||
+        state.truncated === true;
+      const expansionHint = isExpandable
+        ? buildExpansionHint(
+            theme,
+            options.expanded ? "collapse" : "expand",
+            metadata ? "suffix" : "standalone",
+          )
+        : "";
 
-      return [summaryLine, outputLines.text]
-        .filter((line): line is string => Boolean(line))
-        .join("\n");
+      if (options.expanded) {
+        const outputLines = formatOutputLines(
+          errorBody.text,
+          theme,
+          "error",
+          undefined,
+          { closeLastLine: true },
+        );
+        const summary = metadata + expansionHint;
+        return [
+          summary
+            ? theme.fg("dim", outputLines.text ? "├─ " : "╰─ ") + summary
+            : undefined,
+          outputLines.text,
+        ]
+          .filter((line): line is string => Boolean(line))
+          .join("\n");
+      }
+
+      const body = errorBody.text || "error";
+      const summary = [metadata, theme.fg("error", body)]
+        .filter(Boolean)
+        .join(theme.fg("muted", " • "));
+      return theme.fg("dim", "╰─ ") + summary + expansionHint;
     }
 
-    const { parts, needsHint } = buildBashMetadataParts(
+    const limit = MAX_COLLAPSED_LINES();
+    const errorLineCount = countLines(parsedError.output);
+    const collapsedVisibleLineCount =
+      limit === 0 ? 0 : Math.min(errorLineCount, limit);
+    const remainingLines = Math.max(
+      0,
+      errorLineCount - collapsedVisibleLineCount,
+    );
+    const collapsedOutput =
+      limit === 0
+        ? ""
+        : normalizeOutput(parsedError.output)
+            .split("\n")
+            .slice(-limit)
+            .join("\n");
+    const collapsedOutputLines = formatOutputLines(
+      collapsedOutput,
+      theme,
+      "toolOutput",
+      getOutputWidth(),
+    );
+    const isExpandable =
+      remainingLines > 0 ||
+      collapsedOutputLines.truncated ||
+      state.callTruncated === true ||
+      state.truncated === true;
+    const visibleOutput = options.expanded
+      ? normalizeOutput(parsedError.output)
+      : collapsedOutput;
+    const outputLines = options.expanded
+      ? formatOutputLines(visibleOutput, theme, "toolOutput")
+      : collapsedOutputLines;
+    const { parts } = buildBashMetadataParts(
       {
-        toolTruncated: state.truncated === true,
         durationSummary,
-        callTruncated: state.callTruncated,
-        lineTruncated: errorBody.truncated,
+        remainingLines: options.expanded ? 0 : remainingLines,
+        visibleLines: options.expanded
+          ? errorLineCount
+          : collapsedVisibleLineCount,
+        toolTruncated: state.truncated === true,
         expanded: options.expanded,
       },
       theme,
     );
-    if (errorBody.text) parts.push(theme.fg("error", errorBody.text));
-    return (
-      theme.fg("dim", "╰─ ") +
-      parts.join(theme.fg("muted", " • ")) +
-      (options.expanded || needsHint ? hint : "")
-    );
+    const metadata = parts.join(theme.fg("muted", " • "));
+    const expansionHint = isExpandable
+      ? buildExpansionHint(
+          theme,
+          options.expanded ? "collapse" : "expand",
+          metadata ? "suffix" : "standalone",
+        )
+      : "";
+    const summary = metadata + expansionHint;
+    const showHiddenLabel =
+      !options.expanded && collapsedVisibleLineCount > 0 && remainingLines > 0;
+
+    return [
+      summary ? theme.fg("dim", "├─ ") + summary : undefined,
+      showHiddenLabel
+        ? formatHiddenLinesLabel(remainingLines, theme)
+        : undefined,
+      outputLines.text,
+      theme.fg("dim", "╰─ ") + theme.fg("error", parsedError.status),
+    ]
+      .filter((line): line is string => Boolean(line))
+      .join("\n");
   }
 
+  const bashOutput = normalizeOutput(textContent).replace(/\n+$/g, "");
   const limit = MAX_COLLAPSED_LINES();
-  const lineCount = countLines(textContent);
+  const lineCount = countLines(bashOutput);
   const showExpanded = options.expanded && lineCount > 1;
   const visibleLineCount = showExpanded
     ? lineCount
@@ -290,16 +359,18 @@ function formatBashResult(
   const remainingLines = Math.max(0, lineCount - visibleLineCount);
 
   const output = showExpanded
-    ? normalizeOutput(textContent)
+    ? bashOutput
     : limit === 0
       ? ""
-      : normalizeOutput(textContent).split("\n").slice(-limit).join("\n");
+      : bashOutput.split("\n").slice(-limit).join("\n");
+  const hiddenLines =
+    showExpanded || visibleLineCount === 0 ? 0 : remainingLines;
   const outputLines = formatOutputLines(
     output,
     theme,
     "toolOutput",
     showExpanded ? undefined : getOutputWidth(),
-    true,
+    { closeLastLine: true },
   );
 
   const { parts, needsHint } = buildBashMetadataParts(
@@ -315,14 +386,17 @@ function formatBashResult(
     theme,
   );
 
-  const summary =
-    parts.length > 0
-      ? parts.join(theme.fg("muted", " • ")) + (needsHint ? hint : "")
-      : theme.fg("muted", "output");
+  const metadata = parts.join(theme.fg("muted", " • "));
+  const summaryBase = metadata || theme.fg("muted", "output");
+  const summary = showExpanded
+    ? summaryBase + hint
+    : needsHint
+      ? metadata +
+        buildExpansionHint(theme, "expand", metadata ? "suffix" : "standalone")
+      : summaryBase;
 
   if (lineCount <= 1) {
-    const inlineOutput =
-      options.expanded || limit > 0 ? normalizeOutput(textContent) : "";
+    const inlineOutput = options.expanded || limit > 0 ? bashOutput : "";
     const maxLineWidth = getOutputWidth();
     const shouldTruncate =
       !options.expanded && visibleWidth(inlineOutput) > maxLineWidth;
@@ -345,16 +419,37 @@ function formatBashResult(
         theme,
       );
 
+    const baseMetadata = metadataParts.join(theme.fg("muted", " • "));
     const metadataSummary =
-      metadataParts.length > 0
-        ? metadataParts.join(theme.fg("muted", " • ")) +
-          (metadataNeedsHint ? hint : "")
-        : "";
-
-    if (
+      baseMetadata +
+      (metadataNeedsHint
+        ? buildExpansionHint(
+            theme,
+            options.expanded ? "collapse" : "expand",
+            baseMetadata ? "suffix" : "standalone",
+          )
+        : "");
+    const inlineParts = [
+      baseMetadata,
+      inlineOutput ? theme.fg("toolOutput", renderedOutput) : undefined,
+    ]
+      .filter(Boolean)
+      .join(theme.fg("muted", " • "));
+    const expandedInline =
+      (inlineParts || summary) + (options.expanded ? hint : "");
+    const useStructuredResult =
       metadataNeedsHint ||
-      (options.expanded && renderedOutput && shouldTruncate)
-    ) {
+      (options.expanded && visibleWidth(expandedInline) > getOutputWidth());
+
+    if (useStructuredResult) {
+      const structuredMetadata = options.expanded
+        ? baseMetadata +
+          buildExpansionHint(
+            theme,
+            "collapse",
+            baseMetadata ? "suffix" : "standalone",
+          )
+        : metadataSummary;
       const outputLine = renderedOutput
         ? formatTreeLine(renderedOutput, {
             theme,
@@ -365,8 +460,8 @@ function formatBashResult(
           }).text
         : undefined;
       return [
-        metadataSummary
-          ? theme.fg("dim", outputLine ? "├─ " : "╰─ ") + metadataSummary
+        structuredMetadata
+          ? theme.fg("dim", outputLine ? "├─ " : "╰─ ") + structuredMetadata
           : undefined,
         outputLine,
       ]
@@ -374,24 +469,12 @@ function formatBashResult(
         .join("\n");
     }
 
-    const inlineParts = [
-      metadataSummary,
-      inlineOutput ? theme.fg("toolOutput", renderedOutput) : undefined,
-    ]
-      .filter(Boolean)
-      .join(theme.fg("muted", " • "));
-
-    return (
-      theme.fg("dim", "╰─ ") +
-      (inlineParts || summary) +
-      (options.expanded ? hint : "")
-    );
+    return theme.fg("dim", "╰─ ") + expandedInline;
   }
 
   return [
-    theme.fg("dim", outputLines.text ? "├─ " : "╰─ ") +
-      summary +
-      (showExpanded ? hint : ""),
+    theme.fg("dim", outputLines.text ? "├─ " : "╰─ ") + summary,
+    hiddenLines > 0 ? formatHiddenLinesLabel(hiddenLines, theme) : undefined,
     outputLines.text,
   ]
     .filter((line): line is string => Boolean(line))
@@ -400,28 +483,34 @@ function formatBashResult(
 
 export function patchBashTool(pi: ExtensionAPI): Handle {
   const tool = createCwdDeferredTool(createBashToolDefinition);
+  const failedDurations = new Map<string, number>();
 
-  return registerPatchedTool({
+  const registration = registerPatchedTool({
     pi,
     tool,
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const startedAt = Date.now();
-      const result = await tool.execute(
-        toolCallId,
-        params as BashToolInput,
-        signal,
-        onUpdate,
-        ctx,
-      );
-      const details = (result.details ?? {}) as BashDetailsWithTiming;
+      try {
+        const result = await tool.execute(
+          toolCallId,
+          params as BashToolInput,
+          signal,
+          onUpdate,
+          ctx,
+        );
+        const details = (result.details ?? {}) as BashDetailsWithTiming;
 
-      return {
-        ...result,
-        details: {
-          ...details,
-          durationMs: Date.now() - startedAt,
-        },
-      };
+        return {
+          ...result,
+          details: {
+            ...details,
+            durationMs: Date.now() - startedAt,
+          },
+        };
+      } catch (error) {
+        failedDurations.set(toolCallId, Date.now() - startedAt);
+        throw error;
+      }
     },
     renderCall(args, theme, toolCtx) {
       const state = toolCtx.state as BashRenderState;
@@ -436,26 +525,28 @@ export function patchBashTool(pi: ExtensionAPI): Handle {
       let content = prefix;
       const command =
         typeof renderArgs.command === "string"
-          ? sanitizeDisplayText(renderArgs.command)
+          ? sanitizeMultilineDisplayText(renderArgs.command)
           : "...";
-      const commandPreview = toolCtx.expanded
-        ? command
-        : command.replace(/\s+/g, " ").trim();
-      const timeoutSuffix = renderArgs.timeout
-        ? theme.fg("dim", ` (timeout ${renderArgs.timeout}s)`)
+      const collapsedCommand = command.replace(/\s+/g, " ").trim();
+      const timeoutText = renderArgs.timeout
+        ? `(timeout ${renderArgs.timeout}s)`
+        : "";
+      const inlineTimeoutSuffix = timeoutText
+        ? theme.fg("dim", ` ${timeoutText}`)
         : "";
       const staticWidth =
         visibleWidth(prefix) +
         visibleWidth("Bash ") +
         visibleWidth("$ ") +
-        visibleWidth(timeoutSuffix);
+        visibleWidth(inlineTimeoutSuffix);
       const commandBudget = Math.max(1, MAX_CALL_WIDTH() - staticWidth);
-      const commandTruncated =
-        !toolCtx.expanded && visibleWidth(commandPreview) > commandBudget;
+      const commandTruncated = visibleWidth(collapsedCommand) > commandBudget;
+      state.callTruncated = commandTruncated || command.includes("\n");
+
       const visibleCommand = toolCtx.expanded
-        ? commandPreview
+        ? command
         : truncateToWidth(
-            commandPreview,
+            collapsedCommand,
             commandBudget,
             theme.fg("accent", "..."),
           );
@@ -465,10 +556,20 @@ export function patchBashTool(pi: ExtensionAPI): Handle {
           .split("\n")
           .map((line) => theme.bold(theme.fg("accent", line)))
           .join("\n");
+      const finalCommandLine = visibleCommand.split("\n").at(-1) ?? "";
+      const expandedCommandBudget =
+        commandBudget + visibleWidth(inlineTimeoutSuffix);
+      const timeoutOnOwnLine =
+        toolCtx.expanded &&
+        timeoutText.length > 0 &&
+        visibleWidth(finalCommandLine + ` ${timeoutText}`) >
+          expandedCommandBudget;
+
       content += theme.fg("toolTitle", theme.bold("Bash "));
       content += commandDisplay;
-      content += timeoutSuffix;
-      state.callTruncated = commandTruncated;
+      content += timeoutOnOwnLine
+        ? `\n${theme.fg("dim", timeoutText)}`
+        : inlineTimeoutSuffix;
       text.setText(content);
       return text;
     },
@@ -476,7 +577,12 @@ export function patchBashTool(pi: ExtensionAPI): Handle {
       const state = toolCtx.state as BashRenderState;
       const text = getResultText(state, options, toolCtx.lastComponent);
 
-      const details = result.details as BashToolDetails | undefined;
+      const details = result.details as BashDetailsWithTiming | undefined;
+      const failedDuration = failedDurations.get(toolCtx.toolCallId);
+      if (failedDuration !== undefined) {
+        state.durationMs = failedDuration;
+        if (!options.isPartial) failedDurations.delete(toolCtx.toolCallId);
+      }
 
       if (
         state.startedAt !== undefined &&
@@ -512,4 +618,11 @@ export function patchBashTool(pi: ExtensionAPI): Handle {
       return text;
     },
   });
+
+  return {
+    dispose() {
+      failedDurations.clear();
+      registration.dispose();
+    },
+  };
 }

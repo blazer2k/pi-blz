@@ -42,6 +42,19 @@ describe("write renderCall", () => {
     expect(text).toContain("3 lines");
   });
 
+  it("partial empty content has no expansion hint or empty preview row", () => {
+    const def = setupWriteTool();
+    const component = def.renderCall!(
+      { path: "empty.ts", content: "" },
+      mkTheme(),
+      mkToolCtx({ isPartial: true, expanded: true }),
+    );
+    const output = component.render(120).join("\n");
+
+    expect(output).toContain("╰─ 0 lines");
+    expect(output).not.toContain("ctrl+o");
+  });
+
   it("expanded partial call without path still previews content", () => {
     const def = setupWriteTool();
     const renderCall = def.renderCall!;
@@ -82,6 +95,32 @@ describe("write renderResult", () => {
     const output = component.render(120).join("\n");
     expect(output).toContain("2 lines");
     expect(output).toContain("to expand");
+  });
+
+  it("keeps empty results on one non-expandable row", () => {
+    const def = setupWriteTool();
+    const renderResult = def.renderResult!;
+    const theme = mkTheme();
+
+    for (const expanded of [false, true]) {
+      const component = renderResult(
+        {
+          content: [{ type: "text", text: "wrote 0 bytes" }],
+          details: undefined,
+        },
+        { expanded, isPartial: false },
+        theme,
+        mkToolCtx({ args: { path: "empty.ts", content: "" } }),
+      );
+      const lines = component
+        .render(120)
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toContain("╰─ 0 lines");
+      expect(lines[0]).not.toContain("ctrl+o");
+    }
   });
 
   it("puts truncation before line metadata when collapsed and expanded", () => {

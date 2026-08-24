@@ -76,6 +76,64 @@ describe("read renderResult", () => {
     expect(output).toContain("3 lines");
   });
 
+  it("excludes continuation notices from text line counts", () => {
+    const def = setupReadTool();
+    const renderResult = def.renderResult!;
+    const component = renderResult(
+      {
+        content: [
+          {
+            type: "text",
+            text: "line1\nline2\nline3\nline4\n\n[5 more lines in file. Use offset=7 to continue.]",
+          },
+        ],
+        details: undefined,
+      },
+      { expanded: false, isPartial: false },
+      mkTheme(),
+      mkToolCtx(),
+    );
+
+    expect(component.render(120).join("\n")).toContain("4 lines");
+  });
+
+  it("counts tool-truncated content without its generated footer", () => {
+    const def = setupReadTool();
+    const renderResult = def.renderResult!;
+    const component = renderResult(
+      {
+        content: [
+          {
+            type: "text",
+            text: "line1\nline2\n\n[Showing lines 1-2 of 10. Use offset=3 to continue.]",
+          },
+        ],
+        details: { truncation: { truncated: true } },
+      },
+      { expanded: false, isPartial: false },
+      mkTheme(),
+      mkToolCtx(),
+    );
+
+    expect(component.render(120).join("\n")).toContain("truncated • 2 lines");
+  });
+
+  it("does not strip ordinary bracketed file content", () => {
+    const def = setupReadTool();
+    const renderResult = def.renderResult!;
+    const component = renderResult(
+      {
+        content: [{ type: "text", text: "line1\n\n[ordinary note]" }],
+        details: undefined,
+      },
+      { expanded: false, isPartial: false },
+      mkTheme(),
+      mkToolCtx(),
+    );
+
+    expect(component.render(120).join("\n")).toContain("3 lines");
+  });
+
   it("reports image dimensions", () => {
     const def = setupReadTool();
     const renderResult = def.renderResult!;
@@ -97,6 +155,73 @@ describe("read renderResult", () => {
 
     const output = component.render(120).join("\n");
     expect(output).toContain("Image (640x480)");
+  });
+
+  it("reports image processing failures instead of text lines", () => {
+    const def = setupReadTool();
+    const renderResult = def.renderResult!;
+    const theme = {
+      ...mkTheme(),
+      fg: (color: string, text: string) => `${color}:${text}`,
+    } as Theme;
+    const component = renderResult(
+      {
+        content: [
+          {
+            type: "text",
+            text: "Read image file [image/png]\n[Image omitted: resize failed.]",
+          },
+        ],
+        details: undefined,
+      },
+      { expanded: false, isPartial: false },
+      theme,
+      mkToolCtx(),
+    );
+
+    const output = component.render(120).join("\n");
+    expect(output).toContain("├─ warning:Image unavailable");
+    expect(output).toContain("╰─ muted:Image omitted: resize failed.");
+    expect(output).not.toContain("2 lines");
+  });
+
+  it("keeps the image warning style when the reason wraps", () => {
+    const def = setupReadTool();
+    const renderResult = def.renderResult!;
+    const warningOpen = "\x1b[33m";
+    const theme = {
+      ...mkTheme(),
+      fg: (color: string, text: string) => {
+        const open =
+          color === "warning"
+            ? warningOpen
+            : color === "muted"
+              ? "\x1b[90m"
+              : color === "dim"
+                ? "\x1b[2m"
+                : "";
+        return `${open}${text}\x1b[0m`;
+      },
+    } as Theme;
+    const component = renderResult(
+      {
+        content: [
+          {
+            type: "text",
+            text: "Read image file [image/png]\n[Image omitted: could not be resized below the inline image size limit.]",
+          },
+        ],
+        details: undefined,
+      },
+      { expanded: false, isPartial: false },
+      theme,
+      mkToolCtx(),
+    );
+
+    const warningLine = component
+      .render(45)
+      .find((line) => line.includes("Image unavailable"));
+    expect(warningLine).toContain(`${warningOpen}Image unavailable`);
   });
 
   it("marks truncation", () => {

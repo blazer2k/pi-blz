@@ -28,8 +28,10 @@ import {
   countLines,
   extractTextContent,
   formatSimpleErrorResult,
+  formatTreeLine,
   getCallRenderParts,
   renderPath,
+  sanitizeDisplayText,
 } from "./tool-rendering";
 
 const COMPACT_RESOURCE_FILE_NAMES = new Set([
@@ -149,6 +151,36 @@ function formatReadLineRange(
   return theme.fg("dim", `:${startLine}${endLine ? `-${endLine}` : ""}`);
 }
 
+function stripReadContinuationNotice(text: string): string {
+  const normalized = text.endsWith("\n") ? text.slice(0, -1) : text;
+  const footerStart = normalized.lastIndexOf("\n\n[");
+  if (footerStart === -1) return normalized;
+
+  const footer = normalized.slice(footerStart + 2);
+  const isContinuation =
+    /^\[\d+ more lines? in file\. Use offset=\d+ to continue\.\]$/.test(
+      footer,
+    ) ||
+    /^\[Showing lines \d+-\d+ of \d+(?: \([^)]+ limit\))?\. Use offset=\d+ to continue\.\]$/.test(
+      footer,
+    );
+  return isContinuation
+    ? normalized.slice(0, footerStart).trimEnd()
+    : normalized;
+}
+
+function getImageReadMarker(text: string): { reason?: string } | undefined {
+  const match = text.match(/^Read image file \[[^\]]+\](?:\n([\s\S]*))?$/);
+  if (!match) return undefined;
+
+  const reasonLine = match[1]
+    ?.split("\n")
+    .map((line) => line.trim())
+    .find(Boolean);
+  const reason = reasonLine?.replace(/^\[|\]$/g, "");
+  return { reason: reason ? sanitizeDisplayText(reason) : undefined };
+}
+
 function formatReadResult(
   result: {
     content: Array<{ type: string; text?: string }>;
@@ -165,22 +197,37 @@ function formatReadResult(
     return formatSimpleErrorResult(textContent, state, options, theme);
   }
 
-  const parts: string[] = [];
-  if (textContent && !hasImage) {
-    const lines = countLines(textContent);
-    parts.push(`${lines} ${lines === 1 ? "line" : "lines"}`);
-  }
-  if (hasImage) {
-    const match = textContent.match(/original\s+(\d+)x(\d+)/);
-    if (match) {
-      parts.push(`Image (${match[1]}x${match[2]})`);
-    } else {
-      parts.push("Image");
-    }
-  }
-  const summary = parts.length > 0 ? parts.join(" • ") : "no content";
   const metadataParts = buildResultStatusParts(state, theme);
-  metadataParts.push(theme.fg("muted", summary));
+  const imageMarker = getImageReadMarker(textContent);
+
+  if (hasImage) {
+    const match = textContent.match(/original\s+(\d+)x(\d+)/i);
+    metadataParts.push(
+      theme.fg("muted", match ? `Image (${match[1]}x${match[2]})` : "Image"),
+    );
+  } else if (imageMarker) {
+    metadataParts.push(theme.fg("warning", "Image unavailable"));
+    const summary = metadataParts.join(theme.fg("muted", " • "));
+    if (!imageMarker.reason) return theme.fg("dim", "╰─ ") + summary;
+
+    const reason = formatTreeLine(imageMarker.reason, {
+      theme,
+      prefix: "╰─ ",
+      width: MAX_CALL_WIDTH() - 1,
+      mode: "preserve",
+      color: "muted",
+    }).text;
+    return theme.fg("dim", "├─ ") + summary + "\n" + reason;
+  } else {
+    const fileContent = stripReadContinuationNotice(textContent);
+    const lines = countLines(fileContent);
+    metadataParts.push(
+      theme.fg(
+        "muted",
+        lines > 0 ? `${lines} ${lines === 1 ? "line" : "lines"}` : "no content",
+      ),
+    );
+  }
 
   return theme.fg("dim", "╰─ ") + metadataParts.join(theme.fg("muted", " • "));
 }
