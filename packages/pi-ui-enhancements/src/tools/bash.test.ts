@@ -4,6 +4,7 @@ import { saveConfig } from "../config";
 import { patchBashTool } from "./bash";
 import { clearBlinkTimers } from "./tool-rendering";
 import { mkTheme, mkToolCtx, setupTool } from "../test-helpers";
+import { PI_0_84_2_OUTPUT } from "./test-fixtures/pi-0.84.2";
 
 function setupBashTool() {
   return setupTool(patchBashTool);
@@ -390,7 +391,7 @@ describe("bash renderResult", () => {
         content: [
           {
             type: "text",
-            text: "line one\nline two\nline three\nCommand exited with code 3",
+            text: `line one\nline two\nline three\n${PI_0_84_2_OUTPUT.bash.exited}`,
           },
         ],
         details: { durationMs: 50 },
@@ -403,7 +404,7 @@ describe("bash renderResult", () => {
     const output = component.render(120).join("\n");
     expect(output).not.toContain("line one");
     expect(output).not.toContain("line three");
-    expect(output).toContain("╰─ Command exited with code 3");
+    expect(output).toContain(`╰─ ${PI_0_84_2_OUTPUT.bash.exited}`);
     expect(output).toContain("3 lines");
     expect(output).not.toContain("┊");
   });
@@ -533,8 +534,8 @@ describe("bash renderResult", () => {
     const renderResult = def.renderResult!;
 
     for (const status of [
-      "Command timed out after 1 seconds",
-      "Command aborted",
+      PI_0_84_2_OUTPUT.bash.timedOut,
+      PI_0_84_2_OUTPUT.bash.aborted,
     ]) {
       const component = renderResult(
         { content: [{ type: "text", text: status }], details: {} },
@@ -547,6 +548,34 @@ describe("bash renderResult", () => {
       expect(output).toContain(`╰─ ${status}`);
       expect(output).not.toContain("ctrl+o");
     }
+  });
+
+  it("strips Pi's native truncation footer from displayed output", () => {
+    const def = setupBashTool();
+    const component = def.renderResult!(
+      {
+        content: [
+          {
+            type: "text",
+            text: `line one\nline two\n\n${PI_0_84_2_OUTPUT.bash.showingLines}`,
+          },
+        ],
+        details: {
+          durationMs: 50,
+          truncation: { truncated: true },
+          fullOutputPath: PI_0_84_2_OUTPUT.bash.fullOutputPath,
+        },
+      },
+      { expanded: true, isPartial: false },
+      mkTheme(),
+      mkToolCtx({ expanded: true }),
+    );
+
+    const output = component.render(120).join("\n");
+    expect(output).toContain("line one");
+    expect(output).toContain("line two");
+    expect(output).toContain("truncated");
+    expect(output).not.toContain(PI_0_84_2_OUTPUT.bash.fullOutputPath);
   });
 
   it('error strips noisy "no output" prefix', () => {

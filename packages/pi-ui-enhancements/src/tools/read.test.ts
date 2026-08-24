@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { patchReadTool } from "./read";
 import { mkTheme, mkToolCtx, setupTool } from "../test-helpers";
+import { PI_0_84_2_OUTPUT } from "./test-fixtures/pi-0.84.2";
 
 function setupReadTool() {
   return setupTool(patchReadTool);
@@ -135,7 +136,7 @@ describe("read renderResult", () => {
         content: [
           {
             type: "text",
-            text: "line1\nline2\nline3\nline4\n\n[5 more lines in file. Use offset=7 to continue.]",
+            text: `line1\nline2\nline3\nline4\n\n${PI_0_84_2_OUTPUT.read.moreLines}`,
           },
         ],
         details: undefined,
@@ -156,7 +157,7 @@ describe("read renderResult", () => {
         content: [
           {
             type: "text",
-            text: "line1\nline2\n\n[Showing lines 1-2 of 10. Use offset=3 to continue.]",
+            text: `line1\nline2\n\n${PI_0_84_2_OUTPUT.read.showingLines}`,
           },
         ],
         details: { truncation: { truncated: true } },
