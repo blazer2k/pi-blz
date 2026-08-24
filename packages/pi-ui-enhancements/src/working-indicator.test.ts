@@ -45,6 +45,21 @@ function mkIndicatorHarness() {
   };
 }
 
+function installFakeClock(initialTime = 10_000) {
+  const originalNow = Date.now;
+  let now = initialTime;
+  Date.now = () => now;
+
+  return {
+    advance(milliseconds: number) {
+      now += milliseconds;
+    },
+    restore() {
+      Date.now = originalNow;
+    },
+  };
+}
+
 describe("assembleRunDuration", () => {
   it("formats seconds only", () => {
     const start = Date.now() - 30_000;
@@ -118,20 +133,25 @@ describe("registerWorkingIndicator", () => {
 });
 
 describe("working indicator across auto-compaction", () => {
-  it("keeps the total running time across a compaction split", async () => {
+  it("keeps the total running time across a compaction split", () => {
     const { pi, ctx, handlers, getLastFrames } = mkIndicatorHarness();
+    const clock = installFakeClock();
     const handle = registerWorkingIndicator(pi, ctx);
 
-    handlers.agent_start![0]!();
-    await Bun.sleep(1100);
-    handlers["session_before_compact"]![0]!({
-      type: "session_before_compact",
-      reason: "threshold",
-    });
-    handlers.agent_start![0]!();
+    try {
+      handlers.agent_start![0]!();
+      clock.advance(1_100);
+      handlers["session_before_compact"]![0]!({
+        type: "session_before_compact",
+        reason: "threshold",
+      });
+      handlers.agent_start![0]!();
 
-    expect(getLastFrames()!.join("\n")).toContain("1s");
-    handle.dispose();
+      expect(getLastFrames()!.join("\n")).toContain("1s");
+    } finally {
+      handle.dispose();
+      clock.restore();
+    }
   });
 
   it("keeps the indicator lit through the compaction gap", () => {
@@ -148,25 +168,30 @@ describe("working indicator across auto-compaction", () => {
     handle.dispose();
   });
 
-  it("resets the timer for a new task after compaction", async () => {
+  it("resets the timer for a new task after compaction", () => {
     const { pi, ctx, handlers, getLastFrames } = mkIndicatorHarness();
+    const clock = installFakeClock();
     const handle = registerWorkingIndicator(pi, ctx);
 
-    handlers.agent_start![0]!();
-    await Bun.sleep(1100);
-    handlers["session_before_compact"]![0]!({
-      type: "session_before_compact",
-      reason: "threshold",
-    });
-    handlers.input![0]!({
-      type: "input",
-      text: "next task",
-      source: "interactive",
-    });
-    handlers.agent_start![0]!();
+    try {
+      handlers.agent_start![0]!();
+      clock.advance(1_100);
+      handlers["session_before_compact"]![0]!({
+        type: "session_before_compact",
+        reason: "threshold",
+      });
+      handlers.input![0]!({
+        type: "input",
+        text: "next task",
+        source: "interactive",
+      });
+      handlers.agent_start![0]!();
 
-    expect(getLastFrames()!.join("\n")).toContain("0s");
-    handle.dispose();
+      expect(getLastFrames()!.join("\n")).toContain("0s");
+    } finally {
+      handle.dispose();
+      clock.restore();
+    }
   });
 
   it("notifies once at final settle across a compaction split", () => {
