@@ -1,7 +1,7 @@
-// Native notices emitted by @earendil-works/pi-coding-agent 0.84.2.
+// Native notices emitted by @earendil-works/pi-coding-agent 0.84.3.
 // Renderer parsing tests should use these values so an upstream wording change
 // fails in one clearly named compatibility boundary.
-export const PI_0_84_2_OUTPUT = {
+export const PI_0_84_3_OUTPUT = {
   read: {
     moreLines: "[5 more lines in file. Use offset=7 to continue.]",
     showingLines: "[Showing lines 1-2 of 10. Use offset=3 to continue.]",

@@ -3,7 +3,10 @@ import type {
   ExtensionAPI,
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import { createBashToolDefinition } from "@earendil-works/pi-coding-agent";
+import {
+  createBashToolDefinition,
+  createEditToolDefinition,
+} from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
 import {
   createCwdDeferredTool,
@@ -44,5 +47,32 @@ describe("registerPatchedTool", () => {
     expect(registered.renderShell).toBe("self");
     expect(registered.renderCall).not.toBe(native.renderCall);
     expect(registered.renderResult).not.toBe(native.renderResult);
+  });
+
+  it("keeps native edit argument normalization", () => {
+    const registrations: ToolDefinition<any, any, any>[] = [];
+    const pi = {
+      registerTool: (tool: ToolDefinition<any, any, any>) => {
+        registrations.push(tool);
+      },
+    } as unknown as ExtensionAPI;
+    const tool = createCwdDeferredTool(createEditToolDefinition);
+
+    registerPatchedTool({
+      pi,
+      tool,
+      renderCall: () => fakeComponent,
+      renderResult: () => fakeComponent,
+    });
+
+    const prepared = registrations[0]!.prepareArguments!({
+      path: "src/example.ts",
+      edits: { oldText: "before", newText: "after" },
+    });
+
+    expect(prepared).toEqual({
+      path: "src/example.ts",
+      edits: [{ oldText: "before", newText: "after" }],
+    });
   });
 });

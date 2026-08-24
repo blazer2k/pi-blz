@@ -74,17 +74,19 @@ describe("patchCustomToolRendering", () => {
   });
 
   it("does not wrap built-in tools", () => {
-    const tool = mkRegisteredTool("read");
+    const tools = [mkRegisteredTool("read"), mkRegisteredTool("powershell")];
     proto.getAllRegisteredTools = function () {
-      return [tool];
+      return tools;
     };
 
     patchCustomToolRendering();
-    const tools = (proto.getAllRegisteredTools as Function).call(
+    const registered = (proto.getAllRegisteredTools as Function).call(
       {} as any,
     ) as unknown[];
 
-    expect((tools[0] as typeof tool).definition).toBe(tool.definition);
+    expect(
+      registered.map((tool) => (tool as (typeof tools)[number]).definition),
+    ).toEqual(tools.map((tool) => tool.definition));
   });
 
   it("does not double-wrap already wrapped tools", () => {

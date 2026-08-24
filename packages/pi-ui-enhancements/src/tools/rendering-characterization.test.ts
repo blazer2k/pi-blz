@@ -28,7 +28,7 @@ let restorePiKeybindings: (() => void) | undefined;
 
 beforeAll(async () => {
   // keyText() resolves Pi's own TUI instance, which is nested in the installed
-  // Pi 0.84.2 package in this workspace.
+  // Pi package in this workspace.
   const piTui =
     await import("../../../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-tui/dist/index.js");
   const piKeybindings =
@@ -130,7 +130,7 @@ describe("built-in tool output", () => {
     expect(
       renderCompletedTool(
         patchEditTool,
-        { path: "src/a.ts", oldText: "old", newText: "new" },
+        { path: "src/a.ts", edits: [{ oldText: "old", newText: "new" }] },
         {
           content: [{ type: "text", text: "edited" }],
           details: {
@@ -219,7 +219,7 @@ describe("custom tool output", () => {
 });
 
 describe("terminal width contract", () => {
-  it("stays within the tree renderer's three-column minimum through width 200", () => {
+  it("stays within Pi's one-column minimum through width 200", () => {
     const definition = setupTool(patchFindTool);
     const state = {};
     const args = { pattern: "*.ts", path: "src" };
@@ -236,7 +236,7 @@ describe("terminal width contract", () => {
 
     for (let width = 0; width <= 200; width++) {
       for (const line of component.render(width)) {
-        expect(visibleWidth(line)).toBeLessThanOrEqual(Math.max(width, 3));
+        expect(visibleWidth(line)).toBeLessThanOrEqual(Math.max(width, 1));
       }
     }
   });

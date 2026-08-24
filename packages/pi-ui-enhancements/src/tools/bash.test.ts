@@ -4,7 +4,7 @@ import { saveConfig } from "../config";
 import { patchBashTool } from "./bash";
 import { clearBlinkTimers } from "./tool-rendering";
 import { mkTheme, mkToolCtx, setupTool } from "../test-helpers";
-import { PI_0_84_2_OUTPUT } from "./test-fixtures/pi-0.84.2";
+import { PI_0_84_3_OUTPUT } from "./test-fixtures/pi-0.84.3";
 
 function setupBashTool() {
   return setupTool(patchBashTool);
@@ -391,7 +391,7 @@ describe("bash renderResult", () => {
         content: [
           {
             type: "text",
-            text: `line one\nline two\nline three\n${PI_0_84_2_OUTPUT.bash.exited}`,
+            text: `line one\nline two\nline three\n${PI_0_84_3_OUTPUT.bash.exited}`,
           },
         ],
         details: { durationMs: 50 },
@@ -404,7 +404,7 @@ describe("bash renderResult", () => {
     const output = component.render(120).join("\n");
     expect(output).not.toContain("line one");
     expect(output).not.toContain("line three");
-    expect(output).toContain(`╰─ ${PI_0_84_2_OUTPUT.bash.exited}`);
+    expect(output).toContain(`╰─ ${PI_0_84_3_OUTPUT.bash.exited}`);
     expect(output).toContain("3 lines");
     expect(output).not.toContain("┊");
   });
@@ -534,8 +534,8 @@ describe("bash renderResult", () => {
     const renderResult = def.renderResult!;
 
     for (const status of [
-      PI_0_84_2_OUTPUT.bash.timedOut,
-      PI_0_84_2_OUTPUT.bash.aborted,
+      PI_0_84_3_OUTPUT.bash.timedOut,
+      PI_0_84_3_OUTPUT.bash.aborted,
     ]) {
       const component = renderResult(
         { content: [{ type: "text", text: status }], details: {} },
@@ -557,13 +557,13 @@ describe("bash renderResult", () => {
         content: [
           {
             type: "text",
-            text: `line one\nline two\n\n${PI_0_84_2_OUTPUT.bash.showingLines}`,
+            text: `line one\nline two\n\n${PI_0_84_3_OUTPUT.bash.showingLines}`,
           },
         ],
         details: {
           durationMs: 50,
           truncation: { truncated: true },
-          fullOutputPath: PI_0_84_2_OUTPUT.bash.fullOutputPath,
+          fullOutputPath: PI_0_84_3_OUTPUT.bash.fullOutputPath,
         },
       },
       { expanded: true, isPartial: false },
@@ -575,7 +575,7 @@ describe("bash renderResult", () => {
     expect(output).toContain("line one");
     expect(output).toContain("line two");
     expect(output).toContain("truncated");
-    expect(output).not.toContain(PI_0_84_2_OUTPUT.bash.fullOutputPath);
+    expect(output).not.toContain(PI_0_84_3_OUTPUT.bash.fullOutputPath);
   });
 
   it('error strips noisy "no output" prefix', () => {

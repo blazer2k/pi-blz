@@ -31,6 +31,7 @@ const BUILTIN_TOOLS = new Set([
   "write",
   "edit",
   "bash",
+  "powershell",
   "ls",
   "find",
   "grep",
