@@ -1,167 +1,143 @@
-import type {
-  Theme,
-  ToolRenderResultOptions,
-} from "@earendil-works/pi-coding-agent";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import {
-  buildExpansionHint,
-  countLines,
-  formatTreeLine,
-  getMaxCollapsedLines,
-  normalizeOutput,
-} from "../tool-rendering";
+import { buildExpansionHint, formatTreeLine } from "../tool-rendering";
 import { buildBashMetadataParts, joinMetadata } from "./metadata";
+import type { BashSuccessView } from "./model";
 import {
   formatHiddenLinesLabel,
   formatOutputLines,
   getBashOutputWidth,
 } from "./output";
-import type { BashRenderState } from "./types";
 
-function formatSingleLineResult(
-  output: string,
-  fallbackSummary: string,
-  state: BashRenderState,
-  options: ToolRenderResultOptions,
+function buildSuccessMetadata(
+  view: BashSuccessView,
+  lineTruncated: boolean,
   theme: Theme,
-  durationSummary: string | undefined,
-): string {
-  const inlineOutput =
-    options.expanded || getMaxCollapsedLines() > 0 ? output : "";
-  const maxLineWidth = getBashOutputWidth();
-  const shouldTruncate =
-    !options.expanded && visibleWidth(inlineOutput) > maxLineWidth;
-  const renderedOutput = shouldTruncate
-    ? truncateToWidth(inlineOutput, maxLineWidth, theme.fg("toolOutput", "..."))
-    : inlineOutput;
+): { metadata: string; needsHint: boolean } {
   const { parts, needsHint } = buildBashMetadataParts(
     {
-      durationSummary,
-      callExpandable: state.callExpandable,
-      lineTruncated: shouldTruncate,
-      toolTruncated: state.truncated === true,
-      expanded: options.expanded,
+      durationSummary: view.durationSummary,
+      remainingLines: view.output.remainingLines,
+      visibleLines: view.output.visibleLines,
+      callExpandable: view.callExpandable,
+      lineTruncated,
+      toolTruncated: view.toolTruncated,
+      expanded: view.expanded,
     },
     theme,
   );
-  const metadata = joinMetadata(parts, theme);
-  const metadataSummary =
+  return { metadata: joinMetadata(parts, theme), needsHint };
+}
+
+function buildCollapsedSummary(
+  metadata: string,
+  needsHint: boolean,
+  theme: Theme,
+): string {
+  if (!needsHint) return metadata || theme.fg("muted", "output");
+  return (
     metadata +
-    (needsHint
-      ? buildExpansionHint(
-          theme,
-          options.expanded ? "collapse" : "expand",
-          metadata ? "suffix" : "standalone",
-        )
-      : "");
-  const inlineParts = [
-    metadata,
-    inlineOutput ? theme.fg("toolOutput", renderedOutput) : undefined,
-  ]
-    .filter(Boolean)
-    .join(theme.fg("muted", " • "));
-  const expandedInline =
-    (inlineParts || fallbackSummary) +
-    (options.expanded ? buildExpansionHint(theme, "collapse") : "");
-  const useStructuredResult =
-    needsHint ||
-    (options.expanded && visibleWidth(expandedInline) > getBashOutputWidth());
+    buildExpansionHint(theme, "expand", metadata ? "suffix" : "standalone")
+  );
+}
 
-  if (!useStructuredResult) {
-    return theme.fg("dim", "╰─ ") + expandedInline;
-  }
-
-  const structuredMetadata = options.expanded
+function renderStructuredSingleLine(
+  output: string,
+  metadata: string,
+  collapsedSummary: string,
+  view: BashSuccessView,
+  theme: Theme,
+): string {
+  const summary = view.expanded
     ? metadata +
       buildExpansionHint(theme, "collapse", metadata ? "suffix" : "standalone")
-    : metadataSummary;
-  const outputLine = renderedOutput
-    ? formatTreeLine(renderedOutput, {
+    : collapsedSummary;
+  const outputLine = output
+    ? formatTreeLine(output, {
         theme,
         prefix: "╰─ ",
         width: getBashOutputWidth() + 3,
-        mode: options.expanded ? "preserve" : "truncate",
+        mode: view.expanded ? "preserve" : "truncate",
         color: "toolOutput",
       }).text
     : undefined;
+
   return [
-    structuredMetadata
-      ? theme.fg("dim", outputLine ? "├─ " : "╰─ ") + structuredMetadata
-      : undefined,
+    summary ? theme.fg("dim", outputLine ? "├─ " : "╰─ ") + summary : undefined,
     outputLine,
   ]
     .filter((line): line is string => Boolean(line))
     .join("\n");
 }
 
-export function formatSuccessfulResult(
-  text: string,
-  state: BashRenderState,
-  options: ToolRenderResultOptions,
-  theme: Theme,
-  durationSummary: string | undefined,
-): string {
-  const output = normalizeOutput(text).replace(/\n+$/g, "");
-  const limit = getMaxCollapsedLines();
-  const lineCount = countLines(output);
-  const showExpanded = options.expanded && lineCount > 1;
-  const visibleLineCount = showExpanded
-    ? lineCount
-    : limit === 0
-      ? 0
-      : Math.min(lineCount, limit);
-  const remainingLines = Math.max(0, lineCount - visibleLineCount);
-  const visibleOutput = showExpanded
-    ? output
-    : limit === 0
-      ? ""
-      : output.split("\n").slice(-limit).join("\n");
-  const hiddenLines =
-    showExpanded || visibleLineCount === 0 ? 0 : remainingLines;
+function renderSingleLineSuccess(view: BashSuccessView, theme: Theme): string {
+  const inlineOutput = view.output.visibleText;
+  const maxLineWidth = getBashOutputWidth();
+  const lineTruncated =
+    !view.expanded && visibleWidth(inlineOutput) > maxLineWidth;
+  const renderedOutput = lineTruncated
+    ? truncateToWidth(inlineOutput, maxLineWidth, theme.fg("toolOutput", "..."))
+    : inlineOutput;
+  const { metadata, needsHint } = buildSuccessMetadata(
+    view,
+    lineTruncated,
+    theme,
+  );
+  const collapsedSummary = buildCollapsedSummary(metadata, needsHint, theme);
+  const inlineParts = [
+    metadata,
+    inlineOutput ? theme.fg("toolOutput", renderedOutput) : undefined,
+  ]
+    .filter(Boolean)
+    .join(theme.fg("muted", " • "));
+  const inline =
+    (inlineParts || collapsedSummary) +
+    (view.expanded ? buildExpansionHint(theme, "collapse") : "");
+  const structured =
+    needsHint || (view.expanded && visibleWidth(inline) > maxLineWidth);
+
+  return structured
+    ? renderStructuredSingleLine(
+        renderedOutput,
+        metadata,
+        collapsedSummary,
+        view,
+        theme,
+      )
+    : theme.fg("dim", "╰─ ") + inline;
+}
+
+function renderMultiLineSuccess(view: BashSuccessView, theme: Theme): string {
   const outputLines = formatOutputLines(
-    visibleOutput,
+    view.output.visibleText,
     theme,
     "toolOutput",
-    showExpanded ? undefined : getBashOutputWidth(),
+    view.expanded ? undefined : getBashOutputWidth(),
     { closeLastLine: true },
   );
-  const { parts, needsHint } = buildBashMetadataParts(
-    {
-      durationSummary,
-      remainingLines,
-      visibleLines: visibleLineCount,
-      callExpandable: state.callExpandable,
-      lineTruncated: outputLines.truncated,
-      toolTruncated: state.truncated === true,
-      expanded: options.expanded,
-    },
+  const { metadata, needsHint } = buildSuccessMetadata(
+    view,
+    outputLines.truncated,
     theme,
   );
-  const metadata = joinMetadata(parts, theme);
-  const summaryBase = metadata || theme.fg("muted", "output");
-  const summary = showExpanded
-    ? summaryBase + buildExpansionHint(theme, "collapse")
-    : needsHint
-      ? metadata +
-        buildExpansionHint(theme, "expand", metadata ? "suffix" : "standalone")
-      : summaryBase;
-
-  if (lineCount <= 1) {
-    return formatSingleLineResult(
-      output,
-      summary,
-      state,
-      options,
-      theme,
-      durationSummary,
-    );
-  }
+  const summary = view.expanded
+    ? (metadata || theme.fg("muted", "output")) +
+      buildExpansionHint(theme, "collapse")
+    : buildCollapsedSummary(metadata, needsHint, theme);
 
   return [
     theme.fg("dim", outputLines.text ? "├─ " : "╰─ ") + summary,
-    hiddenLines > 0 ? formatHiddenLinesLabel(hiddenLines, theme) : undefined,
+    view.output.hiddenLines > 0
+      ? formatHiddenLinesLabel(view.output.hiddenLines, theme)
+      : undefined,
     outputLines.text,
   ]
     .filter((line): line is string => Boolean(line))
     .join("\n");
+}
+
+export function renderBashSuccess(view: BashSuccessView, theme: Theme): string {
+  return view.output.totalLines <= 1
+    ? renderSingleLineSuccess(view, theme)
+    : renderMultiLineSuccess(view, theme);
 }

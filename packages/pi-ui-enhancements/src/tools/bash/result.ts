@@ -2,16 +2,11 @@ import type {
   Theme,
   ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
-import { extractTextContent } from "../tool-rendering";
-import { formatErrorResult } from "./error-result";
-import { getDurationSummary } from "./metadata";
-import { stripBashTruncationNotice } from "./output";
-import { formatSuccessfulResult } from "./success-result";
-import type {
-  BashDetailsWithTiming,
-  BashRenderState,
-  BashResult,
-} from "./types";
+import { getMaxCollapsedLines } from "../tool-rendering";
+import { renderCommandError, renderUnknownError } from "./error-result";
+import { buildBashResultView } from "./model";
+import { renderBashSuccess } from "./success-result";
+import type { BashRenderState, BashResult } from "./types";
 
 export function formatBashResult(
   result: BashResult,
@@ -19,14 +14,17 @@ export function formatBashResult(
   options: ToolRenderResultOptions,
   theme: Theme,
 ): string {
-  const details = result.details as BashDetailsWithTiming | undefined;
-  const rawText = extractTextContent(result);
-  const text = state.isError
-    ? rawText
-    : stripBashTruncationNotice(rawText, details);
-  const durationSummary = getDurationSummary(details, state, options);
+  const view = buildBashResultView(result, state, options, {
+    collapsedLineLimit: getMaxCollapsedLines(),
+    errorEllipsis: theme.fg("error", "..."),
+  });
 
-  return state.isError
-    ? formatErrorResult(text, state, options, theme, durationSummary)
-    : formatSuccessfulResult(text, state, options, theme, durationSummary);
+  switch (view.kind) {
+    case "success":
+      return renderBashSuccess(view, theme);
+    case "command-error":
+      return renderCommandError(view, theme);
+    case "unknown-error":
+      return renderUnknownError(view, theme);
+  }
 }
