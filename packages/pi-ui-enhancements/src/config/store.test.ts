@@ -2,10 +2,28 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { getConfig, loadConfig, saveConfig } from "./store";
+import { getDefaultConfig } from "./definition";
+import {
+  clearOnConfigChange,
+  getConfig,
+  loadConfig,
+  saveConfig,
+  setOnConfigChange,
+  type ConfigStorage,
+} from "./store";
 
 let configDir: string;
 let previousConfigPath: string | undefined;
+
+function createStorage(overrides: Partial<ConfigStorage> = {}): ConfigStorage {
+  return {
+    prepare() {},
+    exists: () => true,
+    read: () => "{}",
+    write() {},
+    ...overrides,
+  };
+}
 
 beforeEach(() => {
   previousConfigPath = process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH;
@@ -15,6 +33,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  clearOnConfigChange();
   if (previousConfigPath === undefined) {
     delete process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH;
   } else {
@@ -103,5 +122,122 @@ describe("config numeric values", () => {
     expect(getConfig().bashMaxCollapsedLines).toBe(5);
 
     saveConfig("bashMaxCollapsedLines", "5");
+  });
+});
+
+describe("config storage failures", () => {
+  it("falls back to defaults when the config directory cannot be prepared", () => {
+    saveConfig("asciiHeaderAlign", "right");
+    const failure = new Error("prepare failed");
+    const errors: unknown[] = [];
+
+    loadConfig(
+      (error) => errors.push(error),
+      createStorage({
+        prepare() {
+          throw failure;
+        },
+      }),
+    );
+
+    expect(getConfig().asciiHeaderAlign).toBe(
+      getDefaultConfig().asciiHeaderAlign,
+    );
+    expect(errors).toEqual([failure]);
+  });
+
+  it("reports a failure to create a missing config file", () => {
+    const failure = new Error("create failed");
+    const errors: unknown[] = [];
+
+    loadConfig(
+      (error) => errors.push(error),
+      createStorage({
+        exists: () => false,
+        write() {
+          throw failure;
+        },
+      }),
+    );
+
+    expect(getConfig().asciiHeaderAlign).toBe(
+      getDefaultConfig().asciiHeaderAlign,
+    );
+    expect(errors).toEqual([failure]);
+  });
+
+  it("falls back to defaults when the config cannot be read", () => {
+    saveConfig("asciiHeaderAlign", "right");
+    const failure = new Error("read failed");
+    const errors: unknown[] = [];
+
+    loadConfig(
+      (error) => errors.push(error),
+      createStorage({
+        read() {
+          throw failure;
+        },
+      }),
+    );
+
+    expect(getConfig().asciiHeaderAlign).toBe(
+      getDefaultConfig().asciiHeaderAlign,
+    );
+    expect(errors).toEqual([failure]);
+  });
+
+  it("falls back to defaults when the config contains malformed JSON", () => {
+    const errors: unknown[] = [];
+
+    loadConfig(
+      (error) => errors.push(error),
+      createStorage({ read: () => "{" }),
+    );
+
+    expect(getConfig().asciiHeaderAlign).toBe(
+      getDefaultConfig().asciiHeaderAlign,
+    );
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toBeInstanceOf(SyntaxError);
+  });
+
+  it("keeps validated config when normalization cannot be persisted", () => {
+    const failure = new Error("normalize failed");
+    const errors: unknown[] = [];
+
+    loadConfig(
+      (error) => errors.push(error),
+      createStorage({
+        read: () => JSON.stringify({ asciiHeaderAlign: "right" }),
+        write() {
+          throw failure;
+        },
+      }),
+    );
+
+    expect(getConfig().asciiHeaderAlign).toBe("right");
+    expect(errors).toEqual([failure]);
+  });
+
+  it("does not mutate config or notify listeners when a save fails", () => {
+    saveConfig("asciiHeaderAlign", "right");
+    const failure = new Error("save failed");
+    let notificationCount = 0;
+    setOnConfigChange(() => notificationCount++);
+
+    expect(() =>
+      saveConfig(
+        "asciiHeaderAlign",
+        "center",
+        createStorage({
+          write() {
+            throw failure;
+          },
+        }),
+      ),
+    ).toThrow(failure);
+
+    expect(getConfig().asciiHeaderAlign).toBe("right");
+    expect(notificationCount).toBe(0);
   });
 });

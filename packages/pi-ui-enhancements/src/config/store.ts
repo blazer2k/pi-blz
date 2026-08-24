@@ -10,6 +10,26 @@ import {
   type ConfigKey,
 } from "./definition";
 
+export interface ConfigStorage {
+  prepare(configPath: string): void;
+  exists(configPath: string): boolean;
+  read(configPath: string): string;
+  write(configPath: string, contents: string): void;
+}
+
+const nodeConfigStorage: ConfigStorage = {
+  prepare(configPath) {
+    mkdirSync(dirname(configPath), { recursive: true });
+  },
+  exists: existsSync,
+  read(configPath) {
+    return readFileSync(configPath, "utf-8");
+  },
+  write(configPath, contents) {
+    writeFileSync(configPath, contents);
+  },
+};
+
 function getConfigPath(): string {
   if (process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH) {
     return process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH;
@@ -40,11 +60,14 @@ export function clearOnConfigChange(): void {
   onConfigChange = null;
 }
 
-export function loadConfig(onError?: (error: unknown) => void): void {
+export function loadConfig(
+  onError?: (error: unknown) => void,
+  storage: ConfigStorage = nodeConfigStorage,
+): void {
   const configPath = getConfigPath();
 
   try {
-    mkdirSync(dirname(configPath), { recursive: true });
+    storage.prepare(configPath);
   } catch (error) {
     config = getDefaultConfig();
     reportConfigError(
@@ -55,10 +78,10 @@ export function loadConfig(onError?: (error: unknown) => void): void {
     return;
   }
 
-  if (!existsSync(configPath)) {
+  if (!storage.exists(configPath)) {
     config = getDefaultConfig();
     try {
-      writeFileSync(configPath, JSON.stringify(config, null, 2));
+      storage.write(configPath, JSON.stringify(config, null, 2));
     } catch (error) {
       reportConfigError(
         onError,
@@ -70,7 +93,7 @@ export function loadConfig(onError?: (error: unknown) => void): void {
   }
 
   try {
-    const saved: unknown = JSON.parse(readFileSync(configPath, "utf-8"));
+    const saved: unknown = JSON.parse(storage.read(configPath));
     config = validateConfig(saved);
   } catch (error) {
     config = getDefaultConfig();
@@ -84,7 +107,7 @@ export function loadConfig(onError?: (error: unknown) => void): void {
 
   try {
     // Persist missing defaults and discard unknown or invalid values.
-    writeFileSync(configPath, JSON.stringify(config, null, 2));
+    storage.write(configPath, JSON.stringify(config, null, 2));
   } catch (error) {
     reportConfigError(
       onError,
@@ -94,11 +117,15 @@ export function loadConfig(onError?: (error: unknown) => void): void {
   }
 }
 
-export function saveConfig(key: ConfigKey, value: string): void {
+export function saveConfig(
+  key: ConfigKey,
+  value: string,
+  storage: ConfigStorage = nodeConfigStorage,
+): void {
   const updated = applyConfigUpdate(config, key, value);
   const configPath = getConfigPath();
-  mkdirSync(dirname(configPath), { recursive: true });
-  writeFileSync(configPath, JSON.stringify(updated, null, 2));
+  storage.prepare(configPath);
+  storage.write(configPath, JSON.stringify(updated, null, 2));
   config = updated;
   onConfigChange?.();
 }
