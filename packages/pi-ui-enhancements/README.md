@@ -68,6 +68,14 @@ The `patchedBuiltInTools` setting has two modes:
 
 Changes here require `/reload` since tool renderers are registered at load time. Everything else applies immediately.
 
+### Editor and Footer Ownership
+
+Pi supports one custom editor and one custom footer at a time; extensions do not compose these components automatically. This extension installs a `CustomEditor` subclass for each TUI session and uses the footer only for extension-provided status messages already not shown in the editor border.
+
+The editor factory active during registration is restored on shutdown only when the rounded editor is still active. An editor installed later by another extension is therefore not overwritten during disposal. Changing UI settings re-registers the rounded editor, so extension load order and later settings changes determine which custom editor is active.
+
+When another footer replaces this extension's footer, Pi disposes the previous footer component and releases its ownership. The extension only clears the footer during shutdown while its own component still owns that slot.
+
 ### Third-Party Tool Monkey-Patching
 
 By default, the extension monkey-patches `ExtensionRunner.prototype.getAllRegisteredTools` to intercept third-party tool definitions and wrap their output in the same compact format. Built-in tools and tools with `renderShell: "self"` are left alone.
