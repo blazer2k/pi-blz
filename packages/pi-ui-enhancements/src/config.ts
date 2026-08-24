@@ -2,151 +2,41 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
-import { Compile } from "typebox/compile";
+import {
+  applyConfigUpdate,
+  getDefaultConfig,
+  validateConfig,
+  type Config,
+  type ConfigKey,
+} from "./config/definition";
+
+export {
+  ALLOWED_FONTS,
+  type Config,
+  type ConfigKey,
+} from "./config/definition";
 
 function getConfigPath(): string {
   if (process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH) {
     return process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH;
   }
-
   if (process.env.NODE_ENV === "test") {
     return join(tmpdir(), "pi-ui-enhancements-test", "ui-settings.json");
   }
-
   return join(getAgentDir(), "ui-settings.json");
 }
 
-export const ALLOWED_FONTS = [
-  "3D-ASCII",
-  "Alligator",
-  "ANSI Compact",
-  "Classy",
-  "Coder Mini",
-  "Crazy",
-  "Delta Corps Priest 1",
-  "Future",
-  "Future Smooth",
-  "Georgia11",
-  "Greek",
-  "Greek Large",
-  "Italic",
-  "Jazmine",
-  "Larry 3D",
-  "Poison",
-  "Rebel",
-  "Slant",
-  "Tmplr",
-  "Trek",
-  "Univers",
-];
-
-export interface Config {
-  // ASCII header
-  asciiHeaderEnabled: boolean;
-  asciiHeaderFont: string;
-  asciiHeaderColor: "text" | "accent" | "dim";
-  asciiHeaderAlign: "left" | "center" | "right";
-  asciiHeaderShowVersion: boolean;
-
-  // Working indicator
-  workingIndicatorShowInterruptMsg: boolean;
-  workingIndicatorShowDuration: boolean;
-
-  // Tool rendering
-  patchedBuiltInTools: "essential" | "all";
-  patchCustomTools: boolean;
-  capitalizeToolNames: boolean;
-  indicatorStyle: "dot" | "circle" | "diamond";
-  maxCallWidth: number;
-  maxExpandedEntries: number;
-  bashMaxCollapsedLines: number;
-  showExpansionHint: boolean;
-
-  // Editor
-  roundedEditorColor: "thinking" | "dim" | "muted";
-  roundedEditorShowThinkingLevel: boolean;
-  roundedEditorShowCacheTokens: boolean;
-  roundedEditorShowCost: boolean;
-  roundedEditorShowBranch: boolean;
+function reportConfigError(
+  onError: ((error: unknown) => void) | undefined,
+  message: string,
+  error: unknown,
+): void {
+  if (onError) onError(error);
+  else console.error(message, error);
 }
 
-const defaultConfig: Config = {
-  asciiHeaderEnabled: true,
-  asciiHeaderFont: "Greek",
-  asciiHeaderColor: "text",
-  asciiHeaderAlign: "center",
-  asciiHeaderShowVersion: true,
-  workingIndicatorShowInterruptMsg: true,
-  workingIndicatorShowDuration: true,
-  patchedBuiltInTools: "essential",
-  patchCustomTools: true,
-  capitalizeToolNames: true,
-  indicatorStyle: "circle",
-  maxCallWidth: 80,
-  maxExpandedEntries: 20,
-  bashMaxCollapsedLines: 5,
-  showExpansionHint: true,
-  roundedEditorColor: "thinking",
-  roundedEditorShowThinkingLevel: true,
-  roundedEditorShowCacheTokens: false,
-  roundedEditorShowCost: false,
-  roundedEditorShowBranch: true,
-};
-
-const ConfigSchema = Type.Object(
-  {
-    asciiHeaderEnabled: Type.Boolean(),
-    asciiHeaderFont: Type.String({ minLength: 1 }),
-    asciiHeaderColor: Type.Union([
-      Type.Literal("text"),
-      Type.Literal("accent"),
-      Type.Literal("dim"),
-    ]),
-    asciiHeaderAlign: Type.Union([
-      Type.Literal("left"),
-      Type.Literal("center"),
-      Type.Literal("right"),
-    ]),
-    asciiHeaderShowVersion: Type.Boolean(),
-    workingIndicatorShowInterruptMsg: Type.Boolean(),
-    workingIndicatorShowDuration: Type.Boolean(),
-    patchedBuiltInTools: Type.Union([
-      Type.Literal("essential"),
-      Type.Literal("all"),
-    ]),
-    patchCustomTools: Type.Boolean(),
-    capitalizeToolNames: Type.Boolean(),
-    indicatorStyle: Type.Union([
-      Type.Literal("dot"),
-      Type.Literal("circle"),
-      Type.Literal("diamond"),
-    ]),
-    maxCallWidth: Type.Number({ minimum: 40, maximum: 200 }),
-    maxExpandedEntries: Type.Number({ minimum: -1, maximum: 100 }),
-    bashMaxCollapsedLines: Type.Union([
-      Type.Literal(0),
-      Type.Literal(1),
-      Type.Literal(5),
-      Type.Literal(10),
-    ]),
-    showExpansionHint: Type.Boolean(),
-    roundedEditorColor: Type.Union([
-      Type.Literal("thinking"),
-      Type.Literal("dim"),
-      Type.Literal("muted"),
-    ]),
-    roundedEditorShowThinkingLevel: Type.Boolean(),
-    roundedEditorShowCacheTokens: Type.Boolean(),
-    roundedEditorShowCost: Type.Boolean(),
-    roundedEditorShowBranch: Type.Boolean(),
-  },
-  { additionalProperties: false },
-);
-
-export type ConfigKey = keyof Config;
-
 let onConfigChange: (() => void) | null = null;
+let config = getDefaultConfig();
 
 export function setOnConfigChange(callback: (() => void) | null): void {
   onConfigChange = callback;
@@ -156,165 +46,66 @@ export function clearOnConfigChange(): void {
   onConfigChange = null;
 }
 
-const validator = Compile(ConfigSchema);
-
-let config: Config = { ...defaultConfig };
-
-const INTEGER_CONFIG_KEYS: ReadonlySet<ConfigKey> = new Set([
-  "maxCallWidth",
-  "maxExpandedEntries",
-  "bashMaxCollapsedLines",
-]);
-
-// Keys not in INTEGER_CONFIG_KEYS have no integer constraint, so the gate passes.
-function isIntegerConstrainedValue(key: ConfigKey, value: unknown): boolean {
-  if (!INTEGER_CONFIG_KEYS.has(key)) return true;
-  return typeof value === "number" && Number.isInteger(value);
-}
-
-function validateConfig(raw: unknown): Config {
-  if (typeof raw !== "object" || raw === null) return { ...defaultConfig };
-
-  const input = raw as Partial<Record<ConfigKey, unknown>>;
-  const validated: Config = { ...defaultConfig };
-
-  for (const key of Object.keys(defaultConfig) as ConfigKey[]) {
-    if (!(key in input)) continue;
-    if (!isIntegerConstrainedValue(key, input[key])) continue;
-
-    const candidate = { ...validated, [key]: input[key] };
-    if (validator.Check(candidate)) {
-      validated[key] = candidate[key] as never;
-    }
-  }
-
-  if (!ALLOWED_FONTS.includes(validated.asciiHeaderFont)) {
-    console.error(
-      `Invalid font "${validated.asciiHeaderFont}", ` +
-        `falling back to "${defaultConfig.asciiHeaderFont}"`,
-    );
-    validated.asciiHeaderFont = defaultConfig.asciiHeaderFont;
-  }
-
-  return validated;
-}
-
 export function loadConfig(onError?: (error: unknown) => void): void {
   const configPath = getConfigPath();
 
   try {
     mkdirSync(dirname(configPath), { recursive: true });
   } catch (error) {
-    config = { ...defaultConfig };
-    if (onError) onError(error);
-    else
-      console.error(
-        `Failed to prepare config directory for ${configPath}:`,
-        error,
-      );
+    config = getDefaultConfig();
+    reportConfigError(
+      onError,
+      `Failed to prepare config directory for ${configPath}:`,
+      error,
+    );
     return;
   }
 
   if (!existsSync(configPath)) {
-    config = { ...defaultConfig };
+    config = getDefaultConfig();
     try {
       writeFileSync(configPath, JSON.stringify(config, null, 2));
     } catch (error) {
-      if (onError) onError(error);
-      else console.error(`Failed to create config at ${configPath}:`, error);
+      reportConfigError(
+        onError,
+        `Failed to create config at ${configPath}:`,
+        error,
+      );
     }
     return;
   }
 
-  let saved: unknown;
   try {
-    saved = JSON.parse(readFileSync(configPath, "utf-8"));
+    const saved: unknown = JSON.parse(readFileSync(configPath, "utf-8"));
+    config = validateConfig(saved);
   } catch (error) {
-    config = { ...defaultConfig };
-    if (onError) onError(error);
-    else console.error(`Failed to load config from ${configPath}:`, error);
+    config = getDefaultConfig();
+    reportConfigError(
+      onError,
+      `Failed to load config from ${configPath}:`,
+      error,
+    );
     return;
   }
 
-  const validated = validateConfig(saved);
-  config = validated;
-
   try {
-    // Normalize config by adding missing default keys
-    writeFileSync(configPath, JSON.stringify(validated, null, 2));
+    // Persist missing defaults and discard unknown or invalid values.
+    writeFileSync(configPath, JSON.stringify(config, null, 2));
   } catch (error) {
-    if (onError) onError(error);
-    else console.error(`Failed to normalize config at ${configPath}:`, error);
+    reportConfigError(
+      onError,
+      `Failed to normalize config at ${configPath}:`,
+      error,
+    );
   }
 }
 
-function parseConfigValue(id: ConfigKey, value: string): Config[ConfigKey] {
-  switch (id) {
-    case "asciiHeaderEnabled":
-      return value === "true";
-    case "asciiHeaderFont":
-      return value;
-    case "asciiHeaderColor":
-      return value as Config["asciiHeaderColor"];
-    case "asciiHeaderAlign":
-      return value as Config["asciiHeaderAlign"];
-    case "asciiHeaderShowVersion":
-      return value === "true";
-    case "workingIndicatorShowInterruptMsg":
-      return value === "true";
-    case "workingIndicatorShowDuration":
-      return value === "true";
-    case "patchedBuiltInTools":
-      return value as Config["patchedBuiltInTools"];
-    case "patchCustomTools":
-      return value === "true";
-    case "capitalizeToolNames":
-      return value === "true";
-    case "indicatorStyle":
-      return value as Config["indicatorStyle"];
-    case "maxCallWidth":
-      return Number(value);
-    case "maxExpandedEntries":
-      return Number(value);
-    case "bashMaxCollapsedLines":
-      return Number(value);
-    case "showExpansionHint":
-      return value === "true";
-    case "roundedEditorColor":
-      return value as Config["roundedEditorColor"];
-    case "roundedEditorShowThinkingLevel":
-      return value === "true";
-    case "roundedEditorShowCacheTokens":
-      return value === "true";
-    case "roundedEditorShowCost":
-      return value === "true";
-    case "roundedEditorShowBranch":
-      return value === "true";
-  }
-}
-
-export function saveConfig(id: ConfigKey, value: string): void {
-  const parsed = parseConfigValue(id, value);
-
-  const updated = { ...config, [id]: parsed };
-  if (!isIntegerConstrainedValue(id, parsed)) {
-    throw new Error(`Invalid config update: ${id}=${value}`);
-  }
-  if (!validator.Check(updated)) {
-    throw new Error(`Invalid config update: ${id}=${value}`);
-  }
-  if (id === "asciiHeaderFont" && !ALLOWED_FONTS.includes(String(parsed))) {
-    throw new Error(`Invalid config update: ${id}=${value}`);
-  }
-
-  // Re-run domain-specific validation on the updated config
-  const validated = validateConfig(updated);
-
+export function saveConfig(key: ConfigKey, value: string): void {
+  const updated = applyConfigUpdate(config, key, value);
   const configPath = getConfigPath();
   mkdirSync(dirname(configPath), { recursive: true });
-  writeFileSync(configPath, JSON.stringify(validated, null, 2));
-  config = validated;
-
+  writeFileSync(configPath, JSON.stringify(updated, null, 2));
+  config = updated;
   onConfigChange?.();
 }
 

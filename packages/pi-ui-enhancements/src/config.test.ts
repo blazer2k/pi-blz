@@ -42,6 +42,25 @@ describe("tool patch config", () => {
   });
 });
 
+describe("config value parsing", () => {
+  it("saves boolean settings", () => {
+    saveConfig("asciiHeaderEnabled", "false");
+    saveConfig("roundedEditorShowCost", "true");
+
+    expect(getConfig().asciiHeaderEnabled).toBe(false);
+    expect(getConfig().roundedEditorShowCost).toBe(true);
+  });
+
+  it("saves enum settings and rejects unsupported values", () => {
+    saveConfig("asciiHeaderAlign", "right");
+    expect(getConfig().asciiHeaderAlign).toBe("right");
+
+    expect(() => saveConfig("asciiHeaderAlign", "justify")).toThrow(
+      "Invalid config update",
+    );
+  });
+});
+
 describe("config numeric values", () => {
   it("rejects fractional numeric updates", () => {
     expect(() => saveConfig("maxExpandedEntries", "20.5")).toThrow(
