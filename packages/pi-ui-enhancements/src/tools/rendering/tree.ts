@@ -108,7 +108,7 @@ export function getCallRenderParts(
 
   updateBlinkTimer(state, animate && !isDone, toolContext.invalidate);
 
-  const color = staticActive ? "accent" : getStatusColor(isDone, blinkOn);
+  const color = staticActive ? "dim" : getStatusColor(isDone, blinkOn);
   const symbol = staticActive
     ? getBlinkIndicator().unfilled
     : getStatusSymbol(isDone, blinkOn);

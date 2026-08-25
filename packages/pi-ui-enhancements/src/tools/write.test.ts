@@ -232,7 +232,7 @@ describe("write renderResult", () => {
     expect(updated.split("\n").at(-1)).toContain("╰─ 2 lines");
   });
 
-  it("uses a static accent indicator while expanded and success when done", () => {
+  it("uses a static dim indicator while expanded and success when done", () => {
     const def = setupWriteTool();
     const state = {};
     const args = { path: "status.txt", content: "done" };
@@ -250,7 +250,7 @@ describe("write renderResult", () => {
     const active = def.renderCall!(args, theme, activeCtx)
       .render(120)
       .join("\n");
-    expect(active).toContain(`accent:${getBlinkIndicator().unfilled}`);
+    expect(active).toContain(`dim:${getBlinkIndicator().unfilled}`);
     expect((state as { blinkTimer?: unknown }).blinkTimer).toBeUndefined();
 
     def.renderResult!(

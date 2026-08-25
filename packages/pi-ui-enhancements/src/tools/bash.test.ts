@@ -52,7 +52,7 @@ describe("bash renderCall", () => {
     expect(lines.join("\n")).not.toContain("...");
   });
 
-  it("uses a static accent indicator for effectively expanded calls", () => {
+  it("uses a static dim indicator for effectively expanded calls", () => {
     const def = setupBashTool();
     const state = {};
     const theme = {
@@ -67,7 +67,7 @@ describe("bash renderCall", () => {
       .render(120)
       .join("\n");
 
-    expect(output).toContain(`accent:${getBlinkIndicator().unfilled}`);
+    expect(output).toContain(`dim:${getBlinkIndicator().unfilled}`);
     expect((state as { blinkTimer?: unknown }).blinkTimer).toBeUndefined();
   });
 
