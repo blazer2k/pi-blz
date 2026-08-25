@@ -17,6 +17,7 @@ import { patchFindTool } from "../find";
 import { patchReadTool } from "../read";
 import { patchWriteTool } from "../write";
 import { clearBlinkTimers } from "./state";
+import { stripAnsi } from "./text";
 
 type Renderable = { render(width: number): string[] };
 type ToolResult = {
@@ -47,7 +48,7 @@ afterAll(() => {
 function meaningfulLines(component: Renderable, width = 80): string[] {
   return component
     .render(width)
-    .map((line) => line.trimEnd())
+    .map((line) => stripAnsi(line).trimEnd())
     .filter((line) => line.trim().length > 0);
 }
 
