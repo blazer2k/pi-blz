@@ -281,7 +281,7 @@ describe("bash renderResult", () => {
     expect(output).not.toContain("L08");
     expect(output).toContain("│  L09");
     expect(output).toContain("│  L10");
-    expect(output).toContain("⋮  6 hidden lines");
+    expect(output).toContain("┊  (6 hidden lines)");
     expect(output.split("\n").at(-1)).toContain("╰─ took 50ms");
   });
 
@@ -304,7 +304,7 @@ describe("bash renderResult", () => {
 
     expect(firstLine).toBeGreaterThanOrEqual(0);
     expect(lines[firstLine + 1]?.trim()).toBe("│");
-    expect(lines[firstLine + 2]).toContain("⋮  3 hidden lines");
+    expect(lines[firstLine + 2]).toContain("┊  (3 hidden lines)");
   });
 
   it("preview mode shows all five lines without enabling expansion", () => {
@@ -736,7 +736,7 @@ describe("bash renderResult", () => {
     expect(output).not.toContain("│  line6");
     expect(output).toContain("│  line7");
     expect(output).toContain("│  line8");
-    expect(output).toContain("⋮  4 hidden lines");
+    expect(output).toContain("┊  (4 hidden lines)");
     const lines = output.split("\n");
     expect(lines.at(-2)).toContain("├─ Command exited with code 2");
     expect(lines.at(-1)).toContain("╰─ took 123ms • truncated");

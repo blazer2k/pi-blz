@@ -28,7 +28,7 @@ export function formatOmissionRow(
   const label = `${hiddenCount} hidden ${
     hiddenCount === 1 ? noun.singular : noun.plural
   }`;
-  return theme.fg("dim", "│  ⋮  " + theme.italic(label));
+  return theme.fg("dim", `┊  ${theme.italic(`(${label})`)}`);
 }
 
 export function formatTreeLine(

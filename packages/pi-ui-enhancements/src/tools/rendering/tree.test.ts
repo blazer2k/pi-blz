@@ -27,7 +27,7 @@ describe("formatOmissionRow", () => {
 
     expect(
       formatOmissionRow(1, { singular: "line", plural: "lines" }, theme),
-    ).toBe("<dim>│  ⋮  <italic>1 hidden line</italic></dim>");
+    ).toBe("<dim>┊  <italic>(1 hidden line)</italic></dim>");
   });
 });
 
