@@ -8,6 +8,14 @@ import type { ConfigKey } from "./definition";
 import { getSettingItems } from "./settings";
 import { getConfig, saveConfig } from "./store";
 
+const TOOL_RENDER_SETTINGS = new Set<ConfigKey>([
+  "indicatorStyle",
+  "maxCallWidth",
+  "maxExpandedEntries",
+  "bashCollapsedDisplay",
+  "showExpansionHint",
+]);
+
 export function registerConfigCommand(
   pi: ExtensionAPI,
   onOpen: () => void,
@@ -36,7 +44,13 @@ export function registerConfigCommand(
             getSettingsListTheme(),
             (id, newValue) => {
               try {
-                saveConfig(id as ConfigKey, newValue);
+                const key = id as ConfigKey;
+                saveConfig(key, newValue);
+
+                if (TOOL_RENDER_SETTINGS.has(key)) {
+                  tui.invalidate();
+                  tui.requestRender();
+                }
               } catch (error) {
                 context.ui.notify(
                   error instanceof Error ? error.message : String(error),
