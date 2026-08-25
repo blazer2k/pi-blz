@@ -19,7 +19,6 @@ const GREP_CONFIG: ListResultConfig = {
   emptyMessage: "No matches found",
   singularLabel: "line",
   pluralLabel: "lines",
-  moreLabel: "more lines",
   preprocess: splitNativeListOutput,
 };
 

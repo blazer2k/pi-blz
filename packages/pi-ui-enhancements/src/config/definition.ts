@@ -109,7 +109,13 @@ const ConfigSchema = Type.Object(
       Type.Literal("diamond"),
     ]),
     maxCallWidth: Type.Number({ minimum: 40, maximum: 200 }),
-    maxExpandedEntries: Type.Number({ minimum: -1, maximum: 100 }),
+    maxExpandedEntries: Type.Union([
+      Type.Literal(-1),
+      Type.Literal(10),
+      Type.Literal(20),
+      Type.Literal(50),
+      Type.Literal(100),
+    ]),
     bashMaxCollapsedLines: Type.Union([
       Type.Literal(0),
       Type.Literal(1),

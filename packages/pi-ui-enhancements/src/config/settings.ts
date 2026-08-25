@@ -117,8 +117,7 @@ const SETTING_DEFINITIONS: SettingDefinition[] = [
   {
     id: "maxExpandedEntries",
     label: "Max expanded entries",
-    description:
-      "Maximum number of lines to show when expanding tool output (-1 to show all)",
+    description: "Maximum entries shown by expanded list tools (-1 shows all)",
     values: ["-1", "10", "20", "50", "100"],
   },
   {

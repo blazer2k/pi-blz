@@ -232,8 +232,8 @@ describe("read renderResult", () => {
     );
 
     const output = component.render(120).join("\n");
-    expect(output).toContain("├─ warning:Image unavailable");
-    expect(output).toContain("╰─ muted:Image omitted: resize failed.");
+    expect(output).toContain("│  muted:Image omitted: resize failed.");
+    expect(output).toContain("╰─ warning:Image unavailable");
     expect(output).not.toContain("2 lines");
   });
 

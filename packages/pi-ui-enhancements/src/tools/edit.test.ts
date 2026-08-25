@@ -148,7 +148,7 @@ describe("edit renderResult", () => {
     const output = component.render(120).join("\n");
     expect(output).toContain("│  ");
     expect(output).toContain("╰─ ");
-    expect(output).toContain("├─ +1 -1");
+    expect(output).toContain("╰─ +1 -1");
     expect(output).toContain("+new");
     expect(output).toContain("-old");
   });

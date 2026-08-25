@@ -20,7 +20,6 @@ const LS_CONFIG: ListResultConfig = {
   emptyMessage: "(empty directory)",
   singularLabel: "entry",
   pluralLabel: "entries",
-  moreLabel: "more entries",
   preprocess: splitNativeListOutput,
 };
 

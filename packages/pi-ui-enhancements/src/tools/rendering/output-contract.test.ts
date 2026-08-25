@@ -161,10 +161,10 @@ describe("built-in tool output", () => {
       ),
     ).toEqual([
       " ● Find *.ts in src",
-      " ├─ 3 files • ctrl+o to collapse",
       " │  src/a.ts",
       " │  src/b.ts",
-      " ╰─ src/c.ts",
+      " │  src/c.ts",
+      " ╰─ 3 files • ctrl+o to collapse",
     ]);
   });
 });

@@ -14,6 +14,7 @@ import type {
   ListResultConfig,
   ResultStatusState,
 } from "./types";
+import { saveConfig } from "../../config/store";
 import { mkTheme } from "../../testing/helpers";
 
 const opts: ToolRenderResultOptions = { expanded: false, isPartial: false };
@@ -90,10 +91,10 @@ describe("formatSimpleErrorResult", () => {
     expect(collapsed.split("\n")).toHaveLength(1);
 
     const expanded = formatSimpleErrorResult(error, state, optsExpanded, theme);
-    expect(expanded).toContain("├─ ");
     expect(expanded).toContain("to collapse");
     expect(expanded).toContain("│      (?:[)");
-    expect(expanded).toContain("╰─        ^");
+    expect(expanded).toContain("│         ^");
+    expect(expanded.split("\n").at(-1)).toContain("╰─  to collapse");
   });
 
   it("labels empty errors without offering expansion", () => {
@@ -112,7 +113,6 @@ const baseConfig: ListResultConfig = {
   emptyMessage: "(empty)",
   singularLabel: "file",
   pluralLabel: "files",
-  moreLabel: "more files",
   preprocess: (text) => text.split("\n").filter((l) => l.length > 0),
 };
 
@@ -160,25 +160,49 @@ describe("formatListResult", () => {
     expect(output).toContain("to expand");
   });
 
-  it("expanded renders first 20 items", () => {
-    const theme = mkTheme();
-    const state = resultStatusState();
+  it("expanded splits the configured entries around an omission row", () => {
     const lines = Array.from({ length: 25 }, (_, i) => `file${i}.txt`).join(
       "\n",
     );
-    const result = {
-      content: [{ type: "text", text: lines }],
-    };
     const output = formatListResult(
-      result,
-      state,
+      { content: [{ type: "text", text: lines }] },
+      resultStatusState(),
       optsExpanded,
-      theme,
+      mkTheme(),
       baseConfig,
     );
+    const rendered = output.split("\n");
+
     expect(output).toContain("file0.txt");
-    expect(output).toContain("file19.txt");
-    expect(output).toContain("5 more files");
+    expect(output).toContain("file9.txt");
+    expect(output).not.toContain("file10.txt");
+    expect(output).not.toContain("file14.txt");
+    expect(output).toContain("file15.txt");
+    expect(output).toContain("file24.txt");
+    expect(output).toContain("⋮  5 hidden files");
+    expect(rendered.at(-1)).toContain("╰─ 25 files");
+  });
+
+  it("renders every item when maxExpandedEntries is unlimited", () => {
+    saveConfig("maxExpandedEntries", "-1");
+    try {
+      const lines = Array.from({ length: 25 }, (_, i) => `file${i}.txt`).join(
+        "\n",
+      );
+      const output = formatListResult(
+        { content: [{ type: "text", text: lines }] },
+        resultStatusState(),
+        optsExpanded,
+        mkTheme(),
+        baseConfig,
+      );
+
+      expect(output).toContain("file0.txt");
+      expect(output).toContain("file24.txt");
+      expect(output).not.toContain("hidden files");
+    } finally {
+      saveConfig("maxExpandedEntries", "20");
+    }
   });
 
   it("colors counts as muted and omits redundant result limits", () => {

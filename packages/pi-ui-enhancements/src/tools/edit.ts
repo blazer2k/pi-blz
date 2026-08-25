@@ -100,18 +100,18 @@ function formatEditResult(
   }
 
   const rendered = renderDiff(diff);
-  const lines = rendered.split("\n");
-  const renderedLines = lines.map((line, index) => {
-    const prefix = index === lines.length - 1 ? "╰─ " : "│  ";
-    return formatTreeLine(line, {
-      theme,
-      prefix,
-      width: getMaxCallWidth() - 1,
-      mode: "preserve",
-    }).text;
-  });
-  if (metadata || hint) {
-    renderedLines.unshift(theme.fg("dim", "├─ ") + metadata + hint);
+  const hasFooter = Boolean(metadata || hint);
+  const renderedLines = rendered.split("\n").map(
+    (line, index, lines) =>
+      formatTreeLine(line, {
+        theme,
+        prefix: !hasFooter && index === lines.length - 1 ? "╰─ " : "│  ",
+        width: getMaxCallWidth() - 1,
+        mode: "preserve",
+      }).text,
+  );
+  if (hasFooter) {
+    renderedLines.push(theme.fg("dim", "╰─ ") + metadata + hint);
   }
   return renderedLines.join("\n");
 }

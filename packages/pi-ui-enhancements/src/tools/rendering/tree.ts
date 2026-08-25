@@ -19,6 +19,17 @@ import {
 import { safeTruncateToWidth, stripAnsi } from "./text";
 import type { BaseRenderState } from "./types";
 
+export function formatOmissionRow(
+  hiddenCount: number,
+  noun: { singular: string; plural: string },
+  theme: Theme,
+): string {
+  const label = `${hiddenCount} hidden ${
+    hiddenCount === 1 ? noun.singular : noun.plural
+  }`;
+  return theme.fg("dim", "│  ⋮  ") + theme.italic(theme.fg("muted", label));
+}
+
 export function formatTreeLine(
   line: string,
   options: {

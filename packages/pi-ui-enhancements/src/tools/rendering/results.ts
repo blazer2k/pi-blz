@@ -14,7 +14,7 @@ import {
   updateResultState,
 } from "./state";
 import { extractTextContent, normalizeOutput } from "./text";
-import { formatTreeLine, getResultText } from "./tree";
+import { formatOmissionRow, formatTreeLine, getResultText } from "./tree";
 import type {
   BaseRenderState,
   FormatResultFn,
@@ -83,22 +83,6 @@ export function formatSimpleErrorResult(
     : collapsedBody;
   const hasErrorBody = errorBody.text.length > 0;
   const bodyText = hasErrorBody ? errorBody.text : "error";
-  const maxWidth = getMaxCallWidth();
-
-  const formatted = bodyText
-    .split("\n")
-    .map((line, index, lines) => {
-      const prefix = index === lines.length - 1 ? "╰─ " : "│  ";
-      return formatTreeLine(line, {
-        theme,
-        prefix,
-        width: maxWidth - 1,
-        mode: "preserve",
-        color: "error",
-      }).text;
-    })
-    .join("\n");
-
   const status = state.truncated
     ? buildResultStatusParts(state, theme).join(theme.fg("muted", " • "))
     : "";
@@ -106,16 +90,27 @@ export function formatSimpleErrorResult(
     state.callExpandable === true || state.truncated || collapsedBody.truncated;
 
   if (options.expanded) {
-    if (!isExpandable) return formatted;
+    const collapseHint = isExpandable
+      ? buildExpansionHint(theme, "collapse", status ? "suffix" : "standalone")
+      : "";
+    const footer = status + collapseHint;
+    const formatted = bodyText
+      .split("\n")
+      .map(
+        (line, index, lines) =>
+          formatTreeLine(line, {
+            theme,
+            prefix: !footer && index === lines.length - 1 ? "╰─ " : "│  ",
+            width: getMaxCallWidth() - 1,
+            mode: "preserve",
+            color: "error",
+          }).text,
+      )
+      .join("\n");
 
-    const collapseHint = buildExpansionHint(
-      theme,
-      "collapse",
-      status ? "suffix" : "standalone",
-    );
-    if (!status && !collapseHint) return formatted;
-
-    return theme.fg("dim", "├─ ") + status + collapseHint + "\n" + formatted;
+    return footer
+      ? formatted + "\n" + theme.fg("dim", "╰─ ") + footer
+      : formatted;
   }
 
   const suffix = isExpandable ? buildExpansionHint(theme, "expand") : "";
@@ -176,34 +171,43 @@ export function formatListResult(
   }
 
   const maxEntries = getMaxExpandedEntries();
-  const visible = items.slice(0, maxEntries);
-  const remaining = Math.max(0, total - maxEntries);
-  const lines: string[] = [
-    theme.fg("dim", "├─ ") +
-      summary +
-      buildToolExpansionHint(theme, state, options, true),
-  ];
+  const hasOmission = Number.isFinite(maxEntries) && total > maxEntries;
+  const headCount = hasOmission ? Math.ceil(maxEntries / 2) : total;
+  const tailCount = hasOmission ? Math.floor(maxEntries / 2) : 0;
+  const head = items.slice(0, headCount);
+  const tail = tailCount > 0 ? items.slice(-tailCount) : [];
+  const hiddenCount = total - head.length - tail.length;
+  const lines: string[] = [];
 
-  visible.forEach((item, index) => {
-    const isLast = index === visible.length - 1 && remaining === 0;
+  const renderItem = (item: string) => {
     const rendered = config.renderItem ? config.renderItem(item, theme) : item;
     lines.push(
       formatTreeLine(rendered, {
         theme,
-        prefix: isLast ? "╰─ " : "│  ",
+        prefix: "│  ",
         width: getMaxCallWidth() - 1,
         mode: "preserve",
         color: "toolOutput",
       }).text,
     );
-  });
+  };
 
-  if (remaining > 0) {
+  head.forEach(renderItem);
+  if (hiddenCount > 0) {
     lines.push(
-      theme.fg("dim", "╰─ ") +
-        theme.fg("muted", `${remaining} ${config.moreLabel}`),
+      formatOmissionRow(
+        hiddenCount,
+        { singular: config.singularLabel, plural: config.pluralLabel },
+        theme,
+      ),
     );
   }
+  tail.forEach(renderItem);
+  lines.push(
+    theme.fg("dim", "╰─ ") +
+      summary +
+      buildToolExpansionHint(theme, state, options, true),
+  );
 
   return lines.join("\n");
 }

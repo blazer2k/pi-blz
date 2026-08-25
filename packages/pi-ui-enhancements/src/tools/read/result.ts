@@ -75,12 +75,12 @@ export function formatReadResult(
 
     const reason = formatTreeLine(imageMarker.reason, {
       theme,
-      prefix: "╰─ ",
+      prefix: "│  ",
       width: getMaxCallWidth() - 1,
       mode: "preserve",
       color: "muted",
     }).text;
-    return theme.fg("dim", "├─ ") + summary + "\n" + reason;
+    return reason + "\n" + theme.fg("dim", "╰─ ") + summary;
   } else {
     const fileContent = stripReadContinuationNotice(textContent);
     const lines = countLines(fileContent);

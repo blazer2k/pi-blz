@@ -1,13 +1,30 @@
 import { describe, expect, it } from "bun:test";
-import type { ToolRenderResultOptions } from "@earendil-works/pi-coding-agent";
+import type {
+  Theme,
+  ToolRenderResultOptions,
+} from "@earendil-works/pi-coding-agent";
 import { clearBlinkTimers } from "./state";
-import { getCallRenderParts, getResultText } from "./tree";
+import { formatOmissionRow, getCallRenderParts, getResultText } from "./tree";
 import { mkTheme } from "../../testing/helpers";
 
 const optsExpanded: ToolRenderResultOptions = {
   expanded: true,
   isPartial: false,
 };
+
+describe("formatOmissionRow", () => {
+  it("dims the marker and italicizes only the muted hidden count", () => {
+    const theme = {
+      ...mkTheme(),
+      fg: (color: string, text: string) => `<${color}>${text}</${color}>`,
+      italic: (text: string) => `<italic>${text}</italic>`,
+    } as Theme;
+
+    expect(
+      formatOmissionRow(1, { singular: "line", plural: "lines" }, theme),
+    ).toBe("<dim>│  ⋮  </dim><italic><muted>1 hidden line</muted></italic>");
+  });
+});
 
 describe("tree-aware text wrapping", () => {
   it("prefixes every wrapped result row and closes only the final row", () => {

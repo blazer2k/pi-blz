@@ -17,7 +17,6 @@ const FIND_CONFIG: ListResultConfig = {
   emptyMessage: "No files found matching pattern",
   singularLabel: "file",
   pluralLabel: "files",
-  moreLabel: "more files",
   preprocess: splitNativeListOutput,
 };
 

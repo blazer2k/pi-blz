@@ -23,7 +23,6 @@ export type ListResultConfig = {
   emptyMessage: string;
   singularLabel: string;
   pluralLabel: string;
-  moreLabel: string;
   preprocess: (text: string) => string[];
   renderItem?: (item: string, theme: Theme) => string;
 };

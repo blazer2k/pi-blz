@@ -90,6 +90,21 @@ describe("config numeric values", () => {
     );
   });
 
+  it("accepts only configured maxExpandedEntries values", () => {
+    for (const value of ["-1", "10", "20", "50", "100"]) {
+      saveConfig("maxExpandedEntries", value);
+      expect(getConfig().maxExpandedEntries).toBe(Number(value));
+    }
+
+    for (const value of ["0", "25", "99"]) {
+      expect(() => saveConfig("maxExpandedEntries", value)).toThrow(
+        "Invalid config update",
+      );
+    }
+
+    saveConfig("maxExpandedEntries", "20");
+  });
+
   it("falls back to defaults for fractional numeric values loaded from disk", () => {
     writeFileSync(
       process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH!,
