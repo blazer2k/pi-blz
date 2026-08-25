@@ -128,8 +128,8 @@ function wrapTreeText(
     .split("\n")
     .flatMap((line, sourceLineIndex) => {
       const lineWidth = visibleWidth(line);
-      const prefix = sliceByColumn(line, 0, 3);
-      const visiblePrefix = stripAnsi(prefix);
+      const slicedPrefix = sliceByColumn(line, 0, 3);
+      const visiblePrefix = stripAnsi(slicedPrefix);
       const hasTreePrefix = /^[│├╰┊][─ ] /u.test(visiblePrefix);
 
       if (!hasTreePrefix && callContinuationPrefix) {
@@ -144,7 +144,10 @@ function wrapTreeText(
       if (lineWidth <= width) return [line];
       if (!hasTreePrefix) return wrapTextWithAnsi(line, width);
 
-      const content = sliceByColumn(line, 3, lineWidth - 3);
+      const rawPrefixStart = line.indexOf(visiblePrefix);
+      const rawContentStart = rawPrefixStart + visiblePrefix.length;
+      const content = line.slice(rawContentStart);
+      const prefix = slicedPrefix + "\x1b[39m";
       const chunks = wrapTextWithAnsi(content, Math.max(1, width - 3));
       const continuationPrefix = prefix
         .replace("├─ ", "│  ")
