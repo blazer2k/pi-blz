@@ -10,6 +10,7 @@ import {
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
 import {
+  getBlinkIndicator,
   getMaxCallWidth,
   getStatusColor,
   getStatusSymbol,
@@ -86,7 +87,11 @@ export function getCallRenderParts(
     isPartial?: boolean;
     invalidate: () => void;
   },
-  renderOptions?: { paddingX?: number; animate?: boolean },
+  renderOptions?: {
+    paddingX?: number;
+    animate?: boolean;
+    staticActive?: boolean;
+  },
 ): { text: Text; prefix: string; isDone: boolean } {
   const text = new TreeText(
     renderOptions?.paddingX ?? 1,
@@ -96,16 +101,18 @@ export function getCallRenderParts(
   const isDone =
     state.hasResult ||
     (!toolContext.executionStarted && !toolContext.isPartial);
-  const animate = renderOptions?.animate ?? true;
+  const staticActive = renderOptions?.staticActive === true && !isDone;
+  const animate = (renderOptions?.animate ?? true) && !staticActive;
   const blinkOn = animate ? isBlinkOn() : false;
   state.blinkOn = blinkOn;
 
   updateBlinkTimer(state, animate && !isDone, toolContext.invalidate);
 
-  const prefix = theme.fg(
-    getStatusColor(isDone, blinkOn),
-    `${getStatusSymbol(isDone, blinkOn)} `,
-  );
+  const color = staticActive ? "accent" : getStatusColor(isDone, blinkOn);
+  const symbol = staticActive
+    ? getBlinkIndicator().unfilled
+    : getStatusSymbol(isDone, blinkOn);
+  const prefix = theme.fg(color, `${symbol} `);
 
   return { text, prefix, isDone };
 }

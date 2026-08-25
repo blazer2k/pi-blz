@@ -13,7 +13,6 @@ import {
   buildResultStatusParts,
   buildToolExpansionHint,
   getMaxCallWidth,
-  getMaxExpandedEntries,
   invalidateIfChanged,
   updateResultState,
 } from "./rendering/state";
@@ -31,9 +30,127 @@ import {
   registerPatchedTool,
 } from "./tool-registration";
 
+type WriteHighlightCache = {
+  rawPath: string | null;
+  lang: string;
+  rawContent: string;
+  sourceLines: string[];
+  highlightedLines: string[];
+};
+
+type WriteRenderState = BaseRenderState & {
+  highlightCache?: WriteHighlightCache;
+};
+
+const WRITE_CONTEXT_HIGHLIGHT_LINES = 50;
+
+function highlightSingleLine(line: string, lang: string): string {
+  return highlightCode(line, lang)[0] ?? "";
+}
+
+function refreshHighlightContext(cache: WriteHighlightCache): void {
+  const count = Math.min(
+    WRITE_CONTEXT_HIGHLIGHT_LINES,
+    cache.sourceLines.length,
+  );
+  if (count === 0) return;
+
+  const highlighted = highlightCode(
+    cache.sourceLines.slice(0, count).join("\n"),
+    cache.lang,
+  );
+  for (let index = 0; index < count; index++) {
+    cache.highlightedLines[index] =
+      highlighted[index] ??
+      highlightSingleLine(cache.sourceLines[index] ?? "", cache.lang);
+  }
+}
+
+function rebuildHighlightCache(
+  rawPath: string | null,
+  content: string,
+): WriteHighlightCache | undefined {
+  const lang = rawPath ? getLanguageFromPath(rawPath) : undefined;
+  if (!lang) return undefined;
+
+  const sourceLines = content.split("\n");
+  const highlighted = highlightCode(content, lang);
+  return {
+    rawPath,
+    lang,
+    rawContent: content,
+    sourceLines,
+    highlightedLines: sourceLines.map(
+      (line, index) => highlighted[index] ?? highlightSingleLine(line, lang),
+    ),
+  };
+}
+
+function updateHighlightCache(
+  cache: WriteHighlightCache | undefined,
+  rawPath: string | null,
+  content: string,
+): WriteHighlightCache | undefined {
+  const lang = rawPath ? getLanguageFromPath(rawPath) : undefined;
+  if (!lang) return undefined;
+  if (
+    !cache ||
+    cache.rawPath !== rawPath ||
+    cache.lang !== lang ||
+    !content.startsWith(cache.rawContent)
+  ) {
+    return rebuildHighlightCache(rawPath, content);
+  }
+  if (content.length === cache.rawContent.length) return cache;
+
+  const delta = content.slice(cache.rawContent.length);
+  const segments = delta.split("\n");
+  const lastIndex = cache.sourceLines.length - 1;
+  cache.sourceLines[lastIndex] =
+    (cache.sourceLines[lastIndex] ?? "") + (segments[0] ?? "");
+  cache.highlightedLines[lastIndex] = highlightSingleLine(
+    cache.sourceLines[lastIndex] ?? "",
+    cache.lang,
+  );
+  for (let index = 1; index < segments.length; index++) {
+    const line = segments[index] ?? "";
+    cache.sourceLines.push(line);
+    cache.highlightedLines.push(highlightSingleLine(line, cache.lang));
+  }
+  cache.rawContent = content;
+  refreshHighlightContext(cache);
+  return cache;
+}
+
+function getHighlightedWriteLines(
+  state: WriteRenderState,
+  path: string | undefined,
+  content: string,
+  theme: Theme,
+): string[] {
+  state.highlightCache = updateHighlightCache(
+    state.highlightCache,
+    path ?? null,
+    content,
+  );
+
+  const sourceLines = content.split("\n");
+  const displayLineCount =
+    content.endsWith("\n") && content.length > 0
+      ? sourceLines.length - 1
+      : sourceLines.length;
+  if (state.highlightCache) {
+    return state.highlightCache.highlightedLines.slice(0, displayLineCount);
+  }
+
+  return sourceLines
+    .slice(0, displayLineCount)
+    .map((line) => theme.fg("mdCodeBlock", line));
+}
+
 function formatWriteResult(
   result: { content: Array<{ type: string; text?: string }> },
-  state: BaseRenderState,
+  state: WriteRenderState,
   options: ToolRenderResultOptions,
   theme: Theme,
   args: WriteToolInput,
@@ -56,45 +173,21 @@ function formatWriteResult(
   }
 
   if (options.expanded) {
-    const lang = args.path ? getLanguageFromPath(args.path) : undefined;
-    const maxPreviewLines = getMaxExpandedEntries();
-    const previewLineCount = Number.isFinite(maxPreviewLines)
-      ? maxPreviewLines
-      : Infinity;
-    const previewText = args.content
-      .split("\n")
-      .slice(0, previewLineCount)
-      .join("\n");
-    const previewBase = previewText.endsWith("\n")
-      ? previewText.slice(0, -1)
-      : previewText;
-    // highlightCode falls back to pi's global theme proxy when no language
-    // matches, so color unhighlighted lines with the injected theme instead.
-    const highlightedLines = lang
-      ? highlightCode(previewBase, lang)
-      : previewBase.split("\n").map((line) => theme.fg("mdCodeBlock", line));
-    const remainingLines = Math.max(0, lines - previewLineCount);
-
-    const renderedLines = highlightedLines.map((line, index) => {
-      const isLastLine = index === highlightedLines.length - 1;
-      const prefix = remainingLines === 0 && isLastLine ? "╰─ " : "│  ";
-      return formatTreeLine(line, {
-        theme,
-        prefix,
-        width: getMaxCallWidth() - 1,
-        mode: "preserve",
-      }).text;
-    });
-
-    if (remainingLines > 0) {
-      renderedLines.push(
-        theme.fg("dim", "╰─ ") +
-          theme.fg("muted", `${remainingLines} more lines`),
-      );
-    }
-
-    renderedLines.unshift(theme.fg("dim", "├─ ") + metadata + hint);
-
+    const renderedLines = getHighlightedWriteLines(
+      state,
+      args.path,
+      args.content,
+      theme,
+    ).map(
+      (line) =>
+        formatTreeLine(line, {
+          theme,
+          prefix: "│  ",
+          width: getMaxCallWidth() - 1,
+          mode: "preserve",
+        }).text,
+    );
+    renderedLines.push(theme.fg("dim", "╰─ ") + metadata + hint);
     return renderedLines.join("\n");
   }
 
@@ -108,9 +201,11 @@ export function patchWriteTool(pi: ExtensionAPI): Handle {
     pi,
     tool,
     renderCall(args, theme, toolCtx) {
-      const state = toolCtx.state as BaseRenderState;
+      const state = toolCtx.state as WriteRenderState;
       const renderArgs = args as WriteToolInput;
-      const { text, prefix } = getCallRenderParts(state, theme, toolCtx);
+      const { text, prefix } = getCallRenderParts(state, theme, toolCtx, {
+        staticActive: toolCtx.expanded,
+      });
 
       const title = theme.fg("toolTitle", theme.bold("Write "));
       const fullPath = renderPath(renderArgs.path, theme, toolCtx.cwd);
@@ -146,7 +241,7 @@ export function patchWriteTool(pi: ExtensionAPI): Handle {
       return text;
     },
     renderResult(result, options, theme, toolCtx) {
-      const state = toolCtx.state as BaseRenderState;
+      const state = toolCtx.state as WriteRenderState;
       const text = getResultText(state, options, toolCtx.lastComponent);
 
       const details = result.details as

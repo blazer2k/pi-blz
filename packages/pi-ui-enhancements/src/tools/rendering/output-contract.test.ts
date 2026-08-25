@@ -120,9 +120,9 @@ describe("built-in tool output", () => {
       ),
     ).toEqual([
       " ● Write notes.txt",
-      " ├─ 2 lines • ctrl+o to collapse",
       " │  alpha",
-      " ╰─ beta",
+      " │  beta",
+      " ╰─ 2 lines • ctrl+o to collapse",
     ]);
   });
 

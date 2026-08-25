@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { getConfig } from "../config/store";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import { patchWriteTool } from "./write";
+import { getBlinkIndicator } from "./rendering/state";
 import { mkTheme, mkToolCtx, setupTool } from "../testing/helpers";
 
 function setupWriteTool() {
@@ -176,12 +177,9 @@ describe("write renderResult", () => {
     }
   });
 
-  it("expanded result previews up to maxExpandedEntries lines", () => {
+  it("expanded result renders every content line with metadata last", () => {
     const def = setupWriteTool();
-    const renderResult = def.renderResult!;
-    const theme = mkTheme();
-    const maxEntries = getConfig().maxExpandedEntries;
-    const totalLines = maxEntries + 5;
+    const totalLines = 25;
     const lines = Array.from(
       { length: totalLines },
       (_, i) => `L${String(i + 1).padStart(2, "0")}`,
@@ -190,23 +188,86 @@ describe("write renderResult", () => {
       args: { path: "big.ts", content: lines },
     });
 
-    const component = renderResult(
+    const component = def.renderResult!(
       {
         content: [{ type: "text", text: `wrote ${totalLines} lines` }],
         details: undefined,
       },
       { expanded: true, isPartial: false },
-      theme,
+      mkTheme(),
       ctx,
     );
 
     const output = component.render(120).join("\n");
-    expect(output).toContain(`├─ ${totalLines} lines`);
     expect(output).toContain("L01");
-    const lastVisible = String(maxEntries).padStart(2, "0");
-    expect(output).toContain(`L${lastVisible}`);
-    const nextLine = String(maxEntries + 1).padStart(2, "0");
-    expect(output).not.toContain(`L${nextLine}`);
-    expect(output).toContain("5 more lines");
+    expect(output).toContain("L25");
+    expect(output).not.toContain("hidden lines");
+    expect(output.split("\n").at(-1)).toContain(`╰─ ${totalLines} lines`);
+  });
+
+  it("preserves prior highlighted lines across append-only partial updates", () => {
+    const def = setupWriteTool();
+    const state = {};
+    const ctx = mkToolCtx({ expanded: true, isPartial: true, state });
+    const theme = mkTheme();
+
+    def.renderCall!(
+      { path: "append.ts", content: "const first = 1;" },
+      theme,
+      ctx,
+    );
+    const updated = def.renderCall!(
+      {
+        path: "append.ts",
+        content: "const first = 1;\nconst second = 2;",
+      },
+      theme,
+      ctx,
+    )
+      .render(120)
+      .join("\n");
+
+    expect(updated).toContain("const first");
+    expect(updated).toContain("const second");
+    expect(updated.split("\n").at(-1)).toContain("╰─ 2 lines");
+  });
+
+  it("uses a static accent indicator while expanded and success when done", () => {
+    const def = setupWriteTool();
+    const state = {};
+    const args = { path: "status.txt", content: "done" };
+    const theme = {
+      ...mkTheme(),
+      fg: (color: string, text: string) => `${color}:${text}`,
+    } as Theme;
+    const activeCtx = mkToolCtx({
+      args,
+      expanded: true,
+      isPartial: true,
+      state,
+    });
+
+    const active = def.renderCall!(args, theme, activeCtx)
+      .render(120)
+      .join("\n");
+    expect(active).toContain(`accent:${getBlinkIndicator().unfilled}`);
+    expect((state as { blinkTimer?: unknown }).blinkTimer).toBeUndefined();
+
+    def.renderResult!(
+      {
+        content: [{ type: "text", text: "wrote 1 line" }],
+        details: undefined,
+      },
+      { expanded: true, isPartial: false },
+      theme,
+      activeCtx,
+    );
+    const completed = def.renderCall!(args, theme, {
+      ...activeCtx,
+      isPartial: false,
+    })
+      .render(120)
+      .join("\n");
+    expect(completed).toContain(`success:${getBlinkIndicator().filled}`);
   });
 });
