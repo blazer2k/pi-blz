@@ -104,8 +104,7 @@ const SETTING_DEFINITIONS: SettingDefinition[] = [
   {
     id: "indicatorStyle",
     label: "Indicator style",
-    description:
-      "Symbol style of the blinking status indicator next to tool calls",
+    description: "Symbol style of the status indicator next to tool calls",
     values: ["dot", "circle", "diamond"],
   },
   {
@@ -117,15 +116,15 @@ const SETTING_DEFINITIONS: SettingDefinition[] = [
   {
     id: "maxExpandedEntries",
     label: "Max expanded entries",
-    description: "Maximum entries shown by expanded list tools (-1 shows all)",
+    description:
+      "Maximum entries shown by capped list and custom results (-1 shows all)",
     values: ["-1", "10", "20", "50", "100"],
   },
   {
-    id: "bashMaxCollapsedLines",
-    label: "Bash max collapsed lines",
-    description:
-      "Maximum number of bash output lines to show when collapsed (0 shows metadata only)",
-    values: ["0", "1", "5", "10"],
+    id: "bashCollapsedDisplay",
+    label: "Collapsed Bash output",
+    description: "Show a five-row preview or summary-only Bash result",
+    values: ["preview", "summary"],
   },
   {
     id: "showExpansionHint",

@@ -97,6 +97,23 @@ describe("formatSimpleErrorResult", () => {
     expect(expanded.split("\n").at(-1)).toContain("╰─  to collapse");
   });
 
+  it("nests dim tree prefixes inside expanded error styling", () => {
+    const theme = {
+      ...mkTheme(),
+      fg: (color: string, text: string) => `<${color}>${text}</${color}>`,
+    } as Theme;
+    const output = formatSimpleErrorResult(
+      "ENOENT: missing file",
+      { isError: true, callExpandable: true },
+      optsExpanded,
+      theme,
+    );
+
+    expect(output).toContain(
+      "<error><dim>│  </dim>ENOENT: missing file</error>",
+    );
+  });
+
   it("labels empty errors without offering expansion", () => {
     const output = formatSimpleErrorResult(
       "",

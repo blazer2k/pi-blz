@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { saveConfig } from "../config/store";
 import { patchBashTool } from "./bash";
-import { clearBlinkTimers } from "./rendering/state";
+import { clearBlinkTimers, getBlinkIndicator } from "./rendering/state";
 import { mkTheme, mkToolCtx, setupTool } from "../testing/helpers";
 import { PI_0_84_3_OUTPUT } from "./test-fixtures/pi-0.84.3";
 
@@ -50,6 +50,25 @@ describe("bash renderCall", () => {
     expect(lines.join("\n")).toContain("printf done");
     expect(lines.slice(1).every((line) => line.startsWith("│  "))).toBe(true);
     expect(lines.join("\n")).not.toContain("...");
+  });
+
+  it("uses a static accent indicator for effectively expanded calls", () => {
+    const def = setupBashTool();
+    const state = {};
+    const theme = {
+      ...mkTheme(),
+      fg: (color: string, text: string) => `${color}:${text}`,
+    } as Theme;
+    const output = def.renderCall!(
+      { command: "printf one\nprintf two" },
+      theme,
+      mkToolCtx({ expanded: true, executionStarted: true, state }),
+    )
+      .render(120)
+      .join("\n");
+
+    expect(output).toContain(`accent:${getBlinkIndicator().unfilled}`);
+    expect((state as { blinkTimer?: unknown }).blinkTimer).toBeUndefined();
   });
 
   it("preserves command boundaries and safe whitespace when expanded", () => {
@@ -230,51 +249,13 @@ describe("bash renderResult", () => {
     }
   });
 
-  it("collapsed output shows last five lines", () => {
-    const def = setupBashTool();
-    const renderResult = def.renderResult!;
-    const theme = mkTheme();
-    const ctx = mkToolCtx();
-
-    const component = renderResult(
-      {
-        content: [
-          {
-            type: "text",
-            text: Array.from(
-              { length: 10 },
-              (_, i) => `L${String(i + 1).padStart(2, "0")}`,
-            ).join("\n"),
-          },
-        ],
-        details: { durationMs: 50 },
-      },
-      { expanded: false, isPartial: false },
-      theme,
-      ctx,
-    );
-
-    const output = component.render(120).join("\n");
-    expect(output).not.toContain("L01");
-    expect(output).not.toContain("L05");
-    expect(output).toContain("┊  5 more lines");
-    expect(output).toContain("│  L06");
-    expect(output).not.toContain("┊  L06");
-    expect(output).toContain("╰─ L10");
-  });
-
   afterEach(() => {
-    saveConfig("bashMaxCollapsedLines", "5");
+    saveConfig("bashCollapsedDisplay", "preview");
   });
 
-  it("collapsed output shows metadata only when the limit is 0", () => {
-    saveConfig("bashMaxCollapsedLines", "0");
+  it("preview mode shows two head and two tail lines around an omission row", () => {
     const def = setupBashTool();
-    const renderResult = def.renderResult!;
-    const theme = mkTheme();
-    const ctx = mkToolCtx();
-
-    const component = renderResult(
+    const output = def.renderResult!(
       {
         content: [
           {
@@ -286,127 +267,89 @@ describe("bash renderResult", () => {
           },
         ],
         details: { durationMs: 50 },
-      },
-      { expanded: false, isPartial: false },
-      theme,
-      ctx,
-    );
-
-    const output = component.render(120).join("\n");
-    expect(output).not.toContain("L01");
-    expect(output).not.toContain("L10");
-    expect(output).toContain("10 lines");
-    expect(output).not.toContain("┊");
-  });
-
-  it("collapsed output shows only the last line when the limit is 1", () => {
-    saveConfig("bashMaxCollapsedLines", "1");
-    const def = setupBashTool();
-    const renderResult = def.renderResult!;
-    const theme = mkTheme();
-    const ctx = mkToolCtx();
-
-    const component = renderResult(
-      {
-        content: [
-          {
-            type: "text",
-            text: Array.from(
-              { length: 10 },
-              (_, i) => `L${String(i + 1).padStart(2, "0")}`,
-            ).join("\n"),
-          },
-        ],
-        details: { durationMs: 50 },
-      },
-      { expanded: false, isPartial: false },
-      theme,
-      ctx,
-    );
-
-    const output = component.render(120).join("\n");
-    expect(output).not.toContain("L09");
-    expect(output).toContain("┊  9 more lines");
-    expect(output).toContain("╰─ L10");
-  });
-
-  it("shows a standalone hint when collapsed output has no metadata", () => {
-    saveConfig("bashMaxCollapsedLines", "1");
-    const def = setupBashTool();
-    const component = def.renderResult!(
-      {
-        content: [{ type: "text", text: "first line\nlast line" }],
-        details: {},
       },
       { expanded: false, isPartial: false },
       mkTheme(),
       mkToolCtx(),
-    );
+    )
+      .render(120)
+      .join("\n");
 
-    const output = component.render(120).join("\n");
-    const summaryLine = output.split("\n").find((line) => line.includes("├─"));
-    expect(summaryLine).toContain("to expand");
-    expect(summaryLine).not.toContain("•");
+    expect(output).toContain("│  L01");
+    expect(output).toContain("│  L02");
+    expect(output).not.toContain("L03");
+    expect(output).not.toContain("L08");
+    expect(output).toContain("│  L09");
+    expect(output).toContain("│  L10");
+    expect(output).toContain("⋮  6 hidden lines");
+    expect(output.split("\n").at(-1)).toContain("╰─ took 50ms");
   });
 
-  it("omits the hint separator when a collapsed error has no metadata", () => {
-    saveConfig("bashMaxCollapsedLines", "1");
+  it("preview mode shows all five lines without enabling expansion", () => {
     const def = setupBashTool();
-    const renderResult = def.renderResult!;
-    const theme = mkTheme();
-
-    const component = renderResult(
+    const output = def.renderResult!(
       {
-        content: [
-          {
-            type: "text",
-            text: "first detail\nlast detail\nCommand exited with code 1",
-          },
-        ],
-        details: {},
+        content: [{ type: "text", text: "one\ntwo\nthree\nfour\nfive" }],
+        details: { durationMs: 50 },
       },
       { expanded: false, isPartial: false },
-      theme,
-      mkToolCtx({ isError: true }),
-    );
+      mkTheme(),
+      mkToolCtx(),
+    )
+      .render(120)
+      .join("\n");
 
-    const output = component.render(120).join("\n");
-    const summaryLine = output.split("\n").find((line) => line.includes("├─"));
-    expect(summaryLine).toContain("to expand");
-    expect(summaryLine).not.toContain("•");
-    expect(output).toContain("┊  1 more line");
-    expect(output).toContain("│  last detail");
-    expect(output).toContain("╰─ Command exited with code 1");
+    for (const line of ["one", "two", "three", "four", "five"]) {
+      expect(output).toContain(`│  ${line}`);
+    }
+    expect(output).not.toContain("ctrl+o");
+    expect(output.split("\n").at(-1)).toContain("╰─ took 50ms");
   });
 
-  it("collapsed errors show metadata only when the limit is 0", () => {
-    saveConfig("bashMaxCollapsedLines", "0");
+  it("summary mode hides output and includes its line count", () => {
+    saveConfig("bashCollapsedDisplay", "summary");
     const def = setupBashTool();
-    const renderResult = def.renderResult!;
-    const theme = mkTheme();
-    const ctx = mkToolCtx({ isError: true });
+    const output = def.renderResult!(
+      {
+        content: [{ type: "text", text: "one\ntwo\nthree" }],
+        details: { durationMs: 50 },
+      },
+      { expanded: false, isPartial: false },
+      mkTheme(),
+      mkToolCtx(),
+    )
+      .render(120)
+      .join("\n");
 
-    const component = renderResult(
+    expect(output).not.toContain("│  one");
+    expect(output).toContain("╰─ took 50ms • 3 lines");
+    expect(output).toContain("to expand");
+  });
+
+  it("puts normalized errors before the metadata footer", () => {
+    saveConfig("bashCollapsedDisplay", "summary");
+    const def = setupBashTool();
+    const output = def.renderResult!(
       {
         content: [
           {
             type: "text",
-            text: `line one\nline two\nline three\n${PI_0_84_3_OUTPUT.bash.exited}`,
+            text: `one\ntwo\nthree\n${PI_0_84_3_OUTPUT.bash.exited}`,
           },
         ],
         details: { durationMs: 50 },
       },
       { expanded: false, isPartial: false },
-      theme,
-      ctx,
-    );
+      mkTheme(),
+      mkToolCtx({ isError: true }),
+    )
+      .render(120)
+      .join("\n");
+    const lines = output.split("\n");
 
-    const output = component.render(120).join("\n");
-    expect(output).not.toContain("line one");
-    expect(output).not.toContain("line three");
-    expect(output).toContain(`╰─ ${PI_0_84_3_OUTPUT.bash.exited}`);
-    expect(output).toContain("3 lines");
-    expect(output).not.toContain("┊");
+    expect(lines.at(-2)).toContain(`├─ ${PI_0_84_3_OUTPUT.bash.exited}`);
+    expect(lines.at(-1)).toContain("╰─ took 50ms • 3 lines");
+    expect(lines.at(-1)).toContain("to expand");
   });
 
   it("does not duplicate a truncated call in expanded results", () => {
@@ -434,7 +377,7 @@ describe("bash renderResult", () => {
     expect(output).toContain("done");
   });
 
-  it("expanded result shows collapse hint, disabled hides both hints", () => {
+  it("shows collapse hints only for effectively expanded results", () => {
     const def = setupBashTool();
     const renderResult = def.renderResult!;
     const theme = mkTheme();
@@ -463,7 +406,9 @@ describe("bash renderResult", () => {
       theme,
       mkToolCtx({ expanded: true }),
     );
-    expect(expandedSingleLine.render(120).join("\n")).toContain("to collapse");
+    expect(expandedSingleLine.render(120).join("\n")).not.toContain(
+      "to collapse",
+    );
 
     saveConfig("showExpansionHint", "false");
     try {
@@ -578,6 +523,37 @@ describe("bash renderResult", () => {
     expect(output).not.toContain(PI_0_84_3_OUTPUT.bash.fullOutputPath);
   });
 
+  it("uses Pi's native no-output wording and call-driven hints", () => {
+    const def = setupBashTool();
+    const short = def.renderResult!(
+      {
+        content: [{ type: "text", text: "" }],
+        details: { durationMs: 12 },
+      },
+      { expanded: false, isPartial: false },
+      mkTheme(),
+      mkToolCtx(),
+    )
+      .render(120)
+      .join("\n");
+    const longCall = def.renderResult!(
+      {
+        content: [{ type: "text", text: "" }],
+        details: { durationMs: 12 },
+      },
+      { expanded: false, isPartial: false },
+      mkTheme(),
+      mkToolCtx({ state: { callExpandable: true } }),
+    )
+      .render(120)
+      .join("\n");
+
+    expect(short).toContain("╰─ took 12ms • (no output)");
+    expect(short).not.toContain("ctrl+o");
+    expect(longCall).toContain("(no output) • ");
+    expect(longCall).toContain("to expand");
+  });
+
   it('error strips noisy "no output" prefix', () => {
     const def = setupBashTool();
     const renderResult = def.renderResult!;
@@ -605,7 +581,6 @@ describe("bash renderResult", () => {
   });
 
   it("colors command output normally and only the status as an error", () => {
-    saveConfig("bashMaxCollapsedLines", "1");
     const def = setupBashTool();
     const renderResult = def.renderResult!;
     const theme = {
@@ -632,7 +607,7 @@ describe("bash renderResult", () => {
     expect(output).toContain("toolOutput:detail two");
     expect(output).not.toContain("error:detail one");
     expect(output).toContain("error:Command exited with code 9");
-    expect(output).toContain("to collapse");
+    expect(output).not.toContain("to collapse");
   });
 
   it("keeps unknown execution errors fully red", () => {
@@ -681,11 +656,10 @@ describe("bash renderResult", () => {
 
     const metadataLine = lines.find((line) => line.includes("took 50ms"));
     expect(metadataLine).toContain("to collapse");
-    expect(lines.at(-1)).not.toContain("collapse");
+    expect(lines.at(-1)).toContain("╰─ took 50ms");
   });
 
-  it("uses the last nonempty tail line while output is partial", () => {
-    saveConfig("bashMaxCollapsedLines", "1");
+  it("shows all short preview output while partial", () => {
     const def = setupBashTool();
     const component = def.renderResult!(
       {
@@ -698,10 +672,11 @@ describe("bash renderResult", () => {
     );
     const output = component.render(120).join("\n");
 
-    expect(output).toContain("elapsed 3.4s");
-    expect(output).toContain("to expand");
-    expect(output).toContain("┊  1 more line");
-    expect(output).toContain("╰─ line two");
+    expect(output).toContain("│  line one");
+    expect(output).toContain("│  line two");
+    expect(output).toContain("╰─ elapsed 3.4s");
+    expect(output).not.toContain("hidden line");
+    expect(output).not.toContain("ctrl+o");
   });
 
   it("collapsed errors render a summary plus the last 5 prefixed lines", () => {
@@ -733,17 +708,16 @@ describe("bash renderResult", () => {
     const output = component.render(120).join("\n");
     expect(output).toContain("took 123ms • truncated");
     expect(output).not.toContain("error •");
-    const lines = output.split("\n");
-    expect(
-      lines.some((l) => l.includes("│  line1") || l.includes("╰─ line1")),
-    ).toBe(false);
-    expect(
-      lines.some((l) => l.includes("│  line3") || l.includes("╰─ line3")),
-    ).toBe(false);
-    expect(output).toContain("┊  3 more lines");
-    expect(output).toContain("│  line4");
+    expect(output).toContain("│  line1");
+    expect(output).toContain("│  line2");
+    expect(output).not.toContain("│  line3");
+    expect(output).not.toContain("│  line6");
+    expect(output).toContain("│  line7");
     expect(output).toContain("│  line8");
-    expect(output).toContain("╰─ Command exited with code 2");
+    expect(output).toContain("⋮  4 hidden lines");
+    const lines = output.split("\n");
+    expect(lines.at(-2)).toContain("├─ Command exited with code 2");
+    expect(lines.at(-1)).toContain("╰─ took 123ms • truncated");
   });
 });
 

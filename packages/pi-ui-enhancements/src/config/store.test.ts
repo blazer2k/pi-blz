@@ -117,26 +117,21 @@ describe("config numeric values", () => {
     expect(getConfig().maxExpandedEntries).toBe(20);
   });
 
-  it("validates bashMaxCollapsedLines against allowed values", () => {
-    expect(getConfig().bashMaxCollapsedLines).toBe(5);
+  it("validates bashCollapsedDisplay against allowed values", () => {
+    expect(getConfig().bashCollapsedDisplay).toBe("preview");
 
-    for (const value of ["0", "1", "10"]) {
-      saveConfig("bashMaxCollapsedLines", value);
-      expect(getConfig().bashMaxCollapsedLines).toBe(Number(value));
-    }
-
-    expect(() => saveConfig("bashMaxCollapsedLines", "7")).toThrow(
+    saveConfig("bashCollapsedDisplay", "summary");
+    expect(getConfig().bashCollapsedDisplay).toBe("summary");
+    expect(() => saveConfig("bashCollapsedDisplay", "tail")).toThrow(
       "Invalid config update",
     );
 
     writeFileSync(
       process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH!,
-      JSON.stringify({ bashMaxCollapsedLines: 7 }),
+      JSON.stringify({ bashCollapsedDisplay: "tail" }),
     );
     loadConfig();
-    expect(getConfig().bashMaxCollapsedLines).toBe(5);
-
-    saveConfig("bashMaxCollapsedLines", "5");
+    expect(getConfig().bashCollapsedDisplay).toBe("preview");
   });
 });
 

@@ -11,6 +11,7 @@ export type BashRenderState = BaseRenderState & {
   endedAt?: number;
   durationTimer?: ReturnType<typeof setInterval>;
   durationMs?: number;
+  resultExpandable?: boolean;
 };
 
 export type BashDetailsWithTiming = BashToolDetails & {

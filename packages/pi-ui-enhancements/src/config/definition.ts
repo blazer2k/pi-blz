@@ -44,7 +44,7 @@ export interface Config {
   indicatorStyle: "dot" | "circle" | "diamond";
   maxCallWidth: number;
   maxExpandedEntries: number;
-  bashMaxCollapsedLines: number;
+  bashCollapsedDisplay: "preview" | "summary";
   showExpansionHint: boolean;
 
   // Editor
@@ -71,7 +71,7 @@ const DEFAULT_CONFIG: Config = {
   indicatorStyle: "circle",
   maxCallWidth: 80,
   maxExpandedEntries: 20,
-  bashMaxCollapsedLines: 5,
+  bashCollapsedDisplay: "preview",
   showExpansionHint: true,
   roundedEditorColor: "thinking",
   roundedEditorShowThinkingLevel: true,
@@ -116,11 +116,9 @@ const ConfigSchema = Type.Object(
       Type.Literal(50),
       Type.Literal(100),
     ]),
-    bashMaxCollapsedLines: Type.Union([
-      Type.Literal(0),
-      Type.Literal(1),
-      Type.Literal(5),
-      Type.Literal(10),
+    bashCollapsedDisplay: Type.Union([
+      Type.Literal("preview"),
+      Type.Literal("summary"),
     ]),
     showExpansionHint: Type.Boolean(),
     roundedEditorColor: Type.Union([
@@ -155,7 +153,6 @@ const BOOLEAN_CONFIG_KEYS: ReadonlySet<ConfigKey> = new Set([
 const INTEGER_CONFIG_KEYS: ReadonlySet<ConfigKey> = new Set([
   "maxCallWidth",
   "maxExpandedEntries",
-  "bashMaxCollapsedLines",
 ]);
 
 export function getDefaultConfig(): Config {

@@ -4,7 +4,7 @@ import {
   visibleWidth,
   type Text,
 } from "@earendil-works/pi-tui";
-import { getMaxCallWidth } from "../rendering/state";
+import { getBlinkIndicator, getMaxCallWidth } from "../rendering/state";
 import { sanitizeMultilineDisplayText } from "../rendering/text";
 import { getCallRenderParts } from "../rendering/tree";
 import type { BashRenderState, BashToolInput } from "./types";
@@ -23,7 +23,6 @@ export function renderBashCall(
   toolContext: BashCallContext,
 ): Text {
   const state = toolContext.state as BashRenderState;
-  const { text, prefix } = getCallRenderParts(state, theme, toolContext);
 
   if (toolContext.executionStarted && state.startedAt === undefined) {
     state.startedAt = Date.now();
@@ -40,15 +39,21 @@ export function renderBashCall(
     ? theme.fg("dim", ` ${timeoutText}`)
     : "";
   const staticWidth =
-    visibleWidth(prefix) +
+    visibleWidth(`${getBlinkIndicator().filled} `) +
     visibleWidth("Bash ") +
     visibleWidth("$ ") +
     visibleWidth(inlineTimeoutSuffix);
   const commandBudget = Math.max(1, getMaxCallWidth() - staticWidth);
   const commandTruncated = visibleWidth(collapsedCommand) > commandBudget;
   state.callExpandable = commandTruncated || command.includes("\n");
+  const expanded =
+    toolContext.expanded &&
+    (state.callExpandable || state.resultExpandable === true);
+  const { text, prefix } = getCallRenderParts(state, theme, toolContext, {
+    staticActive: expanded,
+  });
 
-  const visibleCommand = toolContext.expanded
+  const visibleCommand = expanded
     ? command
     : truncateToWidth(
         collapsedCommand,
@@ -65,7 +70,7 @@ export function renderBashCall(
   const expandedCommandBudget =
     commandBudget + visibleWidth(inlineTimeoutSuffix);
   const timeoutOnOwnLine =
-    toolContext.expanded &&
+    expanded &&
     timeoutText.length > 0 &&
     visibleWidth(finalCommandLine + ` ${timeoutText}`) > expandedCommandBudget;
 

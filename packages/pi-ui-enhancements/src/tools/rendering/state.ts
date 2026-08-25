@@ -28,11 +28,9 @@ export function getMaxExpandedEntries(): number {
 
 export const MAX_EXPANDED_ENTRIES = getMaxExpandedEntries;
 
-export function getMaxCollapsedLines(): number {
-  return getConfig().bashMaxCollapsedLines;
+export function getBashCollapsedDisplay(): "preview" | "summary" {
+  return getConfig().bashCollapsedDisplay;
 }
-
-export const MAX_COLLAPSED_LINES = getMaxCollapsedLines;
 
 const BLINK_INTERVAL_MS = 500;
 const activeBlinkTimers = new Set<NonNullable<BaseRenderState["blinkTimer"]>>();

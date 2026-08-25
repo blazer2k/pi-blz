@@ -8,20 +8,16 @@ import type { BashDetailsWithTiming, BashRenderState } from "./types";
 
 type MetadataOptions = {
   durationSummary?: string;
-  remainingLines?: number;
-  visibleLines?: number;
-  callExpandable?: boolean;
-  lineTruncated?: boolean;
+  totalLines?: number;
+  includeLineCount?: boolean;
   toolTruncated?: boolean;
-  expanded?: boolean;
 };
 
 export function buildBashMetadataParts(
   options: MetadataOptions,
   theme: Theme,
-): { parts: string[]; needsHint: boolean } {
+): string[] {
   const parts: string[] = [];
-  let needsHint = false;
 
   if (options.durationSummary) {
     parts.push(theme.fg("muted", options.durationSummary));
@@ -29,18 +25,14 @@ export function buildBashMetadataParts(
   parts.push(
     ...buildResultStatusParts({ truncated: options.toolTruncated }, theme),
   );
-  if ((options.remainingLines ?? 0) > 0) {
-    if (options.visibleLines === 0) {
-      const remainingLines = options.remainingLines ?? 0;
-      const suffix = remainingLines === 1 ? "line" : "lines";
-      parts.push(theme.fg("muted", `${remainingLines} ${suffix}`));
-    }
-    needsHint = true;
+  if (options.includeLineCount && (options.totalLines ?? 0) > 0) {
+    const totalLines = options.totalLines ?? 0;
+    parts.push(
+      theme.fg("muted", `${totalLines} ${totalLines === 1 ? "line" : "lines"}`),
+    );
   }
-  if (options.callExpandable && !options.expanded) needsHint = true;
-  if (options.lineTruncated) needsHint = true;
 
-  return { parts, needsHint };
+  return parts;
 }
 
 export function joinMetadata(parts: string[], theme: Theme): string {

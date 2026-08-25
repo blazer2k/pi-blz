@@ -13,7 +13,7 @@ const optsExpanded: ToolRenderResultOptions = {
 };
 
 describe("formatOmissionRow", () => {
-  it("dims the marker and italicizes only the muted hidden count", () => {
+  it("dims the row and italicizes only the hidden count", () => {
     const theme = {
       ...mkTheme(),
       fg: (color: string, text: string) => `<${color}>${text}</${color}>`,
@@ -22,7 +22,7 @@ describe("formatOmissionRow", () => {
 
     expect(
       formatOmissionRow(1, { singular: "line", plural: "lines" }, theme),
-    ).toBe("<dim>│  ⋮  </dim><italic><muted>1 hidden line</muted></italic>");
+    ).toBe("<dim>│  ⋮  <italic>1 hidden line</italic></dim>");
   });
 });
 

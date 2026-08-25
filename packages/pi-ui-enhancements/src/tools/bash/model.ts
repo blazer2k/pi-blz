@@ -13,18 +13,21 @@ import type {
   BashResult,
 } from "./types";
 
+const BASH_PREVIEW_ROWS = 5;
+const BASH_PREVIEW_EDGE_LINES = 2;
+
 export type BashOutputWindow = {
-  collapsedText: string;
-  visibleText: string;
+  fullText: string;
+  previewHeadText: string;
+  previewTailText: string;
   totalLines: number;
-  collapsedRemainingLines: number;
-  visibleLines: number;
-  remainingLines: number;
+  previewVisibleLines: number;
   hiddenLines: number;
 };
 
 type BaseBashResultView = {
   expanded: boolean;
+  collapsedDisplay: "preview" | "summary";
   durationSummary?: string;
   callExpandable: boolean;
   toolTruncated: boolean;
@@ -43,8 +46,11 @@ export type BashCommandErrorView = BaseBashResultView & {
 
 export type BashUnknownErrorView = BaseBashResultView & {
   kind: "unknown-error";
-  body: { text: string; truncated: boolean };
-  expandable: boolean;
+  body: {
+    collapsedText: string;
+    expandedText: string;
+    collapsedTruncated: boolean;
+  };
 };
 
 export type BashResultView =
@@ -53,38 +59,47 @@ export type BashResultView =
   | BashUnknownErrorView;
 
 export type BashResultPolicy = {
-  collapsedLineLimit: number;
+  collapsedDisplay: "preview" | "summary";
   errorEllipsis: string;
 };
 
 export function selectBashOutputWindow(
   text: string,
-  expanded: boolean,
-  collapsedLimit: number,
+  collapsedDisplay: "preview" | "summary",
 ): BashOutputWindow {
   const fullText = normalizeOutput(text).replace(/\n+$/g, "");
   const totalLines = countLines(fullText);
-  const collapsedVisibleLines =
-    collapsedLimit === 0 ? 0 : Math.min(totalLines, collapsedLimit);
-  const collapsedRemainingLines = Math.max(
-    0,
-    totalLines - collapsedVisibleLines,
-  );
-  const collapsedText =
-    collapsedLimit === 0
-      ? ""
-      : fullText.split("\n").slice(-collapsedLimit).join("\n");
-  const visibleLines = expanded ? totalLines : collapsedVisibleLines;
-  const remainingLines = expanded ? 0 : collapsedRemainingLines;
+  const lines = totalLines === 0 ? [] : fullText.split("\n");
+
+  if (collapsedDisplay === "summary" || totalLines === 0) {
+    return {
+      fullText,
+      previewHeadText: "",
+      previewTailText: "",
+      totalLines,
+      previewVisibleLines: 0,
+      hiddenLines: totalLines,
+    };
+  }
+
+  if (totalLines <= BASH_PREVIEW_ROWS) {
+    return {
+      fullText,
+      previewHeadText: fullText,
+      previewTailText: "",
+      totalLines,
+      previewVisibleLines: totalLines,
+      hiddenLines: 0,
+    };
+  }
 
   return {
-    collapsedText,
-    visibleText: expanded ? fullText : collapsedText,
+    fullText,
+    previewHeadText: lines.slice(0, BASH_PREVIEW_EDGE_LINES).join("\n"),
+    previewTailText: lines.slice(-BASH_PREVIEW_EDGE_LINES).join("\n"),
     totalLines,
-    collapsedRemainingLines,
-    visibleLines,
-    remainingLines,
-    hiddenLines: visibleLines === 0 ? 0 : remainingLines,
+    previewVisibleLines: BASH_PREVIEW_EDGE_LINES * 2,
+    hiddenLines: totalLines - BASH_PREVIEW_EDGE_LINES * 2,
   };
 }
 
@@ -100,11 +115,7 @@ function buildErrorView(
     return {
       ...base,
       kind: "command-error",
-      output: selectBashOutputWindow(
-        error.output,
-        options.expanded,
-        policy.collapsedLineLimit,
-      ),
+      output: selectBashOutputWindow(error.output, policy.collapsedDisplay),
       status: error.status,
     };
   }
@@ -114,18 +125,20 @@ function buildErrorView(
     { ...options, expanded: false },
     policy.errorEllipsis,
   );
-  const body = options.expanded
-    ? formatErrorBody(error.output, options, policy.errorEllipsis)
-    : collapsedBody;
+  const expandedBody = formatErrorBody(
+    error.output,
+    { ...options, expanded: true },
+    policy.errorEllipsis,
+  );
 
   return {
     ...base,
     kind: "unknown-error",
-    body,
-    expandable:
-      collapsedBody.truncated ||
-      state.callExpandable === true ||
-      state.truncated === true,
+    body: {
+      collapsedText: collapsedBody.text,
+      expandedText: expandedBody.text,
+      collapsedTruncated: collapsedBody.truncated,
+    },
   };
 }
 
@@ -139,6 +152,7 @@ export function buildBashResultView(
   const rawText = extractTextContent(result);
   const base: BaseBashResultView = {
     expanded: options.expanded,
+    collapsedDisplay: policy.collapsedDisplay,
     durationSummary: getDurationSummary(details, state, options),
     callExpandable: state.callExpandable === true,
     toolTruncated: state.truncated === true,
@@ -152,10 +166,6 @@ export function buildBashResultView(
   return {
     ...base,
     kind: "success",
-    output: selectBashOutputWindow(
-      output,
-      options.expanded,
-      policy.collapsedLineLimit,
-    ),
+    output: selectBashOutputWindow(output, policy.collapsedDisplay),
   };
 }

@@ -7,33 +7,39 @@ import {
 } from "./model";
 
 const policy: BashResultPolicy = {
-  collapsedLineLimit: 2,
+  collapsedDisplay: "preview",
   errorEllipsis: "...",
 };
 
 describe("selectBashOutputWindow", () => {
-  it("selects the collapsed tail and records hidden lines", () => {
-    const output = selectBashOutputWindow("one\ntwo\nthree", false, 2);
+  it("shows every line when preview output has five lines or fewer", () => {
+    const output = selectBashOutputWindow("one\ntwo\nthree", "preview");
 
-    expect(output).toEqual({
-      collapsedText: "two\nthree",
-      visibleText: "two\nthree",
-      totalLines: 3,
-      collapsedRemainingLines: 1,
-      visibleLines: 2,
-      remainingLines: 1,
-      hiddenLines: 1,
-    });
+    expect(output.previewHeadText).toBe("one\ntwo\nthree");
+    expect(output.previewTailText).toBe("");
+    expect(output.previewVisibleLines).toBe(3);
+    expect(output.hiddenLines).toBe(0);
   });
 
-  it("selects all output when expanded while retaining collapsed metadata", () => {
-    const output = selectBashOutputWindow("one\ntwo\nthree", true, 2);
+  it("uses two head and two tail lines beyond the preview limit", () => {
+    const output = selectBashOutputWindow(
+      "one\ntwo\nthree\nfour\nfive\nsix\nseven",
+      "preview",
+    );
 
-    expect(output.visibleText).toBe("one\ntwo\nthree");
-    expect(output.visibleLines).toBe(3);
-    expect(output.remainingLines).toBe(0);
-    expect(output.hiddenLines).toBe(0);
-    expect(output.collapsedRemainingLines).toBe(1);
+    expect(output.previewHeadText).toBe("one\ntwo");
+    expect(output.previewTailText).toBe("six\nseven");
+    expect(output.previewVisibleLines).toBe(4);
+    expect(output.hiddenLines).toBe(3);
+  });
+
+  it("hides all nonempty output in summary mode", () => {
+    const output = selectBashOutputWindow("one\ntwo\nthree", "summary");
+
+    expect(output.previewHeadText).toBe("");
+    expect(output.previewTailText).toBe("");
+    expect(output.previewVisibleLines).toBe(0);
+    expect(output.hiddenLines).toBe(3);
   });
 });
 
@@ -48,7 +54,7 @@ describe("buildBashResultView", () => {
 
     expect(view.kind).toBe("success");
     if (view.kind !== "success") throw new Error("expected success view");
-    expect(view.output.visibleText).toBe("two\nthree");
+    expect(view.output.fullText).toBe("one\ntwo\nthree");
   });
 
   it("separates recognized command failures from unknown errors", () => {

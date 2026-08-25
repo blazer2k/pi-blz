@@ -87,9 +87,9 @@ describe("built-in tool output", () => {
       ),
     ).toEqual([
       " ● Bash $ printf hello",
-      " ├─ took 50ms",
       " │  hello",
-      " ╰─ world",
+      " │  world",
+      " ╰─ took 50ms",
     ]);
   });
 

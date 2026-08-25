@@ -2,108 +2,96 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import { buildExpansionHint } from "../rendering/state";
 import { buildBashMetadataParts, joinMetadata } from "./metadata";
 import type { BashCommandErrorView, BashUnknownErrorView } from "./model";
+import type { BashRenderState } from "./types";
 import {
-  formatHiddenLinesLabel,
+  formatCollapsedBashOutput,
   formatOutputLines,
   getBashOutputWidth,
 } from "./output";
 
-function buildErrorMetadata(
-  view: BashCommandErrorView | BashUnknownErrorView,
-  theme: Theme,
-  output?: { remainingLines: number; visibleLines: number },
-): string {
-  const { parts } = buildBashMetadataParts(
-    {
-      durationSummary: view.durationSummary,
-      remainingLines: output?.remainingLines,
-      visibleLines: output?.visibleLines,
-      toolTruncated: view.toolTruncated,
-      expanded: view.expanded,
-    },
-    theme,
-  );
-  return joinMetadata(parts, theme);
-}
-
-function buildErrorHint(
+function buildHint(
   expandable: boolean,
   expanded: boolean,
-  metadata: string,
+  hasMetadata: boolean,
   theme: Theme,
 ): string {
   if (!expandable) return "";
   return buildExpansionHint(
     theme,
     expanded ? "collapse" : "expand",
-    metadata ? "suffix" : "standalone",
+    hasMetadata ? "suffix" : "standalone",
   );
-}
-
-function renderExpandedUnknownError(
-  view: BashUnknownErrorView,
-  metadata: string,
-  hint: string,
-  theme: Theme,
-): string {
-  const output = formatOutputLines(view.body.text, theme, "error", undefined, {
-    closeLastLine: true,
-  }).text;
-  const summary = metadata + hint;
-  return [
-    summary ? theme.fg("dim", output ? "├─ " : "╰─ ") + summary : undefined,
-    output,
-  ]
-    .filter((line): line is string => Boolean(line))
-    .join("\n");
 }
 
 export function renderUnknownError(
   view: BashUnknownErrorView,
   theme: Theme,
+  state: BashRenderState,
 ): string {
-  const metadata = buildErrorMetadata(view, theme);
-  const hint = buildErrorHint(view.expandable, view.expanded, metadata, theme);
-  if (view.expanded) {
-    return renderExpandedUnknownError(view, metadata, hint, theme);
-  }
+  const expandable =
+    view.callExpandable || view.body.collapsedTruncated || view.toolTruncated;
+  state.resultExpandable = expandable;
+  const expanded = view.expanded && expandable;
+  const metadataParts = buildBashMetadataParts(
+    {
+      durationSummary: view.durationSummary,
+      toolTruncated: view.toolTruncated,
+    },
+    theme,
+  );
+  const metadata = joinMetadata(metadataParts, theme);
+  const hint = buildHint(expandable, expanded, Boolean(metadata), theme);
+  const footer = metadata + hint;
+  const body = expanded ? view.body.expandedText : view.body.collapsedText;
+  const output = formatOutputLines(
+    body || "error",
+    theme,
+    "error",
+    expanded ? undefined : getBashOutputWidth(),
+    { closeLastLine: !footer },
+  ).text;
 
-  const body = view.body.text || "error";
-  const summary = [metadata, theme.fg("error", body)]
-    .filter(Boolean)
-    .join(theme.fg("muted", " • "));
-  return theme.fg("dim", "╰─ ") + summary + hint;
+  return [output, footer ? theme.fg("dim", "╰─ ") + footer : undefined]
+    .filter((line): line is string => Boolean(line))
+    .join("\n");
 }
 
 export function renderCommandError(
   view: BashCommandErrorView,
   theme: Theme,
+  state: BashRenderState,
 ): string {
-  const collapsedOutput = formatOutputLines(
-    view.output.collapsedText,
-    theme,
-    "toolOutput",
-    getBashOutputWidth(),
-  );
+  const collapsedOutput = formatCollapsedBashOutput(view.output, theme);
   const expandable =
-    view.output.collapsedRemainingLines > 0 ||
-    collapsedOutput.truncated ||
     view.callExpandable ||
+    view.output.hiddenLines > 0 ||
+    collapsedOutput.truncated ||
     view.toolTruncated;
-  const output = view.expanded
-    ? formatOutputLines(view.output.visibleText, theme, "toolOutput")
+  state.resultExpandable = expandable;
+  const expanded = view.expanded && expandable;
+  const output = expanded
+    ? formatOutputLines(view.output.fullText, theme, "toolOutput")
     : collapsedOutput;
-  const metadata = buildErrorMetadata(view, theme, view.output);
-  const hint = buildErrorHint(expandable, view.expanded, metadata, theme);
-  const summary = metadata + hint;
+  const metadataParts = buildBashMetadataParts(
+    {
+      durationSummary: view.durationSummary,
+      totalLines: view.output.totalLines,
+      includeLineCount:
+        !expanded &&
+        view.collapsedDisplay === "summary" &&
+        view.output.totalLines > 0,
+      toolTruncated: view.toolTruncated,
+    },
+    theme,
+  );
+  const metadata = joinMetadata(metadataParts, theme);
+  const hint = buildHint(expandable, expanded, Boolean(metadata), theme);
+  const footer = metadata + hint;
 
   return [
-    summary ? theme.fg("dim", "├─ ") + summary : undefined,
-    view.output.hiddenLines > 0
-      ? formatHiddenLinesLabel(view.output.hiddenLines, theme)
-      : undefined,
     output.text,
-    theme.fg("dim", "╰─ ") + theme.fg("error", view.status),
+    theme.fg("dim", footer ? "├─ " : "╰─ ") + theme.fg("error", view.status),
+    footer ? theme.fg("dim", "╰─ ") + footer : undefined,
   ]
     .filter((line): line is string => Boolean(line))
     .join("\n");

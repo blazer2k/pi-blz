@@ -96,15 +96,16 @@ export function formatSimpleErrorResult(
     const footer = status + collapseHint;
     const formatted = bodyText
       .split("\n")
-      .map(
-        (line, index, lines) =>
+      .map((line, index, lines) =>
+        theme.fg(
+          "error",
           formatTreeLine(line, {
             theme,
             prefix: !footer && index === lines.length - 1 ? "╰─ " : "│  ",
             width: getMaxCallWidth() - 1,
             mode: "preserve",
-            color: "error",
           }).text,
+        ),
       )
       .join("\n");
 

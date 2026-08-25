@@ -1,7 +1,8 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { getMaxCallWidth } from "../rendering/state";
 import { normalizeOutput } from "../rendering/text";
-import { formatTreeLine } from "../rendering/tree";
+import { formatOmissionRow, formatTreeLine } from "../rendering/tree";
+import type { BashOutputWindow } from "./model";
 
 // "● " (status symbol + space) + "├─ " (tree connector) + 1 buffer.
 const TREE_PREFIX_WIDTH = 6;
@@ -14,14 +15,6 @@ export function formatDuration(milliseconds: number): string {
   return milliseconds < 1000
     ? `${milliseconds}ms`
     : `${(milliseconds / 1000).toFixed(1)}s`;
-}
-
-export function formatHiddenLinesLabel(
-  hiddenLines: number,
-  theme: Theme,
-): string {
-  const label = `${hiddenLines} more ${hiddenLines === 1 ? "line" : "lines"}`;
-  return theme.fg("dim", "┊  ") + theme.italic(theme.fg("muted", label));
 }
 
 export function formatOutputLines(
@@ -50,4 +43,39 @@ export function formatOutputLines(
   });
 
   return { text: renderedLines.join("\n"), truncated };
+}
+
+export function formatCollapsedBashOutput(
+  output: BashOutputWindow,
+  theme: Theme,
+  color: "toolOutput" | "error" = "toolOutput",
+): { text: string; truncated: boolean } {
+  let truncated = false;
+  const rendered: string[] = [];
+
+  const appendSection = (section: string) => {
+    if (!section) return;
+    const formatted = formatOutputLines(
+      section,
+      theme,
+      color,
+      getBashOutputWidth(),
+    );
+    truncated ||= formatted.truncated;
+    rendered.push(formatted.text);
+  };
+
+  appendSection(output.previewHeadText);
+  if (output.hiddenLines > 0 && output.previewVisibleLines > 0) {
+    rendered.push(
+      formatOmissionRow(
+        output.hiddenLines,
+        { singular: "line", plural: "lines" },
+        theme,
+      ),
+    );
+  }
+  appendSection(output.previewTailText);
+
+  return { text: rendered.filter(Boolean).join("\n"), truncated };
 }

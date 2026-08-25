@@ -39,25 +39,26 @@ Run `/ui-settings` in pi to open the settings menu. The list is searchable: type
 
 ### Available Settings
 
-| Setting                | Description                                                                        |
-| ---------------------- | ---------------------------------------------------------------------------------- |
-| Enable ASCII header    | Show ASCII art header at session start                                             |
-| Header font            | Font for ASCII art header (19 figlet fonts + 2 bundled, default: Greek)            |
-| Header color           | Theme color of ASCII header (text, accent, dim)                                    |
-| Header alignment       | Horizontal alignment (left, center, right)                                         |
-| Show version           | Display pi version below ASCII header                                              |
-| Show interrupt hint    | Show "esc to interrupt" next to the working indicator                              |
-| Show run duration      | Show elapsed time while working, toast on completion                               |
-| Patched built-in tools | Which built-in tool renderers to replace (essential or all)                        |
-| Patch custom tools     | Apply compact rendering to third-party tools                                       |
-| Capitalize tool names  | Capitalize custom tool call labels (default: true, e.g. search → Search)           |
-| Max call width         | Maximum width for tool call and output lines                                       |
-| Max expanded entries   | Maximum lines when expanding tool output (-1 for unlimited), doesn't apply to bash |
-| Editor border color    | How the editor border is colored (thinking, dim, muted)                            |
-| Show thinking level    | Display thinking level in editor footer                                            |
-| Show cache tokens      | Display cache read/write token counts                                              |
-| Show cost              | Display total session cost in editor footer                                        |
-| Show git branch        | Display current git branch in editor header                                        |
+| Setting                | Description                                                                |
+| ---------------------- | -------------------------------------------------------------------------- |
+| Enable ASCII header    | Show ASCII art header at session start                                     |
+| Header font            | Font for ASCII art header (19 figlet fonts + 2 bundled, default: Greek)    |
+| Header color           | Theme color of ASCII header (text, accent, dim)                            |
+| Header alignment       | Horizontal alignment (left, center, right)                                 |
+| Show version           | Display pi version below ASCII header                                      |
+| Show interrupt hint    | Show "esc to interrupt" next to the working indicator                      |
+| Show run duration      | Show elapsed time while working, toast on completion                       |
+| Patched built-in tools | Which built-in tool renderers to replace (essential or all)                |
+| Patch custom tools     | Apply compact rendering to third-party tools                               |
+| Capitalize tool names  | Capitalize custom tool call labels (default: true, e.g. search → Search)   |
+| Max call width         | Maximum width for tool call and output lines                               |
+| Max expanded entries   | Maximum entries shown by capped list and custom results (-1 for unlimited) |
+| Collapsed Bash output  | Show a five-row output preview or summary only (default: preview)          |
+| Editor border color    | How the editor border is colored (thinking, dim, muted)                    |
+| Show thinking level    | Display thinking level in editor footer                                    |
+| Show cache tokens      | Display cache read/write token counts                                      |
+| Show cost              | Display total session cost in editor footer                                |
+| Show git branch        | Display current git branch in editor header                                |
 
 ### Built-in Tool Patches
 
@@ -67,6 +68,10 @@ The `patchedBuiltInTools` setting has two modes:
 - **all**: adds ls, find, grep
 
 Changes here require `/reload` since tool renderers are registered at load time. Everything else applies immediately.
+
+Expanded Write and Bash calls show their complete output. Expanded list tools show a head/tail split capped by `maxExpandedEntries`, with an omission marker between the two sections. Generic custom-tool output retains its existing capped rendering.
+
+`bashCollapsedDisplay` controls collapsed Bash results. `preview` shows all output up to five rows, or two head lines, an omission marker, and two tail lines for longer output. `summary` hides output and reports its line count in the footer.
 
 ### Editor and Footer Ownership
 
