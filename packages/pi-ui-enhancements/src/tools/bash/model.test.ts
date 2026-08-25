@@ -15,9 +15,8 @@ describe("selectBashOutputWindow", () => {
   it("shows every line when preview output has five lines or fewer", () => {
     const output = selectBashOutputWindow("one\ntwo\nthree", "preview");
 
-    expect(output.previewHeadText).toBe("one\ntwo\nthree");
-    expect(output.previewTailText).toBe("");
-    expect(output.previewVisibleLines).toBe(3);
+    expect(output.previewHeadLines).toEqual(["one", "two", "three"]);
+    expect(output.previewTailLines).toEqual([]);
     expect(output.hiddenLines).toBe(0);
   });
 
@@ -27,18 +26,27 @@ describe("selectBashOutputWindow", () => {
       "preview",
     );
 
-    expect(output.previewHeadText).toBe("one\ntwo");
-    expect(output.previewTailText).toBe("six\nseven");
-    expect(output.previewVisibleLines).toBe(4);
+    expect(output.previewHeadLines).toEqual(["one", "two"]);
+    expect(output.previewTailLines).toEqual(["six", "seven"]);
+    expect(output.hiddenLines).toBe(3);
+  });
+
+  it("preserves blank lines selected at preview boundaries", () => {
+    const output = selectBashOutputWindow(
+      "one\n\nthree\nfour\nfive\nsix\nseven",
+      "preview",
+    );
+
+    expect(output.previewHeadLines).toEqual(["one", ""]);
+    expect(output.previewTailLines).toEqual(["six", "seven"]);
     expect(output.hiddenLines).toBe(3);
   });
 
   it("hides all nonempty output in summary mode", () => {
     const output = selectBashOutputWindow("one\ntwo\nthree", "summary");
 
-    expect(output.previewHeadText).toBe("");
-    expect(output.previewTailText).toBe("");
-    expect(output.previewVisibleLines).toBe(0);
+    expect(output.previewHeadLines).toEqual([]);
+    expect(output.previewTailLines).toEqual([]);
     expect(output.hiddenLines).toBe(3);
   });
 });

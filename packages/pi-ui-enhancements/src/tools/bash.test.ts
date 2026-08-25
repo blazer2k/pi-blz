@@ -285,6 +285,28 @@ describe("bash renderResult", () => {
     expect(output.split("\n").at(-1)).toContain("╰─ took 50ms");
   });
 
+  it("renders selected blank preview lines as empty tree rows", () => {
+    const def = setupBashTool();
+    const lines = def.renderResult!(
+      {
+        content: [
+          { type: "text", text: "one\n\nthree\nfour\nfive\nsix\nseven" },
+        ],
+        details: { durationMs: 50 },
+      },
+      { expanded: false, isPartial: false },
+      mkTheme(),
+      mkToolCtx(),
+    )
+      .render(120)
+      .map((line) => line.trimEnd());
+    const firstLine = lines.findIndex((line) => line.includes("│  one"));
+
+    expect(firstLine).toBeGreaterThanOrEqual(0);
+    expect(lines[firstLine + 1]?.trim()).toBe("│");
+    expect(lines[firstLine + 2]).toContain("⋮  3 hidden lines");
+  });
+
   it("preview mode shows all five lines without enabling expansion", () => {
     const def = setupBashTool();
     const output = def.renderResult!(

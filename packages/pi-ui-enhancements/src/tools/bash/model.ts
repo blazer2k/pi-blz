@@ -18,10 +18,9 @@ const BASH_PREVIEW_EDGE_LINES = 2;
 
 export type BashOutputWindow = {
   fullText: string;
-  previewHeadText: string;
-  previewTailText: string;
+  previewHeadLines: string[];
+  previewTailLines: string[];
   totalLines: number;
-  previewVisibleLines: number;
   hiddenLines: number;
 };
 
@@ -74,10 +73,9 @@ export function selectBashOutputWindow(
   if (collapsedDisplay === "summary" || totalLines === 0) {
     return {
       fullText,
-      previewHeadText: "",
-      previewTailText: "",
+      previewHeadLines: [],
+      previewTailLines: [],
       totalLines,
-      previewVisibleLines: 0,
       hiddenLines: totalLines,
     };
   }
@@ -85,20 +83,18 @@ export function selectBashOutputWindow(
   if (totalLines <= BASH_PREVIEW_ROWS) {
     return {
       fullText,
-      previewHeadText: fullText,
-      previewTailText: "",
+      previewHeadLines: lines,
+      previewTailLines: [],
       totalLines,
-      previewVisibleLines: totalLines,
       hiddenLines: 0,
     };
   }
 
   return {
     fullText,
-    previewHeadText: lines.slice(0, BASH_PREVIEW_EDGE_LINES).join("\n"),
-    previewTailText: lines.slice(-BASH_PREVIEW_EDGE_LINES).join("\n"),
+    previewHeadLines: lines.slice(0, BASH_PREVIEW_EDGE_LINES),
+    previewTailLines: lines.slice(-BASH_PREVIEW_EDGE_LINES),
     totalLines,
-    previewVisibleLines: BASH_PREVIEW_EDGE_LINES * 2,
     hiddenLines: totalLines - BASH_PREVIEW_EDGE_LINES * 2,
   };
 }

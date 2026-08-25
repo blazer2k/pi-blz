@@ -17,6 +17,22 @@ export function formatDuration(milliseconds: number): string {
     : `${(milliseconds / 1000).toFixed(1)}s`;
 }
 
+function formatOutputLine(
+  line: string,
+  theme: Theme,
+  color: "toolOutput" | "error",
+  maxLineWidth?: number,
+  closeLine = false,
+): { text: string; truncated: boolean } {
+  return formatTreeLine(line, {
+    theme,
+    prefix: closeLine ? "╰─ " : "│  ",
+    width: (maxLineWidth ?? getBashOutputWidth()) + 3,
+    mode: maxLineWidth === undefined ? "preserve" : "truncate",
+    color,
+  });
+}
+
 export function formatOutputLines(
   text: string,
   theme: Theme,
@@ -30,14 +46,13 @@ export function formatOutputLines(
   let truncated = false;
   const lines = output.split("\n");
   const renderedLines = lines.map((line, index) => {
-    const closeLine = options.closeLastLine && index === lines.length - 1;
-    const rendered = formatTreeLine(line, {
+    const rendered = formatOutputLine(
+      line,
       theme,
-      prefix: closeLine ? "╰─ " : "│  ",
-      width: (maxLineWidth ?? getBashOutputWidth()) + 3,
-      mode: maxLineWidth === undefined ? "preserve" : "truncate",
       color,
-    });
+      maxLineWidth,
+      options.closeLastLine && index === lines.length - 1,
+    );
     truncated ||= rendered.truncated;
     return rendered.text;
   });
@@ -53,20 +68,24 @@ export function formatCollapsedBashOutput(
   let truncated = false;
   const rendered: string[] = [];
 
-  const appendSection = (section: string) => {
-    if (!section) return;
-    const formatted = formatOutputLines(
-      section,
-      theme,
-      color,
-      getBashOutputWidth(),
-    );
-    truncated ||= formatted.truncated;
-    rendered.push(formatted.text);
+  const appendLines = (lines: string[]) => {
+    for (const line of lines) {
+      const formatted = formatOutputLine(
+        line,
+        theme,
+        color,
+        getBashOutputWidth(),
+      );
+      truncated ||= formatted.truncated;
+      rendered.push(formatted.text);
+    }
   };
 
-  appendSection(output.previewHeadText);
-  if (output.hiddenLines > 0 && output.previewVisibleLines > 0) {
+  appendLines(output.previewHeadLines);
+  if (
+    output.hiddenLines > 0 &&
+    output.previewHeadLines.length + output.previewTailLines.length > 0
+  ) {
     rendered.push(
       formatOmissionRow(
         output.hiddenLines,
@@ -75,7 +94,7 @@ export function formatCollapsedBashOutput(
       ),
     );
   }
-  appendSection(output.previewTailText);
+  appendLines(output.previewTailLines);
 
   return { text: rendered.filter(Boolean).join("\n"), truncated };
 }
