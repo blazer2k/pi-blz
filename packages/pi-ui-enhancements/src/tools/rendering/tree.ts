@@ -25,10 +25,10 @@ export function formatOmissionRow(
   noun: { singular: string; plural: string },
   theme: Theme,
 ): string {
-  const label = `${hiddenCount} hidden ${
+  const label = `${hiddenCount} ${
     hiddenCount === 1 ? noun.singular : noun.plural
   }`;
-  return theme.fg("dim", `┊  ${theme.italic(`(${label})`)}`);
+  return theme.fg("dim", `┊  ${theme.italic(`+${label}`)}`);
 }
 
 export function formatTreeLine(

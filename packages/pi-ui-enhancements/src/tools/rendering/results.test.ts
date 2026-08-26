@@ -179,7 +179,7 @@ describe("formatListResult", () => {
     expect(output).not.toContain("file14.txt");
     expect(output).toContain("file15.txt");
     expect(output).toContain("file24.txt");
-    expect(output).toContain("┊  (5 hidden files)");
+    expect(output).toContain("┊  +5 files");
     expect(rendered.at(-1)).toContain("╰─ 25 files");
   });
 
