@@ -136,8 +136,8 @@ const SETTING_DEFINITIONS: SettingDefinition[] = [
   // Editor
   {
     id: "roundedEditorColor",
-    label: "Editor border color",
-    description: "How the editor border is colored",
+    label: "Editor frame color",
+    description: "Color of editor borders and embedded status text",
     values: ["thinking", "dim", "muted"],
   },
   {

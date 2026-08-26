@@ -73,7 +73,7 @@ const DEFAULT_CONFIG: Config = {
   maxExpandedEntries: 20,
   bashCollapsedDisplay: "preview",
   showExpansionHint: true,
-  roundedEditorColor: "thinking",
+  roundedEditorColor: "dim",
   roundedEditorShowThinkingLevel: true,
   roundedEditorShowCacheTokens: false,
   roundedEditorShowCost: false,

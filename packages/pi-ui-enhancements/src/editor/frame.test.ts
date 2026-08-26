@@ -86,6 +86,55 @@ describe("frameEditorLines", () => {
     expect(bottom).toContain("↑1.5k ↓500 R2.0k W3.0k $0.25 42%");
   });
 
+  it("uses the frame color for status text and semantic alert colors", () => {
+    const renderWithContext = (pct: string, pctValue: number) => {
+      const borderCalls: string[] = [];
+      const themeCalls: Array<[string, string]> = [];
+      const border = (text: string) => {
+        borderCalls.push(text);
+        return text;
+      };
+      const theme = {
+        fg: (color: string, text: string) => {
+          themeCalls.push([color, text]);
+          return text;
+        },
+      };
+
+      frameEditorLines(
+        ["─".repeat(78), "─".repeat(78)],
+        80,
+        {
+          ...frameData,
+          modelId: "model",
+          thinkingLevel: "high",
+          pct,
+          pctValue,
+          inputTokens: 1_500,
+          outputTokens: 500,
+        },
+        theme,
+        border,
+      );
+
+      return { borderCalls, themeCalls };
+    };
+
+    const normal = renderWithContext("42%", 42);
+    expect(normal.borderCalls).toEqual(
+      expect.arrayContaining(["model", "(high)", "↑1.5k", "↓500", "42%"]),
+    );
+    expect(normal.themeCalls).toEqual([]);
+
+    const warning = renderWithContext("75%", 75);
+    expect(warning.themeCalls).toEqual([["warning", "75%"]]);
+    expect(warning.borderCalls).not.toContain("75%");
+
+    const error = renderWithContext("95%", 95);
+    expect(error.themeCalls).toEqual([["error", "95%"]]);
+    expect(error.borderCalls).not.toContain("95%");
+  });
+
   it("never renders wider than widths from zero through 200", () => {
     for (let width = 0; width <= 200; width++) {
       const innerWidth = Math.max(1, width - 2);

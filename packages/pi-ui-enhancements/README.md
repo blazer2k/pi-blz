@@ -54,7 +54,7 @@ Run `/ui-settings` in pi to open the settings menu. The list is searchable: type
 | Max call width         | Maximum width for tool call and output lines                               |
 | Max expanded entries   | Maximum entries shown by capped list and custom results (-1 for unlimited) |
 | Collapsed Bash output  | Show a five-row output preview or summary only (default: preview)          |
-| Editor border color    | How the editor border is colored (thinking, dim, muted)                    |
+| Editor frame color     | Color of editor borders and embedded status text (thinking, dim, muted)    |
 | Show thinking level    | Display thinking level in editor footer                                    |
 | Show cache tokens      | Display cache read/write token counts                                      |
 | Show cost              | Display total session cost in editor footer                                |

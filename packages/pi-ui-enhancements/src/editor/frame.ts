@@ -45,36 +45,40 @@ function buildTopLine(width: number, cwd: string, border: BorderFn): string {
   return `${border("╭")}${border("─".repeat(topGap))}${topRight}${border("─╮")}`;
 }
 
-function getUsageParts(data: EditorFrameData, theme: FooterTheme): string[] {
+function getUsageParts(data: EditorFrameData, border: BorderFn): string[] {
   const parts: string[] = [];
 
   if (data.inputTokens > 0) {
-    parts.push(theme.fg("accent", `↑${formatTokens(data.inputTokens)}`));
+    parts.push(border(`↑${formatTokens(data.inputTokens)}`));
   }
   if (data.outputTokens > 0) {
-    parts.push(theme.fg("accent", `↓${formatTokens(data.outputTokens)}`));
+    parts.push(border(`↓${formatTokens(data.outputTokens)}`));
   }
   if (data.showCacheTokens && data.cacheReadTokens > 0) {
-    parts.push(theme.fg("accent", `R${formatTokens(data.cacheReadTokens)}`));
+    parts.push(border(`R${formatTokens(data.cacheReadTokens)}`));
   }
   if (data.showCacheTokens && data.cacheWriteTokens > 0) {
-    parts.push(theme.fg("accent", `W${formatTokens(data.cacheWriteTokens)}`));
+    parts.push(border(`W${formatTokens(data.cacheWriteTokens)}`));
   }
   if (data.showCost && data.totalCost > 0) {
-    parts.push(theme.fg("accent", `$${data.totalCost.toFixed(2)}`));
+    parts.push(border(`$${data.totalCost.toFixed(2)}`));
   }
 
   return parts;
 }
 
-function colorContextUsage(data: EditorFrameData, theme: FooterTheme): string {
+function colorContextUsage(
+  data: EditorFrameData,
+  theme: FooterTheme,
+  border: BorderFn,
+): string {
   if (data.pctValue !== null && data.pctValue > 90) {
     return theme.fg("error", data.pct);
   }
   if (data.pctValue !== null && data.pctValue > 70) {
     return theme.fg("warning", data.pct);
   }
-  return theme.fg("text", data.pct);
+  return border(data.pct);
 }
 
 function buildBottomLine(
@@ -83,14 +87,14 @@ function buildBottomLine(
   theme: FooterTheme,
   border: BorderFn,
 ): string {
-  const modelParts = [theme.fg("text", data.modelId)];
+  const modelParts = [border(data.modelId)];
   if (data.thinkingLevel) {
-    modelParts.push(theme.fg("text", `(${data.thinkingLevel})`));
+    modelParts.push(border(`(${data.thinkingLevel})`));
   }
 
   let bottomLeft = ` ${modelParts.join(" ")} `;
-  const usageParts = getUsageParts(data, theme);
-  usageParts.push(colorContextUsage(data, theme));
+  const usageParts = getUsageParts(data, border);
+  usageParts.push(colorContextUsage(data, theme, border));
   let bottomRight = ` ${usageParts.join(" ")} `;
 
   let leftWidth = visibleWidth(bottomLeft);
@@ -103,15 +107,11 @@ function buildBottomLine(
       Math.max(1, Math.floor(available / 2)),
     );
     const leftBudget = Math.max(1, available - rightBudget);
-    bottomLeft = truncateToWidth(
-      bottomLeft,
-      leftBudget,
-      theme.fg("text", "..."),
-    );
+    bottomLeft = truncateToWidth(bottomLeft, leftBudget, border("..."));
     bottomRight = truncateToWidth(
       bottomRight,
       Math.max(1, available - visibleWidth(bottomLeft)),
-      theme.fg("text", "..."),
+      border("..."),
     );
     leftWidth = visibleWidth(bottomLeft);
     rightWidth = visibleWidth(bottomRight);
