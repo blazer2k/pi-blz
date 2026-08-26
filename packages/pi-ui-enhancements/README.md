@@ -51,6 +51,8 @@ Run `/ui-settings` in pi to open the settings menu. The list is searchable: type
 | Patched built-in tools | Which built-in tool renderers to replace (essential or all)                |
 | Patch custom tools     | Apply compact rendering to third-party tools                               |
 | Capitalize tool names  | Capitalize custom tool call labels (default: true, e.g. search → Search)   |
+| Indicator style        | Symbol style of tool-call status indicators (dot, circle, diamond)         |
+| Indicator color        | Color of filled and completed indicators (success, text, toolTitle)        |
 | Max call width         | Maximum width for tool call and output lines                               |
 | Max expanded entries   | Maximum entries shown by capped list and custom results (-1 for unlimited) |
 | Collapsed Bash output  | Show a five-row output preview or summary only (default: preview)          |

@@ -79,7 +79,7 @@ describe("registerConfigCommand", () => {
 
     expect(events).toEqual(["open", "close"]);
     expect(rendered.join("\n")).toContain("Enable ASCII header");
-    expect(rendered.join("\n")).toContain("(1/20)");
+    expect(rendered.join("\n")).toContain("(1/21)");
   });
 
   it("invalidates tool renders when display settings change", async () => {
@@ -88,6 +88,7 @@ describe("registerConfigCommand", () => {
     setKeybindings(new KeybindingsManager(TUI_KEYBINDINGS));
     const cases: Array<{ key: ConfigKey; invalidates: boolean }> = [
       { key: "indicatorStyle", invalidates: true },
+      { key: "indicatorColor", invalidates: true },
       { key: "maxCallWidth", invalidates: true },
       { key: "maxExpandedEntries", invalidates: true },
       { key: "bashCollapsedDisplay", invalidates: true },

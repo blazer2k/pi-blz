@@ -11,7 +11,7 @@ import {
 } from "./state";
 import { formatTreeLine, getCallRenderParts } from "./tree";
 import type { BaseRenderState } from "./types";
-import { saveConfig } from "../../config/store";
+import { getConfig, saveConfig } from "../../config/store";
 import { mkTheme } from "../../testing/helpers";
 
 describe("updateResultState", () => {
@@ -182,11 +182,20 @@ describe("tool call blink rendering", () => {
     expect(state.blinkTimer).toBeUndefined();
   });
 
-  it("uses only success and dim for status indicators", () => {
-    expect(getStatusColor(false, true)).toBe("success");
-    expect(getStatusColor(false, false)).toBe("dim");
-    expect(getStatusColor(true, true)).toBe("success");
-    expect(getStatusColor(true, false)).toBe("success");
+  it("uses the configured color for filled and completed indicators", () => {
+    const originalColor = getConfig().indicatorColor;
+
+    try {
+      for (const color of ["success", "text", "toolTitle"] as const) {
+        saveConfig("indicatorColor", color);
+        expect(getStatusColor(false, true)).toBe(color);
+        expect(getStatusColor(false, false)).toBe("dim");
+        expect(getStatusColor(true, true)).toBe(color);
+        expect(getStatusColor(true, false)).toBe(color);
+      }
+    } finally {
+      saveConfig("indicatorColor", originalColor);
+    }
   });
 
   it("renders configured indicator style symbols", () => {

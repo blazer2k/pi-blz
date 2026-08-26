@@ -1,4 +1,5 @@
 import { keyText, type Theme } from "@earendil-works/pi-coding-agent";
+import type { Config } from "../../config/definition";
 import { getConfig } from "../../config/store";
 import type { BaseRenderState, BlinkIndicator } from "./types";
 
@@ -56,8 +57,8 @@ export function buildResultStatusParts(
 export function getStatusColor(
   isDone: boolean,
   blinkOn: boolean,
-): "success" | "dim" {
-  return !isDone && !blinkOn ? "dim" : "success";
+): Config["indicatorColor"] | "dim" {
+  return isDone || blinkOn ? getConfig().indicatorColor : "dim";
 }
 
 function millisecondsUntilNextBlink(now = Date.now()): number {

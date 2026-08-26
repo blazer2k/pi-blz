@@ -10,6 +10,7 @@ import { getConfig, saveConfig } from "./store";
 
 const TOOL_RENDER_SETTINGS = new Set<ConfigKey>([
   "indicatorStyle",
+  "indicatorColor",
   "maxCallWidth",
   "maxExpandedEntries",
   "bashCollapsedDisplay",

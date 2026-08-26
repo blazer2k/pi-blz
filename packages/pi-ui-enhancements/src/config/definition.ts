@@ -42,6 +42,7 @@ export interface Config {
   patchCustomTools: boolean;
   capitalizeToolNames: boolean;
   indicatorStyle: "dot" | "circle" | "diamond";
+  indicatorColor: "success" | "text" | "toolTitle";
   maxCallWidth: number;
   maxExpandedEntries: number;
   bashCollapsedDisplay: "preview" | "summary";
@@ -69,6 +70,7 @@ const DEFAULT_CONFIG: Config = {
   patchCustomTools: true,
   capitalizeToolNames: true,
   indicatorStyle: "circle",
+  indicatorColor: "success",
   maxCallWidth: 80,
   maxExpandedEntries: 20,
   bashCollapsedDisplay: "preview",
@@ -107,6 +109,11 @@ const ConfigSchema = Type.Object(
       Type.Literal("dot"),
       Type.Literal("circle"),
       Type.Literal("diamond"),
+    ]),
+    indicatorColor: Type.Union([
+      Type.Literal("success"),
+      Type.Literal("text"),
+      Type.Literal("toolTitle"),
     ]),
     maxCallWidth: Type.Number({ minimum: 40, maximum: 200 }),
     maxExpandedEntries: Type.Union([

@@ -108,6 +108,12 @@ const SETTING_DEFINITIONS: SettingDefinition[] = [
     values: ["dot", "circle", "diamond"],
   },
   {
+    id: "indicatorColor",
+    label: "Indicator color",
+    description: "Color of filled and completed tool-call indicators",
+    values: ["success", "text", "toolTitle"],
+  },
+  {
     id: "maxCallWidth",
     label: "Max call width",
     description: "Maximum width for tool call and output lines",
