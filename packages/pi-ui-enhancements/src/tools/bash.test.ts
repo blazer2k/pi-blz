@@ -1,9 +1,15 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
+import {
+  initTheme,
+  type ExtensionContext,
+  type Theme,
+} from "@earendil-works/pi-coding-agent";
 import { saveConfig } from "../config/store";
 import { patchBashTool } from "./bash";
 import { clearBlinkTimers, getBlinkIndicator } from "./rendering/state";
+import { stripAnsi } from "./rendering/text";
 import { mkTheme, mkToolCtx, setupTool } from "../testing/helpers";
+import type { BashRenderState } from "./bash/types";
 import { PI_0_84_3_OUTPUT } from "./test-fixtures/pi-0.84.3";
 
 function setupBashTool() {
@@ -26,7 +32,7 @@ describe("bash renderCall", () => {
       ctx,
     );
 
-    const text = component.render(120).join("\n");
+    const text = stripAnsi(component.render(120).join("\n"));
     expect(text).toContain("echo hello");
     expect(text).toContain("dim: (timeout 10s)");
     expect(text).not.toContain("echo   hello\npwd");
@@ -43,13 +49,79 @@ describe("bash renderCall", () => {
     const component = renderCall({ command, timeout: 10 }, theme, ctx);
     const lines = component
       .render(36)
-      .map((line) => line.trimEnd().slice(1))
+      .map((line) => stripAnsi(line).trimEnd().slice(1))
       .filter(Boolean);
 
     expect(lines.join("\n")).toContain("echo   hello");
     expect(lines.join("\n")).toContain("printf done");
     expect(lines.slice(1).every((line) => line.startsWith("│  "))).toBe(true);
     expect(lines.join("\n")).not.toContain("...");
+  });
+
+  it("syntax-highlights commands while preserving collapsed truncation", () => {
+    initTheme("dark");
+    const def = setupBashTool();
+    const state: BashRenderState = {};
+    const command = `echo "$HOME" && printf '%s' ${"x".repeat(100)}-tail`;
+    const component = def.renderCall!(
+      { command },
+      mkTheme(),
+      mkToolCtx({ executionStarted: false, isPartial: false, state }),
+    );
+    const output = component.render(120).join("\n");
+    const visibleOutput = stripAnsi(output);
+
+    expect(output).toContain("\x1b[");
+    expect(visibleOutput).toContain("...");
+    expect(visibleOutput).not.toContain("-tail");
+    expect(state.callExpandable).toBe(true);
+  });
+
+  it("reuses highlighted commands until the source changes", () => {
+    const def = setupBashTool();
+    const state: BashRenderState = {};
+    const theme = mkTheme();
+    const context = mkToolCtx({
+      executionStarted: false,
+      isPartial: false,
+      state,
+    });
+
+    def.renderCall!({ command: "echo one" }, theme, context);
+    const firstCache = state.callHighlightCache;
+    def.renderCall!({ command: "echo one" }, theme, context);
+    expect(state.callHighlightCache).toBe(firstCache);
+
+    def.renderCall!({ command: "echo two" }, theme, context);
+    expect(state.callHighlightCache).not.toBe(firstCache);
+  });
+
+  it("refreshes completed command colors after a theme change", () => {
+    const def = setupBashTool();
+    const state: BashRenderState = {};
+    const theme = mkTheme();
+    const context = mkToolCtx({
+      executionStarted: false,
+      isPartial: false,
+      state,
+    });
+
+    try {
+      initTheme("dark");
+      def.renderCall!({ command: `echo "$HOME"` }, theme, context);
+      const darkCache = state.callHighlightCache;
+
+      state.hasResult = true;
+      initTheme("light");
+      def.renderCall!({ command: `echo "$HOME"` }, theme, context);
+
+      expect(state.callHighlightCache).not.toBe(darkCache);
+      expect(state.callHighlightCache?.expandedCommand).not.toBe(
+        darkCache?.expandedCommand,
+      );
+    } finally {
+      initTheme("dark");
+    }
   });
 
   it("uses a static dim indicator for effectively expanded calls", () => {
@@ -79,7 +151,9 @@ describe("bash renderCall", () => {
       mkTheme(),
       mkToolCtx({ expanded: true }),
     );
-    const lines = component.render(120).map((line) => line.trimEnd());
+    const lines = component
+      .render(120)
+      .map((line) => stripAnsi(line).trimEnd());
 
     expect(lines.some((line) => line.includes("first command"))).toBe(true);
     expect(lines.some((line) => line.includes("│   second command"))).toBe(
@@ -253,7 +327,7 @@ describe("bash renderResult", () => {
     saveConfig("bashCollapsedDisplay", "preview");
   });
 
-  it("preview mode shows two head and two tail lines around an omission row", () => {
+  it("preview mode shows one head and one tail line around an omission row", () => {
     const def = setupBashTool();
     const output = def.renderResult!(
       {
@@ -276,12 +350,10 @@ describe("bash renderResult", () => {
       .join("\n");
 
     expect(output).toContain("│  L01");
-    expect(output).toContain("│  L02");
-    expect(output).not.toContain("L03");
-    expect(output).not.toContain("L08");
-    expect(output).toContain("│  L09");
+    expect(output).not.toContain("L02");
+    expect(output).not.toContain("L09");
     expect(output).toContain("│  L10");
-    expect(output).toContain("┊  +6 lines");
+    expect(output).toContain("┊  +8 lines");
     expect(output.split("\n").at(-1)).toContain("╰─ took 50ms");
   });
 
@@ -289,9 +361,7 @@ describe("bash renderResult", () => {
     const def = setupBashTool();
     const lines = def.renderResult!(
       {
-        content: [
-          { type: "text", text: "one\n\nthree\nfour\nfive\nsix\nseven" },
-        ],
+        content: [{ type: "text", text: "\none\ntwo\nthree\nfour" }],
         details: { durationMs: 50 },
       },
       { expanded: false, isPartial: false },
@@ -300,18 +370,16 @@ describe("bash renderResult", () => {
     )
       .render(120)
       .map((line) => line.trimEnd());
-    const firstLine = lines.findIndex((line) => line.includes("│  one"));
-
-    expect(firstLine).toBeGreaterThanOrEqual(0);
-    expect(lines[firstLine + 1]?.trim()).toBe("│");
-    expect(lines[firstLine + 2]).toContain("┊  +3 lines");
+    expect(lines[0]?.trim()).toBe("│");
+    expect(lines[1]).toContain("┊  +3 lines");
+    expect(lines[2]).toContain("│  four");
   });
 
-  it("preview mode shows all five lines without enabling expansion", () => {
+  it("preview mode shows all three lines without enabling expansion", () => {
     const def = setupBashTool();
     const output = def.renderResult!(
       {
-        content: [{ type: "text", text: "one\ntwo\nthree\nfour\nfive" }],
+        content: [{ type: "text", text: "one\ntwo\nthree" }],
         details: { durationMs: 50 },
       },
       { expanded: false, isPartial: false },
@@ -321,7 +389,7 @@ describe("bash renderResult", () => {
       .render(120)
       .join("\n");
 
-    for (const line of ["one", "two", "three", "four", "five"]) {
+    for (const line of ["one", "two", "three"]) {
       expect(output).toContain(`│  ${line}`);
     }
     expect(output).not.toContain("ctrl+o");
@@ -701,7 +769,7 @@ describe("bash renderResult", () => {
     expect(output).not.toContain("ctrl+o");
   });
 
-  it("collapsed errors render a summary plus the last 5 prefixed lines", () => {
+  it("collapsed errors use the three-row output preview", () => {
     const def = setupBashTool();
     const renderResult = def.renderResult!;
     const theme = mkTheme();
@@ -731,12 +799,10 @@ describe("bash renderResult", () => {
     expect(output).toContain("took 123ms • truncated");
     expect(output).not.toContain("error •");
     expect(output).toContain("│  line1");
-    expect(output).toContain("│  line2");
-    expect(output).not.toContain("│  line3");
-    expect(output).not.toContain("│  line6");
-    expect(output).toContain("│  line7");
+    expect(output).not.toContain("│  line2");
+    expect(output).not.toContain("│  line7");
     expect(output).toContain("│  line8");
-    expect(output).toContain("┊  +4 lines");
+    expect(output).toContain("┊  +6 lines");
     const lines = output.split("\n");
     expect(lines.at(-2)).toContain("├─ Command exited with code 2");
     expect(lines.at(-1)).toContain("╰─ took 123ms • truncated");

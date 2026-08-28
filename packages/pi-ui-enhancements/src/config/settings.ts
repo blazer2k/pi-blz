@@ -129,7 +129,7 @@ const SETTING_DEFINITIONS: SettingDefinition[] = [
   {
     id: "bashCollapsedDisplay",
     label: "Collapsed Bash output",
-    description: "Show a five-row preview or summary-only Bash result",
+    description: "Show a three-row preview or summary-only Bash result",
     values: ["preview", "summary"],
   },
   {

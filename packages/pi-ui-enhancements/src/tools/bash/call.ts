@@ -1,4 +1,4 @@
-import type { Theme } from "@earendil-works/pi-coding-agent";
+import { highlightCode, type Theme } from "@earendil-works/pi-coding-agent";
 import {
   truncateToWidth,
   visibleWidth,
@@ -17,6 +17,23 @@ type BashCallContext = {
   invalidate: () => void;
 };
 
+function getHighlightedCommands(
+  state: BashRenderState,
+  source: string,
+  collapsedSource: string,
+): NonNullable<BashRenderState["callHighlightCache"]> {
+  if (state.hasResult !== true && state.callHighlightCache?.source === source) {
+    return state.callHighlightCache;
+  }
+
+  state.callHighlightCache = {
+    source,
+    expandedCommand: highlightCode(source, "bash").join("\n"),
+    collapsedCommand: highlightCode(collapsedSource, "bash").join("\n"),
+  };
+  return state.callHighlightCache;
+}
+
 export function renderBashCall(
   args: BashToolInput,
   theme: Theme,
@@ -33,7 +50,9 @@ export function renderBashCall(
     typeof args.command === "string"
       ? sanitizeMultilineDisplayText(args.command)
       : "...";
-  const collapsedCommand = command.replace(/\s+/g, " ").trim();
+  const collapsedSource = command.replace(/\s+/g, " ").trim();
+  const { expandedCommand, collapsedCommand: highlightedCollapsedCommand } =
+    getHighlightedCommands(state, command, collapsedSource);
   const timeoutText = args.timeout ? `(timeout ${args.timeout}s)` : "";
   const inlineTimeoutSuffix = timeoutText
     ? theme.fg("dim", ` ${timeoutText}`)
@@ -44,7 +63,7 @@ export function renderBashCall(
     visibleWidth("$ ") +
     visibleWidth(inlineTimeoutSuffix);
   const commandBudget = Math.max(1, getMaxCallWidth() - staticWidth);
-  const commandTruncated = visibleWidth(collapsedCommand) > commandBudget;
+  const commandTruncated = visibleWidth(collapsedSource) > commandBudget;
   state.callExpandable = commandTruncated || command.includes("\n");
   const expanded =
     toolContext.expanded &&
@@ -54,18 +73,13 @@ export function renderBashCall(
   });
 
   const visibleCommand = expanded
-    ? command
+    ? expandedCommand
     : truncateToWidth(
-        collapsedCommand,
+        highlightedCollapsedCommand,
         commandBudget,
-        theme.fg("accent", "..."),
+        theme.fg("dim", "..."),
       );
-  const commandDisplay =
-    theme.fg("dim", "$ ") +
-    visibleCommand
-      .split("\n")
-      .map((line) => theme.bold(theme.fg("accent", line)))
-      .join("\n");
+  const commandDisplay = theme.fg("dim", "$ ") + visibleCommand;
   const finalCommandLine = visibleCommand.split("\n").at(-1) ?? "";
   const expandedCommandBudget =
     commandBudget + visibleWidth(inlineTimeoutSuffix);

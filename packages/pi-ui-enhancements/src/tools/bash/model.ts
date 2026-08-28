@@ -13,8 +13,8 @@ import type {
   BashResult,
 } from "./types";
 
-const BASH_PREVIEW_ROWS = 5;
-const BASH_PREVIEW_EDGE_LINES = 2;
+const BASH_PREVIEW_ROWS = 3;
+const BASH_PREVIEW_EDGE_LINES = 1;
 
 export type BashOutputWindow = {
   fullText: string;

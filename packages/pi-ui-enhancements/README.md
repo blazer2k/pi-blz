@@ -55,7 +55,7 @@ Run `/ui-settings` in pi to open the settings menu. The list is searchable: type
 | Indicator color        | Color of filled and completed indicators (success, text, toolTitle)        |
 | Max call width         | Maximum width for tool call and output lines                               |
 | Max expanded entries   | Maximum entries shown by capped list and custom results (-1 for unlimited) |
-| Collapsed Bash output  | Show a five-row output preview or summary only (default: preview)          |
+| Collapsed Bash output  | Show a three-row output preview or summary only (default: preview)         |
 | Editor frame color     | Color of editor borders and embedded status text (thinking, dim, muted)    |
 | Show thinking level    | Display thinking level in editor footer                                    |
 | Show cache tokens      | Display cache read/write token counts                                      |
@@ -73,7 +73,7 @@ Changes here require `/reload` since tool renderers are registered at load time.
 
 Expanded Write and Bash calls show their complete output. Expanded list tools show a head/tail split capped by `maxExpandedEntries`, with an omission marker between the two sections. Generic custom-tool output retains its existing capped rendering.
 
-`bashCollapsedDisplay` controls collapsed Bash results. `preview` shows all output up to five rows, or two head lines, an omission marker, and two tail lines for longer output. `summary` hides output and reports its line count in the footer.
+`bashCollapsedDisplay` controls collapsed Bash results. `preview` shows all output up to three rows, or the first line, an omission marker, and the last line for longer output. `summary` hides output and reports its line count in the footer.
 
 ### Editor and Footer Ownership
 

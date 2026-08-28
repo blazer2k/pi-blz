@@ -7,6 +7,11 @@ import type { BaseRenderState } from "../rendering/types";
 export type BashToolInput = NativeBashToolInput;
 
 export type BashRenderState = BaseRenderState & {
+  callHighlightCache?: {
+    source: string;
+    expandedCommand: string;
+    collapsedCommand: string;
+  };
   startedAt?: number;
   endedAt?: number;
   durationTimer?: ReturnType<typeof setInterval>;

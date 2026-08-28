@@ -12,7 +12,7 @@ const policy: BashResultPolicy = {
 };
 
 describe("selectBashOutputWindow", () => {
-  it("shows every line when preview output has five lines or fewer", () => {
+  it("shows every line when preview output has three lines or fewer", () => {
     const output = selectBashOutputWindow("one\ntwo\nthree", "preview");
 
     expect(output.previewHeadLines).toEqual(["one", "two", "three"]);
@@ -20,25 +20,22 @@ describe("selectBashOutputWindow", () => {
     expect(output.hiddenLines).toBe(0);
   });
 
-  it("uses two head and two tail lines beyond the preview limit", () => {
+  it("uses one head and one tail line beyond the preview limit", () => {
     const output = selectBashOutputWindow(
       "one\ntwo\nthree\nfour\nfive\nsix\nseven",
       "preview",
     );
 
-    expect(output.previewHeadLines).toEqual(["one", "two"]);
-    expect(output.previewTailLines).toEqual(["six", "seven"]);
-    expect(output.hiddenLines).toBe(3);
+    expect(output.previewHeadLines).toEqual(["one"]);
+    expect(output.previewTailLines).toEqual(["seven"]);
+    expect(output.hiddenLines).toBe(5);
   });
 
   it("preserves blank lines selected at preview boundaries", () => {
-    const output = selectBashOutputWindow(
-      "one\n\nthree\nfour\nfive\nsix\nseven",
-      "preview",
-    );
+    const output = selectBashOutputWindow("\none\ntwo\nthree\nfour", "preview");
 
-    expect(output.previewHeadLines).toEqual(["one", ""]);
-    expect(output.previewTailLines).toEqual(["six", "seven"]);
+    expect(output.previewHeadLines).toEqual([""]);
+    expect(output.previewTailLines).toEqual(["four"]);
     expect(output.hiddenLines).toBe(3);
   });
 
