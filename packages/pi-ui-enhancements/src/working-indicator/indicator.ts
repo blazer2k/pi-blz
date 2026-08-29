@@ -24,6 +24,8 @@ type WorkingIndicatorSession = {
   noteMessageEnd(message: WorkingIndicatorAssistantMessage | undefined): void;
   noteCompaction(): void;
   noteInput(): void;
+  pauseForPrompt(): void;
+  resumeAfterPrompt(): void;
   settle(): void;
   dispose(): void;
 };
@@ -52,6 +54,12 @@ function getRuntime(pi: ExtensionAPI): WorkingIndicatorRuntime {
   });
   pi.on("input", async () => {
     runtime.current?.noteInput();
+  });
+  pi.on("ui_prompt_start", async () => {
+    runtime.current?.pauseForPrompt();
+  });
+  pi.on("ui_prompt_end", async () => {
+    runtime.current?.resumeAfterPrompt();
   });
   pi.on("agent_settled", async () => {
     runtime.current?.settle();
@@ -169,6 +177,7 @@ export function registerWorkingIndicator(
   }
 
   let compactionPending = false;
+  let promptStartedAt = 0;
   let lastStopReason: string | undefined;
 
   const session: WorkingIndicatorSession = {
@@ -191,7 +200,23 @@ export function registerWorkingIndicator(
     noteInput() {
       // New user input starts a new task: drop task-bound state.
       compactionPending = false;
+      promptStartedAt = 0;
       lastStopReason = undefined;
+    },
+    pauseForPrompt() {
+      if (runStartTime === 0 || promptStartedAt > 0) return;
+      promptStartedAt = Date.now();
+      stopIndicator();
+    },
+    resumeAfterPrompt() {
+      if (promptStartedAt === 0) return;
+
+      const promptDuration = Math.max(0, Date.now() - promptStartedAt);
+      promptStartedAt = 0;
+      if (runStartTime === 0) return;
+
+      runStartTime += promptDuration;
+      startAnimation();
     },
     settle() {
       // agent_settled fires only when no retry, compaction, or queued
@@ -209,6 +234,7 @@ export function registerWorkingIndicator(
       }
       lastStopReason = undefined;
       compactionPending = false;
+      promptStartedAt = 0;
     },
     dispose() {
       if (runtime.current === session) {
