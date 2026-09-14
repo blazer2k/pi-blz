@@ -21,8 +21,13 @@ function parseNativeBorder(line: string | undefined): NativeBorder | undefined {
   const plain = line.replace(SGR_SEQUENCE, "");
 
   if (/^─+$/.test(plain)) return { scrollDirection: null };
-  if (/^─── ↑/.test(plain)) return { scrollDirection: "up" };
-  if (/^─── ↓/.test(plain)) return { scrollDirection: "down" };
+
+  const scrollMatch =
+    plain.match(/^─+ ([↑↓]) \d+ more ─*$/u) ?? plain.match(/^─── ([↑↓])/u);
+  if (scrollMatch) {
+    return { scrollDirection: scrollMatch[1] === "↑" ? "up" : "down" };
+  }
+
   return undefined;
 }
 
