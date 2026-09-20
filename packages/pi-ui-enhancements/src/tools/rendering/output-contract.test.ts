@@ -1,3 +1,5 @@
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import {
   ExtensionRunner,
@@ -28,12 +30,16 @@ type ToolResult = {
 let restorePiKeybindings: (() => void) | undefined;
 
 beforeAll(async () => {
-  // keyText() resolves Pi's own TUI instance, which is nested in the installed
-  // Pi package in this workspace.
-  const piTui =
-    await import("../../../../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-tui/dist/index.js");
-  const piKeybindings =
-    await import("../../../../../node_modules/@earendil-works/pi-coding-agent/dist/core/keybindings.js");
+  // Resolve from Pi's entry point so this uses Pi's own TUI instance whether
+  // npm installs it nested or deduplicates it at the workspace root.
+  const piEntry = import.meta.resolve("@earendil-works/pi-coding-agent");
+  const piTui = await import(
+    import.meta.resolve("@earendil-works/pi-tui", piEntry)
+  );
+  const piRoot = dirname(dirname(fileURLToPath(piEntry)));
+  const piKeybindings = await import(
+    pathToFileURL(join(piRoot, "dist/core/keybindings.js")).href
+  );
   const previous = piTui.getKeybindings();
   piTui.setKeybindings(new piKeybindings.KeybindingsManager());
   restorePiKeybindings = () => piTui.setKeybindings(previous);

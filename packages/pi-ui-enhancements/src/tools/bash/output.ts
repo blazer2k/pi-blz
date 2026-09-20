@@ -12,9 +12,17 @@ export function getBashOutputWidth(): number {
 }
 
 export function formatDuration(milliseconds: number): string {
-  return milliseconds < 1000
-    ? `${milliseconds}ms`
-    : `${(milliseconds / 1000).toFixed(1)}s`;
+  if (milliseconds < 1000) return `${milliseconds}ms`;
+
+  const seconds = milliseconds / 1000;
+  if (seconds < 60) return `${seconds.toFixed(1)}s`;
+
+  const totalSeconds = Math.floor(seconds);
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainingSeconds = totalSeconds % 60;
+  if (minutes < 60) return `${minutes}m ${remainingSeconds}s`;
+
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m ${remainingSeconds}s`;
 }
 
 function formatOutputLine(

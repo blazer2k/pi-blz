@@ -214,6 +214,27 @@ describe("bash renderResult", () => {
     expect(output).toContain("took 1.2s");
   });
 
+  it("formats minute and hour durations", () => {
+    const def = setupBashTool();
+
+    for (const [durationMs, expected] of [
+      [62_000, "took 1m 2s"],
+      [3_784_000, "took 1h 3m 4s"],
+    ] as const) {
+      const component = def.renderResult!(
+        {
+          content: [{ type: "text", text: "hello" }],
+          details: { durationMs },
+        },
+        { expanded: false, isPartial: false },
+        mkTheme(),
+        mkToolCtx(),
+      );
+
+      expect(component.render(120).join("\n")).toContain(expected);
+    }
+  });
+
   it("retains duration when execution throws", async () => {
     const def = setupBashTool();
     const execute = def.execute!;

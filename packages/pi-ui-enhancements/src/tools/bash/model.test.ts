@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { PI_0_84_3_OUTPUT } from "../test-fixtures/pi-0.84.3";
+import { PI_0_86_0_OUTPUT } from "../test-fixtures/pi-0.86.0";
 import {
   buildBashResultView,
   selectBashOutputWindow,
@@ -60,6 +61,29 @@ describe("buildBashResultView", () => {
     expect(view.kind).toBe("success");
     if (view.kind !== "success") throw new Error("expected success view");
     expect(view.output.fullText).toBe("one\ntwo\nthree");
+  });
+
+  it("recognizes Pi 0.86.0 commands terminated without an exit code", () => {
+    const view = buildBashResultView(
+      {
+        content: [
+          {
+            type: "text",
+            text: `(no output)\n\n${PI_0_86_0_OUTPUT.bash.terminatedWithoutExitCode}`,
+          },
+        ],
+      },
+      { isError: true },
+      { expanded: false, isPartial: false },
+      policy,
+    );
+
+    expect(view.kind).toBe("command-error");
+    if (view.kind !== "command-error") {
+      throw new Error("expected command-error view");
+    }
+    expect(view.status).toBe(PI_0_86_0_OUTPUT.bash.terminatedWithoutExitCode);
+    expect(view.output.fullText).toBe("");
   });
 
   it("separates recognized command failures from unknown errors", () => {

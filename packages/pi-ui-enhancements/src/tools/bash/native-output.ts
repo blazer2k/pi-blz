@@ -2,14 +2,14 @@ import { normalizeOutput } from "../rendering/text";
 import type { BashDetailsWithTiming } from "./types";
 
 const BASH_STATUS_PATTERN =
-  /^(?:Command exited with code \d+|Command timed out after .+ seconds|Command aborted)$/;
+  /^(?:Command exited with code \d+|Command terminated without an exit code|Command timed out after .+ seconds|Command aborted)$/;
 
 export function parseBashErrorText(text: string): {
   output: string;
   status?: string;
 } {
   const normalized = normalizeOutput(text).replace(
-    /^\(no output\)\n\n(?=Command (?:exited|timed out|aborted))/,
+    /^\(no output\)\n\n(?=Command (?:exited|terminated|timed out|aborted))/,
     "",
   );
   const lines = normalized.split("\n");
