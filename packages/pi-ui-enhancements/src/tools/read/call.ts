@@ -104,9 +104,9 @@ function getCompactReadClassification(
 }
 
 function formatReadLineRange(args: ReadToolInput, theme: Theme): string {
-  if (args.offset === undefined && args.limit === undefined) return "";
+  if (args.offset == null && args.limit == null) return "";
   const startLine = args.offset ?? 1;
-  const endLine = args.limit !== undefined ? startLine + args.limit - 1 : "";
+  const endLine = args.limit != null ? startLine + args.limit - 1 : "";
   return theme.fg("dim", `:${startLine}${endLine ? `-${endLine}` : ""}`);
 }
 

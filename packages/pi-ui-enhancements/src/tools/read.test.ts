@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import type { Theme } from "@earendil-works/pi-coding-agent";
+import { stripAnsi } from "./rendering/text";
 import { patchReadTool } from "./read";
 import { mkTheme, mkToolCtx, setupTool } from "../testing/helpers";
 import { PI_0_84_3_OUTPUT } from "./test-fixtures/pi-0.84.3";
@@ -40,6 +41,33 @@ describe("read renderCall", () => {
     const text = component.render(120).join("\n");
     expect(text).toContain("dim::10-14");
   });
+
+  for (const { name, args, range } of [
+    {
+      name: "null offset and limit",
+      args: { offset: null, limit: null },
+      range: "",
+    },
+    { name: "null offset", args: { offset: null, limit: 5 }, range: ":1-5" },
+    { name: "null limit", args: { offset: 10, limit: null }, range: ":10" },
+  ]) {
+    it(`treats ${name} as absent`, () => {
+      const def = setupReadTool();
+      const path = "src/index.ts";
+
+      for (const expanded of [false, true]) {
+        const text = stripAnsi(
+          def.renderCall!({ path, ...args }, mkTheme(), mkToolCtx({ expanded }))
+            .render(120)
+            .join("\n"),
+        );
+
+        expect(text).toContain(`${path}${range}`);
+        if (!range) expect(text).not.toContain(`${path}:`);
+        if (range === ":10") expect(text).not.toContain(`${path}:10-`);
+      }
+    });
+  }
 
   it("expands a truncated path and adds call-driven result hints", () => {
     const def = setupReadTool();
