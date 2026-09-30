@@ -1,4 +1,5 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { colorToRgb } from "@earendil-works/pi-tui";
 
 export const RESET_FG = "\x1b[39m";
 
@@ -6,17 +7,6 @@ export interface Color {
   r: number;
   g: number;
   b: number;
-}
-
-// Extract [r, g, b] from a truecolor ANSI sequence like \x1b[38;2;r;g;bm
-export function parseRgb(ansi: string): Color | undefined {
-  const m = ansi.match(/^\x1b\[38;2;(\d+);(\d+);(\d+)m$/);
-  if (!m || !m[1] || !m[2] || !m[3]) return undefined;
-  return {
-    r: Math.min(255, +m[1]),
-    g: Math.min(255, +m[2]),
-    b: Math.min(255, +m[3]),
-  };
 }
 
 // Blend two RGB colors by alpha (0 = low, 1 = high)
@@ -41,8 +31,9 @@ export function resolveTheme(ctx: ExtensionContext): {
   let baseRgb: Color | undefined, highlightRgb: Color | undefined;
 
   if (theme.getColorMode() === "truecolor") {
-    baseRgb = parseRgb(theme.getFgAnsi("muted"));
-    highlightRgb = parseRgb(theme.getFgAnsi("accent"));
+    const colors = theme.colors;
+    baseRgb = colorToRgb(colors.muted);
+    highlightRgb = colorToRgb(colors.accent);
   }
 
   return {
