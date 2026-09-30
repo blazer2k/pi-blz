@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import {
   initTheme,
-  type ExtensionContext,
+  type ExtensionToolContext,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
 import { saveConfig } from "../config/store";
@@ -254,7 +254,7 @@ describe("bash renderResult", () => {
             getSessionId: () => "bash-test-session",
             getSessionFile: () => undefined,
           },
-        } as unknown as ExtensionContext,
+        } as unknown as ExtensionToolContext,
       );
     } catch (error) {
       errorText = error instanceof Error ? error.message : String(error);
@@ -274,6 +274,42 @@ describe("bash renderResult", () => {
     );
 
     expect(component.render(120).join("\n")).toContain("took ");
+  });
+
+  it("preserves nonzero exit results and their duration", async () => {
+    const def = setupBashTool();
+    const result = await def.execute!(
+      "nonzero-call",
+      { command: "echo before failure; exit 4" },
+      undefined,
+      undefined,
+      {
+        cwd: process.cwd(),
+        sessionManager: {
+          getSessionId: () => "bash-test-session",
+          getSessionFile: () => undefined,
+        },
+      } as unknown as ExtensionToolContext,
+    );
+
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      output: "before failure\n",
+      exit_code: 4,
+    });
+    expect(result.details).toMatchObject({ durationMs: expect.any(Number) });
+
+    const component = def.renderResult!(
+      result,
+      { expanded: false, isPartial: false },
+      mkTheme(),
+      mkToolCtx({ toolCallId: "nonzero-call", isError: result.isError }),
+    );
+    const text = stripAnsi(component.render(120).join("\n"));
+
+    expect(text).toContain("before failure");
+    expect(text).toContain("exited with code 4");
+    expect(text).toContain("took ");
   });
 
   it("puts duration before truncation metadata", () => {
