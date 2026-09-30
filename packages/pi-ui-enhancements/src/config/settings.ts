@@ -83,12 +83,6 @@ const SETTING_DEFINITIONS: SettingDefinition[] = [
 
   // Tool rendering
   {
-    id: "patchedBuiltInTools",
-    label: "Patched built-in tools",
-    description: "Which built-in tool renderers to replace (reload required)",
-    values: ["essential", "all"],
-  },
-  {
     id: "patchCustomTools",
     label: "Patch custom tools",
     description: "Apply compact rendering to third-party tools",

@@ -48,7 +48,6 @@ Run `/ui-settings` in pi to open the settings menu. The list is searchable: type
 | Show version           | Display pi version below ASCII header                                      |
 | Show interrupt hint    | Show "esc to interrupt" next to the working indicator                      |
 | Show run duration      | Show elapsed time while working, toast on completion                       |
-| Patched built-in tools | Which built-in tool renderers to replace (essential or all)                |
 | Patch custom tools     | Apply compact rendering to third-party tools                               |
 | Capitalize tool names  | Capitalize custom tool call labels (default: true, e.g. search → Search)   |
 | Indicator style        | Symbol style of tool-call status indicators (dot, circle, diamond)         |
@@ -64,12 +63,9 @@ Run `/ui-settings` in pi to open the settings menu. The list is searchable: type
 
 ### Built-in Tool Patches
 
-The `patchedBuiltInTools` setting has two modes:
+The extension replaces the renderers for read, write, edit, bash, ls, find, and grep without enabling those tools. Pi's `defaultTools` setting and CLI options control which tools are active. A fresh Pi configuration uses our renderers for read, bash, edit, and write; ls, find, and grep use our renderers when enabled.
 
-- **essential** (default): read, write, edit, bash
-- **all**: adds ls, find, grep
-
-Changes here require `/reload` since tool renderers are registered at load time. Everything else applies immediately.
+UI settings apply immediately.
 
 Expanded Write and Bash calls show their complete output. Expanded list tools show a head/tail split capped by `maxExpandedEntries`, with an omission marker between the two sections. Generic custom-tool output retains its existing capped rendering.
 

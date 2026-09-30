@@ -38,7 +38,6 @@ export interface Config {
   workingIndicatorShowDuration: boolean;
 
   // Tool rendering
-  patchedBuiltInTools: "essential" | "all";
   patchCustomTools: boolean;
   capitalizeToolNames: boolean;
   indicatorStyle: "dot" | "circle" | "diamond";
@@ -66,7 +65,6 @@ const DEFAULT_CONFIG: Config = {
   asciiHeaderShowVersion: true,
   workingIndicatorShowInterruptMsg: true,
   workingIndicatorShowDuration: true,
-  patchedBuiltInTools: "essential",
   patchCustomTools: true,
   capitalizeToolNames: true,
   indicatorStyle: "circle",
@@ -99,10 +97,6 @@ const ConfigSchema = Type.Object(
     asciiHeaderShowVersion: Type.Boolean(),
     workingIndicatorShowInterruptMsg: Type.Boolean(),
     workingIndicatorShowDuration: Type.Boolean(),
-    patchedBuiltInTools: Type.Union([
-      Type.Literal("essential"),
-      Type.Literal("all"),
-    ]),
     patchCustomTools: Type.Boolean(),
     capitalizeToolNames: Type.Boolean(),
     indicatorStyle: Type.Union([

@@ -16,7 +16,7 @@ import {
 const fakeComponent = { render: () => [] } as unknown as Component;
 
 describe("registerPatchedTool", () => {
-  it("keeps native tool properties and only replaces rendering", () => {
+  it("keeps native tool properties without auto-activating the replacement", () => {
     const registrations: ToolDefinition<any, any, any>[] = [];
     const pi = {
       registerTool: (tool: ToolDefinition<any, any, any>) => {
@@ -44,6 +44,7 @@ describe("registerPatchedTool", () => {
     expect(registered.constrainedSampling).toEqual(native.constrainedSampling);
     expect(registered.prepareArguments).toBe(native.prepareArguments);
     expect(registered.executionMode).toBe(native.executionMode);
+    expect(registered.defaultActive).toBe(false);
     expect(registered.renderShell).toBe("self");
     expect(registered.renderCall).not.toBe(native.renderCall);
     expect(registered.renderResult).not.toBe(native.renderResult);

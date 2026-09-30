@@ -43,21 +43,36 @@ afterEach(() => {
   loadConfig();
 });
 
-describe("tool patch config", () => {
-  it("defaults to essential built-in tools", () => {
-    expect(getConfig().patchedBuiltInTools).toBe("essential");
-  });
+describe("config compatibility", () => {
+  it("ignores removed and additional fields without resetting valid settings", () => {
+    const errors: unknown[] = [];
+    let normalized = "";
 
-  it("saves all built-in tool patch mode", () => {
-    saveConfig("patchedBuiltInTools", "all");
-
-    expect(getConfig().patchedBuiltInTools).toBe("all");
-  });
-
-  it("rejects invalid built-in tool patch mode", () => {
-    expect(() => saveConfig("patchedBuiltInTools", "invalid")).toThrow(
-      "Invalid config update",
+    loadConfig(
+      (error) => errors.push(error),
+      createStorage({
+        read: () =>
+          JSON.stringify({
+            patchedBuiltInTools: "all",
+            futureSetting: true,
+            maxCallWidth: 120,
+            indicatorColor: "text",
+          }),
+        write(_path, contents) {
+          normalized = contents;
+        },
+      }),
     );
+
+    expect(errors).toEqual([]);
+    expect(getConfig()).toEqual({
+      ...getDefaultConfig(),
+      maxCallWidth: 120,
+      indicatorColor: "text",
+    });
+    expect(JSON.parse(normalized)).toEqual(getConfig());
+    expect(getConfig()).not.toHaveProperty("patchedBuiltInTools");
+    expect(getConfig()).not.toHaveProperty("futureSetting");
   });
 });
 

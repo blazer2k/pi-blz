@@ -28,7 +28,7 @@ export function createCwdDeferredTool(
 /**
  * Re-register a native tool with custom rendering. All native properties
  * (description, parameters, prompt metadata, constrained sampling, ...) are
- * kept as-is; only the renderers, and optionally execute, are replaced.
+ * kept as-is; activation stays with Pi, and execute may be replaced.
  */
 export function registerPatchedTool(config: {
   pi: ExtensionAPI;
@@ -39,6 +39,7 @@ export function registerPatchedTool(config: {
 }): Handle {
   config.pi.registerTool({
     ...config.tool,
+    defaultActive: false,
     renderShell: "self",
     execute: config.execute ?? config.tool.execute,
     renderCall: config.renderCall,

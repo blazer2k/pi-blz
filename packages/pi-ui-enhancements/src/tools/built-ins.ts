@@ -1,5 +1,4 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { getConfig } from "../config/store";
 import type { Handle } from "../shared/handle";
 import { patchBashTool } from "./bash";
 import { patchLsTool } from "./ls";
@@ -9,20 +8,16 @@ import { patchReadTool } from "./read";
 import { patchWriteTool } from "./write";
 import { patchEditTool } from "./edit";
 
-const ESSENTIAL_PATCHES = [
+const BUILT_IN_PATCHES = [
   patchReadTool,
   patchWriteTool,
   patchEditTool,
   patchBashTool,
+  patchLsTool,
+  patchFindTool,
+  patchGrepTool,
 ] as const;
 
-const EXTRA_PATCHES = [patchLsTool, patchFindTool, patchGrepTool] as const;
-
 export function patchTools(pi: ExtensionAPI): Handle[] {
-  const patches =
-    getConfig().patchedBuiltInTools === "all"
-      ? [...ESSENTIAL_PATCHES, ...EXTRA_PATCHES]
-      : ESSENTIAL_PATCHES;
-
-  return patches.map((patchFn) => patchFn(pi));
+  return BUILT_IN_PATCHES.map((patchFn) => patchFn(pi));
 }

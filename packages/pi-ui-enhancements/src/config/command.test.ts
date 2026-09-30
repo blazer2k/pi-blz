@@ -79,7 +79,8 @@ describe("registerConfigCommand", () => {
 
     expect(events).toEqual(["open", "close"]);
     expect(rendered.join("\n")).toContain("Enable ASCII header");
-    expect(rendered.join("\n")).toContain("(1/21)");
+    expect(rendered.join("\n")).toContain("(1/20)");
+    expect(rendered.join("\n")).not.toContain("Patched built-in tools");
   });
 
   it("invalidates tool renders when display settings change", async () => {
