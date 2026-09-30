@@ -235,22 +235,32 @@ describe("bash renderResult", () => {
     }
   });
 
-  it("retains duration when execution throws", async () => {
+  it("retains duration when execution is aborted", async () => {
     const def = setupBashTool();
     const execute = def.execute!;
+    const controller = new AbortController();
+    controller.abort();
     let errorText = "";
 
     try {
       await execute(
         "failed-call",
-        { command: "exit 4" },
+        { command: "echo hello" },
+        controller.signal,
         undefined,
-        undefined,
-        { cwd: process.cwd() } as ExtensionContext,
+        {
+          cwd: process.cwd(),
+          sessionManager: {
+            getSessionId: () => "bash-test-session",
+            getSessionFile: () => undefined,
+          },
+        } as unknown as ExtensionContext,
       );
     } catch (error) {
       errorText = error instanceof Error ? error.message : String(error);
     }
+
+    expect(errorText).toContain("Command aborted");
 
     const component = def.renderResult!(
       { content: [{ type: "text", text: errorText }], details: undefined },
