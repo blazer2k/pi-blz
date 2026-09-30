@@ -4,11 +4,13 @@ import { join } from "node:path";
 import { describe, expect, it, beforeEach, afterEach } from "bun:test";
 import { ExtensionRunner } from "@earendil-works/pi-coding-agent";
 import type { Theme, ToolDefinition } from "@earendil-works/pi-coding-agent";
-import { Text } from "@earendil-works/pi-tui";
+import { Text, visibleWidth } from "@earendil-works/pi-tui";
 import { getConfig, loadConfig, saveConfig } from "../../config/store";
 import { cleanRunnerProto, mkTheme, mkToolCtx } from "../../testing/helpers";
 import { clearBlinkTimers } from "../rendering/state";
 import { patchCustomToolRendering } from "./patch-manager";
+import { createWrappedDefinition } from "./definition-adapter";
+import { stripAnsi } from "../rendering/text";
 
 const originalConfigPath = process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH;
 let configDir: string;
@@ -111,6 +113,77 @@ describe("wrapped custom tool definitions", () => {
 
     expect(rendered).toContain("\x1b[35msearch\x1b[39m");
     handle.dispose();
+  });
+
+  it("keeps collapsed calls compact and preserves expanded multiline calls", () => {
+    const tool = mkRegisteredTool("codemode").definition;
+    const expansionFlags: boolean[] = [];
+    tool.renderCall = (_args, _theme, context) => {
+      expansionFlags.push(context.expanded);
+      return new Text(
+        `codemode\n\x1b[32mconst message = "${"x".repeat(160)}";\x1b[39m\n\n  return message;`,
+        0,
+        0,
+      );
+    };
+    const wrapped = createWrappedDefinition(tool, {
+      isToolCallActive: () => false,
+      reportIssue: () => {},
+    });
+    const collapsed = wrapped.renderCall!({}, mkTheme(), mkToolCtx())
+      .render(120)
+      .map(stripAnsi);
+    expect(collapsed).toHaveLength(1);
+    expect(collapsed[0]).toContain("...");
+    expect(collapsed[0]).not.toContain("return message;");
+
+    const expanded = wrapped.renderCall!(
+      {},
+      mkTheme(),
+      mkToolCtx({ expanded: true }),
+    );
+    for (const width of [40, 80, 120]) {
+      const rows = expanded.render(width);
+      const plain = rows.map(stripAnsi);
+      expect(rows.every((row) => visibleWidth(row) <= width)).toBe(true);
+      expect(plain[0]).toContain("codemode");
+      expect(
+        plain.slice(1).every((row) => row.trimStart().startsWith("│")),
+      ).toBe(true);
+      expect(plain.map((row) => row.trim())).toContain("│");
+      expect(plain.join("\n")).toContain("│    return message;");
+      expect(plain.join("\n").match(/x/g)).toHaveLength(160);
+      expect(plain.join("\n")).not.toContain("...");
+      expect(rows.join("\n")).toContain("\x1b[32m");
+    }
+    expect(expansionFlags).toEqual([false, true]);
+  });
+
+  it("preserves extra call content supplied by the native expanded renderer", () => {
+    const tool = mkRegisteredTool("mcp").definition;
+    tool.renderCall = (_args, _theme, context) =>
+      new Text(context.expanded ? "mcp\n  full argument" : "mcp preview", 0, 0);
+    const wrapped = createWrappedDefinition(tool, {
+      isToolCallActive: () => false,
+      reportIssue: () => {},
+    });
+
+    const collapsed = wrapped.renderCall!({}, mkTheme(), mkToolCtx())
+      .render(80)
+      .map(stripAnsi)
+      .join("\n");
+    const expanded = wrapped.renderCall!(
+      {},
+      mkTheme(),
+      mkToolCtx({ expanded: true }),
+    )
+      .render(80)
+      .map(stripAnsi)
+      .join("\n");
+    expect(collapsed).toContain("mcp preview");
+    expect(collapsed).not.toContain("full argument");
+    expect(expanded).toContain("│    full argument");
+    expect(expanded).not.toContain("mcp preview");
   });
 
   it("trims padded original renderResult lines before adding tree prefixes", () => {

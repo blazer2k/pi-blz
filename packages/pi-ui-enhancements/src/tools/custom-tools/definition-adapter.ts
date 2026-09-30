@@ -54,11 +54,14 @@ type DefinitionAdapterOptions = {
   reportIssue: CustomToolRenderingReporter;
 };
 
-function renderComponentLines(component: Component): string[] {
-  return component
+function renderComponentLines(
+  component: Component,
+  preserveBlankLines = false,
+): string[] {
+  const lines = component
     .render(getMaxCallWidth())
-    .map((line) => line.trimEnd())
-    .filter((line) => line.length > 0);
+    .map((line) => line.trimEnd());
+  return preserveBlankLines ? lines : lines.filter((line) => line.length > 0);
 }
 
 function formatEmptyResult(
@@ -102,19 +105,22 @@ function createCallRenderer(
         });
         state.callComponent = component;
 
-        let innerText = sanitizeRenderedText(
-          renderComponentLines(component).join(" "),
-        );
+        const lines = renderComponentLines(component, toolContext.expanded);
+        let innerText = toolContext.expanded
+          ? lines.map(sanitizeRenderedText).join("\n")
+          : sanitizeRenderedText(lines.join(" "));
         if (config.capitalizeToolNames) {
           innerText = capitalizeFirstVisibleChar(innerText);
         }
         innerText = applyArgumentHyperlinks(innerText, args, toolContext.cwd);
         text.setText(
-          safeTruncateToWidth(
-            prefix + innerText,
-            maxWidth,
-            theme.fg("accent", "..."),
-          ),
+          toolContext.expanded
+            ? prefix + innerText
+            : safeTruncateToWidth(
+                prefix + innerText,
+                maxWidth,
+                theme.fg("accent", "..."),
+              ),
         );
         return text;
       } catch (error) {
