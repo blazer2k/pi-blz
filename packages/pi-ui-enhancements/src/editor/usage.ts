@@ -37,7 +37,9 @@ export function getTotalUsage(ctx: ExtensionContext): SessionUsage {
   // Match Pi's native accounting across the whole session, not only the
   // currently active branch.
   for (const entry of ctx.sessionManager.getEntries()) {
-    if (entry.type === "message") {
+    if (entry.type === "usage") {
+      add(entry.usage);
+    } else if (entry.type === "message") {
       if (entry.message.role === "assistant") add(entry.message.usage);
       else if (entry.message.role === "toolResult") add(entry.message.usage);
     } else if (

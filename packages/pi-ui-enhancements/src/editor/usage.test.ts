@@ -23,6 +23,7 @@ describe("getTotalUsage", () => {
       },
       { type: "compaction", usage: usage(3, 4, 0.125, 5) },
       { type: "branch_summary", usage: usage(6, 7, 0.0625, 0, 8) },
+      { type: "usage", kind: "cache_warm", usage: usage(4, 0, 0.03125, 8, 16) },
       // Entry outside the active branch (e.g. compacted or sibling history)
       {
         type: "message",
@@ -37,11 +38,38 @@ describe("getTotalUsage", () => {
     } as unknown as ExtensionContext;
 
     expect(getTotalUsage(ctx)).toEqual({
-      inputTokens: 10 + 1 + 3 + 6 + 1000,
+      inputTokens: 10 + 1 + 3 + 6 + 4 + 1000,
       outputTokens: 5 + 2 + 4 + 7 + 1000,
-      cacheReadTokens: 2 + 5,
-      cacheWriteTokens: 1 + 8,
-      totalCost: 0.25 + 0.5 + 0.125 + 0.0625 + 99,
+      cacheReadTokens: 2 + 5 + 8,
+      cacheWriteTokens: 1 + 8 + 16,
+      totalCost: 0.25 + 0.5 + 0.125 + 0.0625 + 0.03125 + 99,
+    });
+  });
+
+  it("counts standalone usage regardless of its category", () => {
+    const ctx = {
+      sessionManager: {
+        getEntries: () => [
+          {
+            type: "usage",
+            kind: "cache_warm",
+            usage: usage(4, 0, 0.03125, 8, 16),
+          },
+          {
+            type: "usage",
+            kind: "background_task",
+            usage: usage(2, 3, 0.015625, 1),
+          },
+        ],
+      },
+    } as unknown as ExtensionContext;
+
+    expect(getTotalUsage(ctx)).toEqual({
+      inputTokens: 6,
+      outputTokens: 3,
+      cacheReadTokens: 9,
+      cacheWriteTokens: 16,
+      totalCost: 0.046875,
     });
   });
 
