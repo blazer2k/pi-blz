@@ -186,6 +186,95 @@ describe("wrapped custom tool definitions", () => {
     expect(expanded).not.toContain("mcp preview");
   });
 
+  it("sizes custom previews to the viewport rather than maxCallWidth", () => {
+    saveConfig("maxCallWidth", "40");
+    const widths: number[] = [];
+    let invalidations = 0;
+    const tool = mkRegisteredTool("preview").definition;
+    tool.renderResult = () => ({
+      render(width) {
+        widths.push(width);
+        const rows = new Text(
+          `\x1b[32m${"x".repeat(2000)}\x1b[39m`,
+          0,
+          0,
+        ).render(width);
+        return [...rows.slice(0, 5), `hidden: ${rows.length - 5}`];
+      },
+      invalidate() {
+        invalidations++;
+      },
+    });
+    const wrapped = createWrappedDefinition(tool, {
+      isToolCallActive: () => false,
+      reportIssue: () => {},
+    });
+    const component = wrapped.renderResult!(
+      { content: [], details: undefined },
+      { expanded: false, isPartial: false },
+      mkTheme(),
+      mkToolCtx(),
+    );
+
+    for (const width of [40, 80, 120, 40]) {
+      const rows = component.render(width);
+      const plain = rows.map(stripAnsi);
+      expect(rows.every((row) => visibleWidth(row) <= width)).toBe(true);
+      expect(plain.filter((row) => /^[│╰─ ]*x+\s*$/.test(row))).toHaveLength(5);
+      expect(plain.join("\n")).toContain(
+        `hidden: ${Math.ceil(2000 / (width - 5)) - 5}`,
+      );
+      expect(rows.join("\n")).toContain("\x1b[32m");
+    }
+    expect(widths).toEqual([35, 75, 115, 35]);
+    component.invalidate();
+    component.render(40);
+    expect(invalidations).toBe(1);
+    expect(widths).toEqual([35, 75, 115, 35, 35]);
+  });
+
+  it("keeps custom calls on one row at narrow viewport widths", () => {
+    const tool = mkRegisteredTool("search").definition;
+    tool.renderCall = () => new Text(`search ${"x".repeat(200)}`, 0, 0);
+    const wrapped = createWrappedDefinition(tool, {
+      isToolCallActive: () => false,
+      reportIssue: () => {},
+    });
+    const component = wrapped.renderCall!({}, mkTheme(), mkToolCtx());
+
+    for (const width of [40, 80, 120, 40]) {
+      const rows = component.render(width);
+      expect(rows).toHaveLength(1);
+      expect(visibleWidth(rows[0]!)).toBeLessThanOrEqual(width);
+      expect(stripAnsi(rows[0]!)).toContain("search");
+      expect(stripAnsi(rows[0]!)).toContain("...");
+    }
+  });
+
+  it("falls back when a custom call component throws during layout", () => {
+    const tool = mkRegisteredTool("broken").definition;
+    tool.renderCall = () => ({
+      render() {
+        throw new Error("layout failed");
+      },
+      invalidate() {},
+    });
+    const issues: unknown[] = [];
+    const wrapped = createWrappedDefinition(tool, {
+      isToolCallActive: () => false,
+      reportIssue: (issue) => issues.push(issue),
+    });
+    const rows = wrapped.renderCall!({ value: 1 }, mkTheme(), mkToolCtx())
+      .render(80)
+      .map(stripAnsi);
+
+    expect(rows.join("\n")).toContain("broken");
+    expect(rows.join("\n")).toContain("value=1");
+    expect(issues).toEqual([
+      expect.objectContaining({ stage: "renderCall", toolName: "broken" }),
+    ]);
+  });
+
   it("trims padded original renderResult lines before adding tree prefixes", () => {
     const tool = mkRegisteredTool("myTool");
     tool.definition.renderResult = (_result, _options, theme) =>
@@ -241,6 +330,32 @@ describe("wrapped custom tool definitions", () => {
       expect.objectContaining({ stage: "renderResult", toolName: "myTool" }),
     ]);
     handle.dispose();
+  });
+
+  it("falls back when a custom result component throws during layout", () => {
+    const tool = mkRegisteredTool("broken").definition;
+    tool.renderResult = () => ({
+      render() {
+        throw new Error("layout failed");
+      },
+      invalidate() {},
+    });
+    const issues: unknown[] = [];
+    const wrapped = createWrappedDefinition(tool, {
+      isToolCallActive: () => false,
+      reportIssue: (issue) => issues.push(issue),
+    });
+    const rows = wrapped.renderResult!(
+      { content: [{ type: "text", text: "one\ntwo" }], details: undefined },
+      { expanded: false, isPartial: false },
+      mkTheme(),
+      mkToolCtx(),
+    ).render(80);
+
+    expect(rows.join("\n")).toContain("2 lines");
+    expect(issues).toEqual([
+      expect.objectContaining({ stage: "renderResult", toolName: "broken" }),
+    ]);
   });
 
   it("uses empty-result formatting for blank custom output", () => {

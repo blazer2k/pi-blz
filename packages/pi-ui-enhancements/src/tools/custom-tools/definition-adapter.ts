@@ -56,11 +56,10 @@ type DefinitionAdapterOptions = {
 
 function renderComponentLines(
   component: Component,
+  width: number,
   preserveBlankLines = false,
 ): string[] {
-  const lines = component
-    .render(getMaxCallWidth())
-    .map((line) => line.trimEnd());
+  const lines = component.render(width).map((line) => line.trimEnd());
   return preserveBlankLines ? lines : lines.filter((line) => line.length > 0);
 }
 
@@ -96,6 +95,30 @@ function createCallRenderer(
     });
     const config = getConfig();
     const maxWidth = getMaxCallWidth();
+    const renderFallback = (width: number): string => {
+      const label =
+        config.capitalizeToolNames && definition.label
+          ? capitalizeFirstVisibleChar(definition.label)
+          : definition.label;
+      const header = buildGenericCallHeader(
+        args as Record<string, unknown>,
+        label,
+        theme,
+      );
+      return safeTruncateToWidth(
+        prefix + header,
+        Math.min(maxWidth, width),
+        theme.fg("accent", "..."),
+      );
+    };
+    const reportError = (error: unknown): void => {
+      state.callComponent = undefined;
+      options.reportIssue({
+        stage: "renderCall",
+        toolName: definition.name,
+        error,
+      });
+    };
 
     if (originalRenderCall) {
       try {
@@ -105,46 +128,44 @@ function createCallRenderer(
         });
         state.callComponent = component;
 
-        const lines = renderComponentLines(component, toolContext.expanded);
-        let innerText = toolContext.expanded
-          ? lines.map(sanitizeRenderedText).join("\n")
-          : sanitizeRenderedText(lines.join(" "));
-        if (config.capitalizeToolNames) {
-          innerText = capitalizeFirstVisibleChar(innerText);
-        }
-        innerText = applyArgumentHyperlinks(innerText, args, toolContext.cwd);
-        text.setText(
-          toolContext.expanded
-            ? prefix + innerText
-            : safeTruncateToWidth(
-                prefix + innerText,
-                maxWidth,
-                theme.fg("accent", "..."),
-              ),
-        );
+        text.setText((width) => {
+          const nativeWidth = Math.max(1, width - 3);
+          try {
+            const lines = renderComponentLines(
+              component,
+              nativeWidth,
+              toolContext.expanded,
+            );
+            let innerText = toolContext.expanded
+              ? lines.map(sanitizeRenderedText).join("\n")
+              : sanitizeRenderedText(lines.join(" "));
+            if (config.capitalizeToolNames) {
+              innerText = capitalizeFirstVisibleChar(innerText);
+            }
+            innerText = applyArgumentHyperlinks(
+              innerText,
+              args,
+              toolContext.cwd,
+            );
+            return toolContext.expanded
+              ? prefix + innerText
+              : safeTruncateToWidth(
+                  prefix + innerText,
+                  Math.min(maxWidth, nativeWidth),
+                  theme.fg("accent", "..."),
+                );
+          } catch (error) {
+            reportError(error);
+            return renderFallback(nativeWidth);
+          }
+        }, component);
         return text;
       } catch (error) {
-        state.callComponent = undefined;
-        options.reportIssue({
-          stage: "renderCall",
-          toolName: definition.name,
-          error,
-        });
+        reportError(error);
       }
     }
 
-    const label =
-      config.capitalizeToolNames && definition.label
-        ? capitalizeFirstVisibleChar(definition.label)
-        : definition.label;
-    const header = buildGenericCallHeader(
-      args as Record<string, unknown>,
-      label,
-      theme,
-    );
-    text.setText(
-      safeTruncateToWidth(prefix + header, maxWidth, theme.fg("accent", "...")),
-    );
+    text.setText((width) => renderFallback(Math.max(1, width - 3)));
     return text;
   };
 }
@@ -188,23 +209,36 @@ function createResultRenderer(
     }
     state.resultComponent = component;
 
-    const innerLines = renderComponentLines(component);
-    if (innerLines.length === 0) {
-      text.setText(formatEmptyResult(result, state, options, theme));
-      return text;
-    }
+    text.setText((width) => {
+      try {
+        const innerLines = renderComponentLines(
+          component,
+          Math.max(1, width - 3),
+        );
+        if (innerLines.length === 0) {
+          return formatEmptyResult(result, state, options, theme);
+        }
 
-    const renderedLines = innerLines.map((line, index) => {
-      const prefix = index === innerLines.length - 1 ? "╰─ " : "│  ";
-      return theme.fg("dim", prefix) + line;
-    });
-    if (state.truncated) {
-      const status = buildResultStatusParts(state, theme).join(
-        theme.fg("muted", " • "),
-      );
-      renderedLines.unshift(theme.fg("dim", "├─ ") + status);
-    }
-    text.setText(renderedLines.join("\n"));
+        const renderedLines = innerLines.map((line, index) => {
+          const prefix = index === innerLines.length - 1 ? "╰─ " : "│  ";
+          return theme.fg("dim", prefix) + line;
+        });
+        if (state.truncated) {
+          const status = buildResultStatusParts(state, theme).join(
+            theme.fg("muted", " • "),
+          );
+          renderedLines.unshift(theme.fg("dim", "├─ ") + status);
+        }
+        return renderedLines.join("\n");
+      } catch (error) {
+        reportIssue({
+          stage: "renderResult",
+          toolName: definition.name,
+          error,
+        });
+        return buildGenericResult(result, state, options, theme);
+      }
+    }, component);
     return text;
   };
 }

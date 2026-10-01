@@ -32,6 +32,26 @@ describe("formatOmissionRow", () => {
 });
 
 describe("tree-aware text wrapping", () => {
+  it("evaluates width-aware text on resize and invalidation", () => {
+    const widths: number[] = [];
+    const text = getResultText({}, optsExpanded, undefined);
+    text.setText((width) => {
+      widths.push(width);
+      return `╰─ width ${width}`;
+    });
+
+    expect(text.render(40).join("\n")).toContain("width 38");
+    text.render(40);
+    expect(text.render(80).join("\n")).toContain("width 78");
+    text.invalidate();
+    text.render(80);
+    expect(widths).toEqual([38, 78, 78]);
+
+    text.setText("╰─ static text");
+    expect(text.render(40).join("\n")).toContain("static text");
+    expect(widths).toEqual([38, 78, 78]);
+  });
+
   it("prefixes every wrapped result row and closes only the final row", () => {
     const text = getResultText({}, optsExpanded, undefined);
     text.setText(

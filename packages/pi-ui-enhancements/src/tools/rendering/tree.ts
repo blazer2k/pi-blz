@@ -3,6 +3,7 @@ import type {
   ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
 import {
+  type Component,
   sliceByColumn,
   Text,
   truncateToWidth,
@@ -92,7 +93,7 @@ export function getCallRenderParts(
     animate?: boolean;
     staticActive?: boolean;
   },
-): { text: Text; prefix: string; isDone: boolean } {
+): { text: TreeText; prefix: string; isDone: boolean } {
   const text = new TreeText(
     renderOptions?.paddingX ?? 1,
     theme.fg("dim", "│  "),
@@ -169,9 +170,12 @@ function wrapTreeText(
     .join("\n");
 }
 
+type TreeTextSource = string | ((width: number) => string);
+
 class TreeText extends Text {
-  private sourceText = "";
-  private renderedSource?: string;
+  private sourceText: TreeTextSource = "";
+  private sourceComponent?: Component;
+  private renderedSource?: TreeTextSource;
   private renderedWidth?: number;
 
   constructor(
@@ -181,11 +185,19 @@ class TreeText extends Text {
     super("", horizontalPadding, 0);
   }
 
-  override setText(text: string): void {
-    if (text === this.sourceText) return;
+  override setText(text: TreeTextSource, sourceComponent?: Component): void {
+    if (text === this.sourceText && sourceComponent === this.sourceComponent)
+      return;
     this.sourceText = text;
+    this.sourceComponent = sourceComponent;
     this.renderedSource = undefined;
     this.renderedWidth = undefined;
+  }
+
+  override invalidate(): void {
+    this.sourceComponent?.invalidate();
+    this.renderedSource = undefined;
+    super.invalidate();
   }
 
   override render(width: number): string[] {
@@ -193,12 +205,13 @@ class TreeText extends Text {
       this.renderedSource !== this.sourceText ||
       this.renderedWidth !== width
     ) {
+      const contentWidth = Math.max(1, width - this.horizontalPadding * 2);
+      const source =
+        typeof this.sourceText === "function"
+          ? this.sourceText(contentWidth)
+          : this.sourceText;
       super.setText(
-        wrapTreeText(
-          this.sourceText,
-          Math.max(1, width - this.horizontalPadding * 2),
-          this.callContinuationPrefix,
-        ),
+        wrapTreeText(source, contentWidth, this.callContinuationPrefix),
       );
       this.renderedSource = this.sourceText;
       this.renderedWidth = width;
@@ -212,7 +225,7 @@ export function getResultText(
   options: ToolRenderResultOptions,
   lastComponent: unknown,
   renderOptions?: { paddingX?: number },
-): Text {
+): TreeText {
   const paddingX = renderOptions?.paddingX ?? 1;
   const previousText =
     lastComponent instanceof TreeText ? lastComponent : undefined;
