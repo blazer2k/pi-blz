@@ -11,9 +11,8 @@ import {
 } from "./tool-registration";
 import { splitNativeListOutput } from "./list-rendering";
 import { buildRenderResult, formatListResult } from "./rendering/results";
-import { getMaxCallWidth } from "./rendering/state";
 import { renderPath } from "./rendering/text";
-import { getCallRenderParts, setExpandableCallText } from "./rendering/tree";
+import { getCallRenderParts, formatExpandableCallText } from "./rendering/tree";
 import type { BaseRenderState, ListResultConfig } from "./rendering/types";
 
 const LS_CONFIG: ListResultConfig = {
@@ -39,28 +38,33 @@ export function patchLsTool(pi: ExtensionAPI): Handle {
         ? theme.fg("dim", ` (limit ${renderArgs.limit})`)
         : "";
       const path = renderArgs.path || ".";
-      const pathWidth = Math.max(
-        1,
-        getMaxCallWidth() - visibleWidth(prefix + title + limit),
-      );
-      const collapsedText =
-        prefix +
-        title +
-        renderPath(path, theme, toolCtx.cwd, pathWidth) +
-        limit;
-      const fullText =
-        prefix + title + renderPath(path, theme, toolCtx.cwd) + limit;
-
-      setExpandableCallText(text, state, {
-        expanded: toolCtx.expanded,
-        collapsedText,
-        fullText,
-        ellipsis: theme.fg("accent", "..."),
+      text.setText((width) => {
+        const callWidth = Math.max(1, width - 3);
+        const pathWidth = Math.max(
+          1,
+          callWidth - visibleWidth(prefix + title + limit),
+        );
+        return formatExpandableCallText(
+          state,
+          {
+            expanded: toolCtx.expanded,
+            collapsedText:
+              prefix +
+              title +
+              renderPath(path, theme, toolCtx.cwd, pathWidth) +
+              limit,
+            fullText:
+              prefix + title + renderPath(path, theme, toolCtx.cwd) + limit,
+            ellipsis: theme.fg("accent", "..."),
+          },
+          callWidth,
+          toolCtx.invalidate,
+        );
       });
       return text;
     },
-    renderResult: buildRenderResult((result, state, options, theme) =>
-      formatListResult(result, state, options, theme, LS_CONFIG),
+    renderResult: buildRenderResult((result, state, options, theme, width) =>
+      formatListResult(result, state, options, theme, LS_CONFIG, width),
     ),
   });
 }

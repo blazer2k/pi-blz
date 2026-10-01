@@ -12,7 +12,7 @@ import {
 } from "@earendil-works/pi-tui";
 import {
   getBlinkIndicator,
-  getMaxCallWidth,
+  invalidateIfChanged,
   getStatusColor,
   getStatusSymbol,
   isBlinkOn,
@@ -37,14 +37,13 @@ export function formatTreeLine(
   options: {
     theme: Theme;
     prefix: "│  " | "├─ " | "╰─ ";
-    width: number;
-    mode: "truncate" | "preserve";
+    width?: number;
     color?: "toolOutput" | "error" | "muted";
   },
 ): { text: string; truncated: boolean } {
-  const { theme, prefix, width, mode, color } = options;
-  const contentWidth = Math.max(1, width - visibleWidth(prefix));
-  const truncated = mode === "truncate" && visibleWidth(line) > contentWidth;
+  const { theme, prefix, width, color } = options;
+  const contentWidth = Math.max(1, (width ?? Infinity) - visibleWidth(prefix));
+  const truncated = width !== undefined && visibleWidth(line) > contentWidth;
   const renderedLine = truncated
     ? truncateToWidth(line, contentWidth, theme.fg(color ?? "muted", "..."))
     : line;
@@ -57,8 +56,7 @@ export function formatTreeLine(
   };
 }
 
-export function setExpandableCallText(
-  text: Text,
+export function formatExpandableCallText(
   state: BaseRenderState,
   options: {
     expanded: boolean;
@@ -67,17 +65,23 @@ export function setExpandableCallText(
     compactIsLossy?: boolean;
     ellipsis: string;
   },
-): void {
-  const maxWidth = getMaxCallWidth();
-  state.callExpandable =
+  width: number,
+  invalidate: () => void,
+): string {
+  const expandable =
     options.compactIsLossy === true ||
     options.fullText.includes("\n") ||
-    visibleWidth(options.fullText) > maxWidth;
-  text.setText(
-    options.expanded
-      ? options.fullText
-      : safeTruncateToWidth(options.collapsedText, maxWidth, options.ellipsis),
-  );
+    visibleWidth(options.fullText) > width;
+  const changed = (state.callExpandable === true) !== expandable;
+  state.callExpandable = expandable;
+  invalidateIfChanged(changed, invalidate);
+  return options.expanded
+    ? options.fullText
+    : safeTruncateToWidth(options.collapsedText, width, options.ellipsis);
+}
+
+export function getCallText(theme: Theme, paddingX = 1): TreeText {
+  return new TreeText(paddingX, theme.fg("dim", "│  "));
 }
 
 export function getCallRenderParts(
@@ -94,11 +98,22 @@ export function getCallRenderParts(
     staticActive?: boolean;
   },
 ): { text: TreeText; prefix: string; isDone: boolean } {
-  const text = new TreeText(
-    renderOptions?.paddingX ?? 1,
-    theme.fg("dim", "│  "),
-  );
+  return {
+    text: getCallText(theme, renderOptions?.paddingX),
+    ...getCallPrefix(state, theme, toolContext, renderOptions),
+  };
+}
 
+export function getCallPrefix(
+  state: BaseRenderState,
+  theme: Theme,
+  toolContext: {
+    executionStarted?: boolean;
+    isPartial?: boolean;
+    invalidate: () => void;
+  },
+  renderOptions?: { animate?: boolean; staticActive?: boolean },
+): { prefix: string; isDone: boolean } {
   const isDone =
     state.hasResult ||
     (!toolContext.executionStarted && !toolContext.isPartial);
@@ -115,7 +130,7 @@ export function getCallRenderParts(
     : getStatusSymbol(isDone, blinkOn);
   const prefix = theme.fg(color, `${symbol} `);
 
-  return { text, prefix, isDone };
+  return { prefix, isDone };
 }
 
 function wrapTreeText(

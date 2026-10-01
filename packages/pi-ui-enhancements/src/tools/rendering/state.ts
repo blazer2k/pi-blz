@@ -16,12 +16,6 @@ export function getBlinkIndicator(): BlinkIndicator {
 
 export const BLINK_INDICATOR = getBlinkIndicator;
 
-export function getMaxCallWidth(): number {
-  return getConfig().maxCallWidth;
-}
-
-export const MAX_CALL_WIDTH = getMaxCallWidth;
-
 export function getMaxExpandedEntries(): number {
   const value = getConfig().maxExpandedEntries;
   return value === -1 ? Infinity : value;

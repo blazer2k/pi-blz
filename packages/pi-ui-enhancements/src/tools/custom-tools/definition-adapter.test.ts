@@ -186,8 +186,7 @@ describe("wrapped custom tool definitions", () => {
     expect(expanded).not.toContain("mcp preview");
   });
 
-  it("sizes custom previews to the viewport rather than maxCallWidth", () => {
-    saveConfig("maxCallWidth", "40");
+  it("sizes custom previews to the viewport", () => {
     const widths: number[] = [];
     let invalidations = 0;
     const tool = mkRegisteredTool("preview").definition;

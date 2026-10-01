@@ -92,12 +92,16 @@ export function patchBashTool(pi: ExtensionAPI): Handle {
         truncated: details?.truncation?.truncated === true,
         isError: toolContext.isError,
       });
-      const previousResultExpandable = state.resultExpandable;
-      text.setText(formatBashResult(result, state, options, theme));
-      invalidateIfChanged(
-        changed || previousResultExpandable !== state.resultExpandable,
-        toolContext.invalidate,
-      );
+      invalidateIfChanged(changed, toolContext.invalidate);
+      text.setText((width) => {
+        const previousResultExpandable = state.resultExpandable === true;
+        const output = formatBashResult(result, state, options, theme, width);
+        invalidateIfChanged(
+          previousResultExpandable !== (state.resultExpandable === true),
+          toolContext.invalidate,
+        );
+        return output;
+      });
       return text;
     },
   });

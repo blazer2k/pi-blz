@@ -60,6 +60,7 @@ export type BashResultView =
 export type BashResultPolicy = {
   collapsedDisplay: "preview" | "summary";
   errorEllipsis: string;
+  errorWidth: number;
 };
 
 export function selectBashOutputWindow(
@@ -119,11 +120,13 @@ function buildErrorView(
   const collapsedBody = formatErrorBody(
     error.output,
     { ...options, expanded: false },
+    policy.errorWidth,
     policy.errorEllipsis,
   );
   const expandedBody = formatErrorBody(
     error.output,
     { ...options, expanded: true },
+    policy.errorWidth,
     policy.errorEllipsis,
   );
 

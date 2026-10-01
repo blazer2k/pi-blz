@@ -37,6 +37,7 @@ export type FormatResultFn = (
   state: ResultStatusState,
   options: ToolRenderResultOptions,
   theme: Theme,
+  width: number,
 ) => string;
 
 export type BlinkIndicator = {

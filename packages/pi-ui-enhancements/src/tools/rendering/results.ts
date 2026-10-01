@@ -8,7 +8,6 @@ import {
   buildExpansionHint,
   buildResultStatusParts,
   buildToolExpansionHint,
-  getMaxCallWidth,
   getMaxExpandedEntries,
   invalidateIfChanged,
   updateResultState,
@@ -23,13 +22,10 @@ import type {
   ToolTextResult,
 } from "./types";
 
-export function getMaxErrorLineWidth(): number {
-  return Math.floor(getMaxCallWidth() / 2);
-}
-
 export function formatErrorBody(
   textContent: string,
   options: ToolRenderResultOptions,
+  width: number,
   ellipsis = "...",
 ): { text: string; truncated: boolean } {
   const output = normalizeOutput(textContent);
@@ -43,7 +39,7 @@ export function formatErrorBody(
   }
   if (trimmed.length === 0) return { text: "", truncated: false };
 
-  const maxLineWidth = getMaxErrorLineWidth();
+  const maxLineWidth = Math.max(1, width);
   const firstLine = trimmed.find((line) => line.length > 0) ?? "";
 
   if (trimmed.length === 1 && visibleWidth(firstLine) <= maxLineWidth) {
@@ -72,22 +68,39 @@ export function formatSimpleErrorResult(
   state: BaseRenderState,
   options: ToolRenderResultOptions,
   theme: Theme,
+  width: number,
 ): string {
-  const collapsedBody = formatErrorBody(
-    textContent,
-    { ...options, expanded: false },
-    theme.fg("error", "..."),
-  );
-  const errorBody = options.expanded
-    ? formatErrorBody(textContent, options, theme.fg("error", "..."))
-    : collapsedBody;
-  const hasErrorBody = errorBody.text.length > 0;
-  const bodyText = hasErrorBody ? errorBody.text : "error";
   const status = state.truncated
     ? buildResultStatusParts(state, theme).join(theme.fg("muted", " • "))
     : "";
+  const errorWidth = Math.max(
+    1,
+    width - 3 - visibleWidth(status ? status + " • " : ""),
+  );
+  const collapsedBody = formatErrorBody(
+    textContent,
+    { ...options, expanded: false },
+    errorWidth,
+    theme.fg("error", "..."),
+  );
   const isExpandable =
     state.callExpandable === true || state.truncated || collapsedBody.truncated;
+  const bodyWidth = Math.max(
+    1,
+    errorWidth -
+      (isExpandable ? visibleWidth(buildExpansionHint(theme, "expand")) : 0),
+  );
+  const errorBody =
+    !options.expanded && bodyWidth === errorWidth
+      ? collapsedBody
+      : formatErrorBody(
+          textContent,
+          options,
+          bodyWidth,
+          theme.fg("error", "..."),
+        );
+  const hasErrorBody = errorBody.text.length > 0;
+  const bodyText = hasErrorBody ? errorBody.text : "error";
 
   if (options.expanded) {
     const collapseHint = isExpandable
@@ -101,8 +114,6 @@ export function formatSimpleErrorResult(
           formatTreeLine(line, {
             theme,
             prefix: !footer && index === lines.length - 1 ? "╰─ " : "│  ",
-            width: getMaxCallWidth() - 1,
-            mode: "preserve",
             color: "error",
           }).text,
       )
@@ -134,6 +145,7 @@ export function formatListResult(
   options: ToolRenderResultOptions,
   theme: Theme,
   config: ListResultConfig,
+  width: number,
 ): string {
   if (state.isError) {
     return formatSimpleErrorResult(
@@ -141,6 +153,7 @@ export function formatListResult(
       state,
       options,
       theme,
+      width,
     );
   }
 
@@ -185,8 +198,6 @@ export function formatListResult(
       formatTreeLine(rendered, {
         theme,
         prefix: "│  ",
-        width: getMaxCallWidth() - 1,
-        mode: "preserve",
         color: "toolOutput",
       }).text,
     );
@@ -231,8 +242,8 @@ export function buildRenderResult(
     });
 
     invalidateIfChanged(changed, toolContext.invalidate);
-    text.setText(
-      formatResult(result, state as ResultStatusState, options, theme),
+    text.setText((width) =>
+      formatResult(result, state as ResultStatusState, options, theme, width),
     );
     return text;
   };

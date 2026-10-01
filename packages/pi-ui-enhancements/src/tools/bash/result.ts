@@ -13,18 +13,20 @@ export function formatBashResult(
   state: BashRenderState,
   options: ToolRenderResultOptions,
   theme: Theme,
+  width: number,
 ): string {
   const view = buildBashResultView(result, state, options, {
     collapsedDisplay: getBashCollapsedDisplay(),
     errorEllipsis: theme.fg("error", "..."),
+    errorWidth: Math.max(1, width - 3),
   });
 
   switch (view.kind) {
     case "success":
-      return renderBashSuccess(view, theme, state);
+      return renderBashSuccess(view, theme, state, width);
     case "command-error":
-      return renderCommandError(view, theme, state);
+      return renderCommandError(view, theme, state, width);
     case "unknown-error":
-      return renderUnknownError(view, theme, state);
+      return renderUnknownError(view, theme, state, width);
   }
 }

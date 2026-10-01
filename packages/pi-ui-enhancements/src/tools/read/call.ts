@@ -16,9 +16,11 @@ import {
   visibleWidth,
   type Text,
 } from "@earendil-works/pi-tui";
-import { getMaxCallWidth } from "../rendering/state";
 import { renderPath } from "../rendering/text";
-import { getCallRenderParts, setExpandableCallText } from "../rendering/tree";
+import {
+  getCallRenderParts,
+  formatExpandableCallText,
+} from "../rendering/tree";
 import type { BaseRenderState } from "../rendering/types";
 
 const COMPACT_RESOURCE_FILE_NAMES = new Set([
@@ -155,36 +157,43 @@ export function renderReadCall(
   const fullPath = renderPath(args.path, theme, toolContext.cwd);
   const fullText = prefix + title + fullPath + lineRange;
 
-  let collapsedText: string;
-  let compactIsLossy = classification !== undefined;
-  if (classification) {
-    collapsedText =
-      prefix +
-      formatCompactReadCall(
-        classification,
-        args,
-        theme,
-        Math.max(1, getMaxCallWidth() - visibleWidth(prefix)),
+  text.setText((width) => {
+    const callWidth = Math.max(1, width - 3);
+    let collapsedText: string;
+    let compactIsLossy = classification !== undefined;
+    if (classification) {
+      collapsedText =
+        prefix +
+        formatCompactReadCall(
+          classification,
+          args,
+          theme,
+          Math.max(1, callWidth - visibleWidth(prefix)),
+        );
+    } else {
+      const pathWidth = Math.max(
+        1,
+        callWidth - visibleWidth(prefix + title + lineRange),
       );
-  } else {
-    const pathWidth = Math.max(
-      1,
-      getMaxCallWidth() - visibleWidth(prefix + title + lineRange),
+      collapsedText =
+        prefix +
+        title +
+        renderPath(args.path, theme, toolContext.cwd, pathWidth) +
+        lineRange;
+      compactIsLossy ||= visibleWidth(fullPath) > pathWidth;
+    }
+    return formatExpandableCallText(
+      state,
+      {
+        expanded: toolContext.expanded,
+        collapsedText,
+        fullText,
+        compactIsLossy,
+        ellipsis: theme.fg("accent", "..."),
+      },
+      callWidth,
+      toolContext.invalidate,
     );
-    collapsedText =
-      prefix +
-      title +
-      renderPath(args.path, theme, toolContext.cwd, pathWidth) +
-      lineRange;
-    compactIsLossy ||= visibleWidth(fullPath) > pathWidth;
-  }
-
-  setExpandableCallText(text, state, {
-    expanded: toolContext.expanded,
-    collapsedText,
-    fullText,
-    compactIsLossy,
-    ellipsis: theme.fg("accent", "..."),
   });
   return text;
 }

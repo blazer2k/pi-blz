@@ -23,8 +23,14 @@ export function renderBashSuccess(
   view: BashSuccessView,
   theme: Theme,
   state: BashRenderState,
+  width: number,
 ): string {
-  const collapsedOutput = formatCollapsedBashOutput(view.output, theme);
+  const collapsedOutput = formatCollapsedBashOutput(
+    view.output,
+    theme,
+    "toolOutput",
+    width,
+  );
   const outputHidden = view.output.hiddenLines > 0;
   const expandable =
     view.callExpandable ||

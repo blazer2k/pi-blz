@@ -16,6 +16,8 @@ import { patchBashTool } from "../bash";
 import { patchCustomToolRendering } from "../custom-tools/patch-manager";
 import { patchEditTool } from "../edit";
 import { patchFindTool } from "../find";
+import { patchGrepTool } from "../grep";
+import { patchLsTool } from "../ls";
 import { patchReadTool } from "../read";
 import { patchWriteTool } from "../write";
 import { clearBlinkTimers } from "./state";
@@ -226,6 +228,157 @@ describe("custom tool output", () => {
 });
 
 describe("terminal width contract", () => {
+  const path = `/tmp/${"segment/".repeat(6)}tail.txt`;
+  const pattern = `needle-${"x".repeat(30)}-tail`;
+  const calls: Array<
+    [Parameters<typeof setupTool>[0], Record<string, unknown>]
+  > = [
+    [patchReadTool, { path }],
+    [patchWriteTool, { path, content: "hello" }],
+    [patchEditTool, { path, edits: [{ oldText: "old", newText: "new" }] }],
+    [patchLsTool, { path, limit: 50 }],
+    [patchFindTool, { pattern, path }],
+    [patchGrepTool, { pattern, path }],
+    [patchBashTool, { command: `echo ${"x".repeat(90)}` }],
+  ];
+
+  for (const [patchTool, args] of calls) {
+    it(`${patchTool.name} adapts collapsed calls and expansion flags on resize`, async () => {
+      const definition = setupTool(patchTool);
+      const state = { hasResult: true, callExpandable: false };
+      let invalidations = 0;
+      const context = mkToolCtx({
+        state,
+        args,
+        executionStarted: false,
+        invalidate: () => invalidations++,
+      });
+      const component = definition.renderCall!(args, mkTheme(), context);
+      for (const width of [40, 200, 40]) {
+        const rows = component.render(width);
+        expect(rows).toHaveLength(1);
+        expect(rows.every((row) => visibleWidth(row) <= width)).toBe(true);
+        expect(state.callExpandable).toBe(width === 40);
+        expect(stripAnsi(rows[0]!).includes("...")).toBe(width === 40);
+        component.render(width);
+      }
+      await Promise.resolve();
+      expect(invalidations).toBe(3);
+    });
+  }
+
+  it("keeps Bash calls with timeouts on one row in narrow viewports", () => {
+    const definition = setupTool(patchBashTool);
+    const component = definition.renderCall!(
+      { command: "echo hello", timeout: 30 },
+      mkTheme(),
+      mkToolCtx({ executionStarted: false }),
+    );
+    for (const width of [10, 20, 40, 80, 120]) {
+      const rows = component.render(width);
+      expect(rows).toHaveLength(1);
+      expect(visibleWidth(rows[0]!)).toBeLessThanOrEqual(width);
+    }
+  });
+
+  it("updates call-driven result hints on resize", () => {
+    const definition = setupTool(patchLsTool);
+    const state = { hasResult: true };
+    const args = { path };
+    const context = mkToolCtx({ state, args, executionStarted: false });
+    const call = definition.renderCall!(args, mkTheme(), context);
+    const result = definition.renderResult!(
+      {
+        content: [{ type: "text", text: "(empty directory)" }],
+        details: undefined,
+      },
+      { expanded: false, isPartial: false },
+      mkTheme(),
+      context,
+    );
+    for (const width of [40, 200, 40]) {
+      call.render(width);
+      const output = meaningfulLines(result, width).join("\n");
+      expect(output.includes("expand")).toBe(width === 40);
+    }
+  });
+
+  it("updates Bash preview truncation and hints on resize", () => {
+    const definition = setupTool(patchBashTool);
+    const state = {
+      hasResult: true,
+      truncated: false,
+      isError: false,
+      resultExpandable: false,
+    };
+    const component = definition.renderResult!(
+      {
+        content: [{ type: "text", text: "x".repeat(60) }],
+        details: { durationMs: 5 },
+      },
+      { expanded: false, isPartial: false },
+      mkTheme(),
+      mkToolCtx({ state }),
+    );
+    for (const width of [40, 200, 40]) {
+      const rows = component.render(width);
+      const output = rows.map(stripAnsi).join("\n");
+      expect(rows).toHaveLength(2);
+      expect(rows.every((row) => visibleWidth(row) <= width)).toBe(true);
+      expect(state.resultExpandable).toBe(width === 40);
+      expect(output.includes("...")).toBe(width === 40);
+      expect(output.includes("to expand")).toBe(width === 40);
+    }
+  });
+
+  it("reflows complete expanded Bash and Write output without truncation", () => {
+    const body = `${"x".repeat(160)}\n\n  final line`;
+    for (const patchTool of [patchBashTool, patchWriteTool]) {
+      const definition = setupTool(patchTool);
+      const component = definition.renderResult!(
+        { content: [{ type: "text", text: body }], details: { durationMs: 5 } },
+        { expanded: true, isPartial: false },
+        mkTheme(),
+        mkToolCtx({
+          expanded: true,
+          args: { path: "notes.txt", content: body },
+        }),
+      );
+      for (const width of [40, 80, 120, 200, 40]) {
+        const rows = component.render(width);
+        const output = rows.map(stripAnsi).join("\n");
+        expect(rows.every((row) => visibleWidth(row) <= width)).toBe(true);
+        expect(output.match(/x/g)).toHaveLength(160);
+        expect(output).toContain("final line");
+        expect(output).not.toContain("...");
+      }
+    }
+  });
+
+  it("fits collapsed errors to the viewport for every built-in", () => {
+    for (const [patchTool, args] of calls) {
+      const definition = setupTool(patchTool);
+      const component = definition.renderResult!(
+        {
+          content: [{ type: "text", text: `failure ${"x".repeat(100)}` }],
+          details: { durationMs: 5 },
+        },
+        { expanded: false, isPartial: false },
+        mkTheme(),
+        mkToolCtx({ args, isError: true }),
+      );
+      for (const width of [40, 80, 120, 200]) {
+        const rows = component.render(width);
+        expect(rows.every((row) => visibleWidth(row) <= width)).toBe(true);
+        expect(
+          rows.filter((row) => stripAnsi(row).includes("failure")),
+        ).toHaveLength(1);
+        if (width === 200)
+          expect(rows.map(stripAnsi).join("\n")).not.toContain("...");
+      }
+    }
+  });
+
   it("stays within Pi's one-column minimum through width 200", () => {
     const definition = setupTool(patchFindTool);
     const state = {};

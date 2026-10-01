@@ -20,13 +20,12 @@ import {
 import {
   buildResultStatusParts,
   buildToolExpansionHint,
-  getMaxCallWidth,
 } from "./rendering/state";
 import { extractTextContent, renderPath } from "./rendering/text";
 import {
   formatTreeLine,
   getCallRenderParts,
-  setExpandableCallText,
+  formatExpandableCallText,
 } from "./rendering/tree";
 import type { BaseRenderState } from "./rendering/types";
 
@@ -54,6 +53,7 @@ function formatEditResult(
   state: BaseRenderState,
   options: ToolRenderResultOptions,
   theme: Theme,
+  width: number,
 ): string {
   if (state.isError) {
     return formatSimpleErrorResult(
@@ -61,6 +61,7 @@ function formatEditResult(
       state,
       options,
       theme,
+      width,
     );
   }
 
@@ -106,8 +107,6 @@ function formatEditResult(
       formatTreeLine(line, {
         theme,
         prefix: !hasFooter && index === lines.length - 1 ? "╰─ " : "│  ",
-        width: getMaxCallWidth() - 1,
-        mode: "preserve",
       }).text,
   );
   if (hasFooter) {
@@ -129,22 +128,24 @@ export function patchEditTool(pi: ExtensionAPI): Handle {
 
       const title = theme.fg("toolTitle", theme.bold("Edit "));
       const fullPath = renderPath(renderArgs.path, theme, toolCtx.cwd);
-      const pathWidth = Math.max(
-        1,
-        getMaxCallWidth() - visibleWidth(prefix + title),
-      );
-      const collapsedText =
-        prefix +
-        title +
-        renderPath(renderArgs.path, theme, toolCtx.cwd, pathWidth);
-      const fullText = prefix + title + fullPath;
-
-      setExpandableCallText(text, state, {
-        expanded: toolCtx.expanded,
-        collapsedText,
-        fullText,
-        compactIsLossy: visibleWidth(fullPath) > pathWidth,
-        ellipsis: theme.fg("accent", "..."),
+      text.setText((width) => {
+        const callWidth = Math.max(1, width - 3);
+        const pathWidth = Math.max(1, callWidth - visibleWidth(prefix + title));
+        return formatExpandableCallText(
+          state,
+          {
+            expanded: toolCtx.expanded,
+            collapsedText:
+              prefix +
+              title +
+              renderPath(renderArgs.path, theme, toolCtx.cwd, pathWidth),
+            fullText: prefix + title + fullPath,
+            compactIsLossy: visibleWidth(fullPath) > pathWidth,
+            ellipsis: theme.fg("accent", "..."),
+          },
+          callWidth,
+          toolCtx.invalidate,
+        );
       });
       return text;
     },

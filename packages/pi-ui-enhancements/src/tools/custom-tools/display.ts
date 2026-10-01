@@ -3,8 +3,7 @@ import { isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { getCapabilities, hyperlink } from "@earendil-works/pi-tui";
-import { getMaxCallWidth } from "../rendering/state";
-import { safeTruncateToWidth, sanitizeDisplayText } from "../rendering/text";
+import { sanitizeDisplayText } from "../rendering/text";
 
 const MIN_LINK_PREFIX_LENGTH = 24;
 
@@ -119,7 +118,7 @@ export function buildGenericCallHeader(
     theme.fg("toolTitle", theme.bold(label)) +
     (preview ? ` ${theme.fg("accent", preview)}` : "");
 
-  return safeTruncateToWidth(raw, getMaxCallWidth(), theme.fg("accent", "..."));
+  return raw;
 }
 
 type LinkTarget = {

@@ -10,6 +10,7 @@ import {
 const policy: BashResultPolicy = {
   collapsedDisplay: "preview",
   errorEllipsis: "...",
+  errorWidth: 75,
 };
 
 describe("selectBashOutputWindow", () => {

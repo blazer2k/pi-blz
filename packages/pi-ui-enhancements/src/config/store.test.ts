@@ -67,10 +67,10 @@ describe("config compatibility", () => {
     expect(errors).toEqual([]);
     expect(getConfig()).toEqual({
       ...getDefaultConfig(),
-      maxCallWidth: 120,
       indicatorColor: "text",
     });
     expect(JSON.parse(normalized)).toEqual(getConfig());
+    expect(getConfig()).not.toHaveProperty("maxCallWidth");
     expect(getConfig()).not.toHaveProperty("patchedBuiltInTools");
     expect(getConfig()).not.toHaveProperty("futureSetting");
   });
@@ -100,9 +100,6 @@ describe("config numeric values", () => {
     expect(() => saveConfig("maxExpandedEntries", "20.5")).toThrow(
       "Invalid config update",
     );
-    expect(() => saveConfig("maxCallWidth", "80.5")).toThrow(
-      "Invalid config update",
-    );
   });
 
   it("accepts only configured maxExpandedEntries values", () => {
@@ -128,7 +125,7 @@ describe("config numeric values", () => {
 
     loadConfig();
 
-    expect(getConfig().maxCallWidth).toBe(80);
+    expect(getConfig()).not.toHaveProperty("maxCallWidth");
     expect(getConfig().maxExpandedEntries).toBe(20);
   });
 

@@ -143,6 +143,23 @@ describe("bash renderCall", () => {
     expect((state as { blinkTimer?: unknown }).blinkTimer).toBeUndefined();
   });
 
+  it("keeps the blink timer when expanded-mode calls remain compact", () => {
+    const def = setupBashTool();
+    const state: BashRenderState = {};
+    const context = mkToolCtx({ expanded: true, isPartial: true, state });
+    const args = { command: "sleep 10" };
+
+    def.renderCall!(args, mkTheme(), context).render(120);
+    const timer = state.blinkTimer;
+    expect(timer).toBeDefined();
+
+    const component = def.renderCall!(args, mkTheme(), context);
+    expect(state.blinkTimer).toBe(timer);
+    component.render(120);
+    expect(state.blinkTimer).toBe(timer);
+    clearBlinkTimers();
+  });
+
   it("preserves command boundaries and safe whitespace when expanded", () => {
     const def = setupBashTool();
     const renderCall = def.renderCall!;
@@ -922,7 +939,7 @@ describe("bash partial duration timer", () => {
     const state: Record<string, unknown> = {};
     const ctx = mkToolCtx({ executionStarted: true, isPartial: true, state });
 
-    renderCall({ command: "sleep 10" }, theme, ctx);
+    renderCall({ command: "sleep 10" }, theme, ctx).render(120);
     expect(state.blinkTimer).toBeDefined();
 
     renderResult(
@@ -936,7 +953,7 @@ describe("bash partial duration timer", () => {
     );
     expect(state.hasResult).toBe(false);
 
-    renderCall({ command: "sleep 10" }, theme, ctx);
+    renderCall({ command: "sleep 10" }, theme, ctx).render(120);
     expect(state.blinkTimer).toBeDefined();
 
     renderResult(
@@ -950,7 +967,10 @@ describe("bash partial duration timer", () => {
     );
     expect(state.hasResult).toBe(true);
 
-    renderCall({ command: "sleep 10" }, theme, { ...ctx, isPartial: false });
+    renderCall({ command: "sleep 10" }, theme, {
+      ...ctx,
+      isPartial: false,
+    }).render(120);
     expect(state.blinkTimer).toBeUndefined();
 
     clearBlinkTimers();

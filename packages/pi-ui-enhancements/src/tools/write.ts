@@ -12,7 +12,6 @@ import { formatSimpleErrorResult } from "./rendering/results";
 import {
   buildResultStatusParts,
   buildToolExpansionHint,
-  getMaxCallWidth,
   invalidateIfChanged,
   updateResultState,
 } from "./rendering/state";
@@ -21,7 +20,7 @@ import {
   formatTreeLine,
   getCallRenderParts,
   getResultText,
-  setExpandableCallText,
+  formatExpandableCallText,
 } from "./rendering/tree";
 import type { BaseRenderState } from "./rendering/types";
 import type { Handle } from "../shared/handle";
@@ -154,11 +153,12 @@ function formatWriteResult(
   options: ToolRenderResultOptions,
   theme: Theme,
   args: WriteToolInput,
+  width: number,
 ): string {
   const textContent = extractTextContent(result);
 
   if (state.isError) {
-    return formatSimpleErrorResult(textContent, state, options, theme);
+    return formatSimpleErrorResult(textContent, state, options, theme, width);
   }
 
   const lines = countLines(args.content);
@@ -183,8 +183,6 @@ function formatWriteResult(
         formatTreeLine(line, {
           theme,
           prefix: "│  ",
-          width: getMaxCallWidth() - 1,
-          mode: "preserve",
         }).text,
     );
     renderedLines.push(theme.fg("dim", "╰─ ") + metadata + hint);
@@ -209,35 +207,39 @@ export function patchWriteTool(pi: ExtensionAPI): Handle {
 
       const title = theme.fg("toolTitle", theme.bold("Write "));
       const fullPath = renderPath(renderArgs.path, theme, toolCtx.cwd);
-      const pathWidth = Math.max(
-        1,
-        getMaxCallWidth() - visibleWidth(prefix + title),
-      );
-      let collapsedText =
-        prefix +
-        title +
-        renderPath(renderArgs.path, theme, toolCtx.cwd, pathWidth);
-      let fullText = prefix + title + fullPath;
-
-      setExpandableCallText(text, state, {
-        expanded: toolCtx.expanded,
-        collapsedText,
-        fullText,
-        compactIsLossy: visibleWidth(fullPath) > pathWidth,
-        ellipsis: theme.fg("accent", "..."),
-      });
-      if (toolCtx.isPartial && typeof renderArgs.content === "string") {
-        const partialResult = formatWriteResult(
-          { content: [] },
+      text.setText((width) => {
+        const callWidth = Math.max(1, width - 3);
+        const pathWidth = Math.max(1, callWidth - visibleWidth(prefix + title));
+        const call = formatExpandableCallText(
           state,
-          { expanded: toolCtx.expanded, isPartial: toolCtx.isPartial },
-          theme,
-          renderArgs,
+          {
+            expanded: toolCtx.expanded,
+            collapsedText:
+              prefix +
+              title +
+              renderPath(renderArgs.path, theme, toolCtx.cwd, pathWidth),
+            fullText: prefix + title + fullPath,
+            compactIsLossy: visibleWidth(fullPath) > pathWidth,
+            ellipsis: theme.fg("accent", "..."),
+          },
+          callWidth,
+          toolCtx.invalidate,
         );
-        collapsedText += `\n${partialResult}`;
-        fullText += `\n${partialResult}`;
-        text.setText(toolCtx.expanded ? fullText : collapsedText);
-      }
+        if (!toolCtx.isPartial || typeof renderArgs.content !== "string")
+          return call;
+        return (
+          call +
+          "\n" +
+          formatWriteResult(
+            { content: [] },
+            state,
+            { expanded: toolCtx.expanded, isPartial: toolCtx.isPartial },
+            theme,
+            renderArgs,
+            width,
+          )
+        );
+      });
       return text;
     },
     renderResult(result, options, theme, toolCtx) {
@@ -255,7 +257,9 @@ export function patchWriteTool(pi: ExtensionAPI): Handle {
       invalidateIfChanged(changed, toolCtx.invalidate);
 
       const writeArgs = toolCtx.args as WriteToolInput;
-      text.setText(formatWriteResult(result, state, options, theme, writeArgs));
+      text.setText((width) =>
+        formatWriteResult(result, state, options, theme, writeArgs, width),
+      );
 
       return text;
     },

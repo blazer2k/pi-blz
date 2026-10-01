@@ -54,8 +54,6 @@ describe("result status rendering", () => {
     const output = formatTreeLine("failure", {
       theme,
       prefix: "╰─ ",
-      width: 80,
-      mode: "preserve",
       color: "error",
     }).text;
 

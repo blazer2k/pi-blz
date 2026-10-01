@@ -12,7 +12,7 @@ import {
 import { buildPatternPathCall, splitNativeListOutput } from "./list-rendering";
 import { buildRenderResult, formatListResult } from "./rendering/results";
 import { sanitizeDisplayText } from "./rendering/text";
-import { getCallRenderParts, setExpandableCallText } from "./rendering/tree";
+import { getCallRenderParts, formatExpandableCallText } from "./rendering/tree";
 import type { BaseRenderState, ListResultConfig } from "./rendering/types";
 
 const GREP_CONFIG: ListResultConfig = {
@@ -43,26 +43,34 @@ export function patchGrepTool(pi: ExtensionAPI): Handle {
       const limit = renderArgs.limit
         ? theme.fg("dim", ` (limit ${renderArgs.limit})`)
         : "";
-      const call = buildPatternPathCall({
-        prefix,
-        title,
-        pattern: renderArgs.pattern,
-        path: renderArgs.path,
-        suffix: glob + context + limit,
-        cwd: toolCtx.cwd,
-        theme,
-      });
-
-      setExpandableCallText(text, state, {
-        expanded: toolCtx.expanded,
-        ...call,
-        ellipsis: theme.fg("accent", "..."),
+      text.setText((width) => {
+        const callWidth = Math.max(1, width - 3);
+        const call = buildPatternPathCall({
+          prefix,
+          title,
+          pattern: renderArgs.pattern,
+          path: renderArgs.path,
+          suffix: glob + context + limit,
+          cwd: toolCtx.cwd,
+          theme,
+          width: callWidth,
+        });
+        return formatExpandableCallText(
+          state,
+          {
+            expanded: toolCtx.expanded,
+            ...call,
+            ellipsis: theme.fg("accent", "..."),
+          },
+          callWidth,
+          toolCtx.invalidate,
+        );
       });
       return text;
     },
     renderResult: buildRenderResult(
-      (result, state, options, theme) =>
-        formatListResult(result, state, options, theme, GREP_CONFIG),
+      (result, state, options, theme, width) =>
+        formatListResult(result, state, options, theme, GREP_CONFIG, width),
       (details) => {
         const d = details as GrepToolDetails | undefined;
         return d?.truncation?.truncated === true || d?.linesTruncated === true;

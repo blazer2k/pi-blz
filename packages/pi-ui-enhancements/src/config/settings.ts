@@ -108,12 +108,6 @@ const SETTING_DEFINITIONS: SettingDefinition[] = [
     values: ["success", "text", "toolTitle"],
   },
   {
-    id: "maxCallWidth",
-    label: "Max call width",
-    description: "Maximum width for tool call and output lines",
-    values: ["40", "60", "80", "100", "120", "160", "200"],
-  },
-  {
     id: "maxExpandedEntries",
     label: "Max expanded entries",
     description:

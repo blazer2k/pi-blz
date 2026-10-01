@@ -7,7 +7,6 @@ import type { Component } from "@earendil-works/pi-tui";
 import { getConfig } from "../../config/store";
 import {
   buildResultStatusParts,
-  getMaxCallWidth,
   invalidateIfChanged,
   updateResultState,
 } from "../rendering/state";
@@ -68,6 +67,7 @@ function formatEmptyResult(
   state: CustomRenderState,
   options: ToolRenderResultOptions,
   theme: Theme,
+  width: number,
 ): string {
   if (state.isError) {
     return formatSimpleErrorResult(
@@ -75,6 +75,7 @@ function formatEmptyResult(
       state,
       options,
       theme,
+      width,
     );
   }
 
@@ -94,7 +95,6 @@ function createCallRenderer(
       animate: options.isToolCallActive(toolContext.toolCallId),
     });
     const config = getConfig();
-    const maxWidth = getMaxCallWidth();
     const renderFallback = (width: number): string => {
       const label =
         config.capitalizeToolNames && definition.label
@@ -107,7 +107,7 @@ function createCallRenderer(
       );
       return safeTruncateToWidth(
         prefix + header,
-        Math.min(maxWidth, width),
+        width,
         theme.fg("accent", "..."),
       );
     };
@@ -151,7 +151,7 @@ function createCallRenderer(
               ? prefix + innerText
               : safeTruncateToWidth(
                   prefix + innerText,
-                  Math.min(maxWidth, nativeWidth),
+                  nativeWidth,
                   theme.fg("accent", "..."),
                 );
           } catch (error) {
@@ -188,7 +188,9 @@ function createResultRenderer(
     invalidateIfChanged(changed, toolContext.invalidate);
 
     if (!originalRenderResult) {
-      text.setText(buildGenericResult(result, state, options, theme));
+      text.setText((width) =>
+        buildGenericResult(result, state, options, theme, width),
+      );
       return text;
     }
 
@@ -204,7 +206,9 @@ function createResultRenderer(
         toolName: definition.name,
         error,
       });
-      text.setText(buildGenericResult(result, state, options, theme));
+      text.setText((width) =>
+        buildGenericResult(result, state, options, theme, width),
+      );
       return text;
     }
     state.resultComponent = component;
@@ -216,7 +220,7 @@ function createResultRenderer(
           Math.max(1, width - 3),
         );
         if (innerLines.length === 0) {
-          return formatEmptyResult(result, state, options, theme);
+          return formatEmptyResult(result, state, options, theme, width);
         }
 
         const renderedLines = innerLines.map((line, index) => {
@@ -236,7 +240,7 @@ function createResultRenderer(
           toolName: definition.name,
           error,
         });
-        return buildGenericResult(result, state, options, theme);
+        return buildGenericResult(result, state, options, theme, width);
       }
     }, component);
     return text;

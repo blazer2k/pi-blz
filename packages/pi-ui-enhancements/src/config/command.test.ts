@@ -79,7 +79,8 @@ describe("registerConfigCommand", () => {
 
     expect(events).toEqual(["open", "close"]);
     expect(rendered.join("\n")).toContain("Enable ASCII header");
-    expect(rendered.join("\n")).toContain("(1/20)");
+    expect(rendered.join("\n")).toContain("(1/19)");
+    expect(rendered.join("\n")).not.toContain("Max call width");
     expect(rendered.join("\n")).not.toContain("Patched built-in tools");
   });
 
@@ -90,7 +91,6 @@ describe("registerConfigCommand", () => {
     const cases: Array<{ key: ConfigKey; invalidates: boolean }> = [
       { key: "indicatorStyle", invalidates: true },
       { key: "indicatorColor", invalidates: true },
-      { key: "maxCallWidth", invalidates: true },
       { key: "maxExpandedEntries", invalidates: true },
       { key: "bashCollapsedDisplay", invalidates: true },
       { key: "showExpansionHint", invalidates: true },

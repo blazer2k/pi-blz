@@ -21,7 +21,7 @@ describe("getSettingItems", () => {
     const config = {
       ...getConfig(),
       asciiHeaderEnabled: false,
-      maxCallWidth: 160,
+      maxExpandedEntries: 100,
       roundedEditorColor: "muted" as const,
     };
     const items = getSettingItems(config);
@@ -30,7 +30,7 @@ describe("getSettingItems", () => {
       Object.fromEntries(items.map((item) => [item.id, item.currentValue])),
     ).toMatchObject({
       asciiHeaderEnabled: "false",
-      maxCallWidth: "160",
+      maxExpandedEntries: "100",
       roundedEditorColor: "muted",
     });
   });

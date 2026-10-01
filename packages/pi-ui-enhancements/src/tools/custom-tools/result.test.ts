@@ -16,6 +16,7 @@ function render(
     state,
     { expanded, isPartial: false },
     theme,
+    80,
   );
 }
 

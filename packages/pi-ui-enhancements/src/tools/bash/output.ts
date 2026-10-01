@@ -1,15 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { getMaxCallWidth } from "../rendering/state";
 import { normalizeOutput } from "../rendering/text";
 import { formatOmissionRow, formatTreeLine } from "../rendering/tree";
 import type { BashOutputWindow } from "./model";
-
-// "● " (status symbol + space) + "├─ " (tree connector) + 1 buffer.
-const TREE_PREFIX_WIDTH = 6;
-
-export function getBashOutputWidth(): number {
-  return Math.max(1, getMaxCallWidth() - TREE_PREFIX_WIDTH);
-}
 
 export function formatDuration(milliseconds: number): string {
   if (milliseconds < 1000) return `${milliseconds}ms`;
@@ -35,8 +27,7 @@ function formatOutputLine(
   return formatTreeLine(line, {
     theme,
     prefix: closeLine ? "╰─ " : "│  ",
-    width: (maxLineWidth ?? getBashOutputWidth()) + 3,
-    mode: maxLineWidth === undefined ? "preserve" : "truncate",
+    width: maxLineWidth === undefined ? undefined : maxLineWidth + 3,
     color,
   });
 }
@@ -71,7 +62,8 @@ export function formatOutputLines(
 export function formatCollapsedBashOutput(
   output: BashOutputWindow,
   theme: Theme,
-  color: "toolOutput" | "error" = "toolOutput",
+  color: "toolOutput" | "error",
+  width: number,
 ): { text: string; truncated: boolean } {
   let truncated = false;
   const rendered: string[] = [];
@@ -82,7 +74,7 @@ export function formatCollapsedBashOutput(
         line,
         theme,
         color,
-        getBashOutputWidth(),
+        Math.max(1, width - 3),
       );
       truncated ||= formatted.truncated;
       rendered.push(formatted.text);

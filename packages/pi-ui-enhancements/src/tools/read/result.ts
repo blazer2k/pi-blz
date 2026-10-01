@@ -5,7 +5,6 @@ import type {
 import {
   buildResultStatusParts,
   buildToolExpansionHint,
-  getMaxCallWidth,
 } from "../rendering/state";
 import { formatSimpleErrorResult } from "../rendering/results";
 import {
@@ -51,12 +50,13 @@ export function formatReadResult(
   state: ResultStatusState,
   options: ToolRenderResultOptions,
   theme: Theme,
+  width: number,
 ): string {
   const hasImage = result.content.some((content) => content.type === "image");
   const textContent = extractTextContent(result);
 
   if (state.isError) {
-    return formatSimpleErrorResult(textContent, state, options, theme);
+    return formatSimpleErrorResult(textContent, state, options, theme, width);
   }
 
   const metadataParts = buildResultStatusParts(state, theme);
@@ -76,8 +76,6 @@ export function formatReadResult(
     const reason = formatTreeLine(imageMarker.reason, {
       theme,
       prefix: "│  ",
-      width: getMaxCallWidth() - 1,
-      mode: "preserve",
       color: "muted",
     }).text;
     return reason + "\n" + theme.fg("dim", "╰─ ") + summary;

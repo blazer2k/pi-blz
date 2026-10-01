@@ -27,6 +27,7 @@ describe("buildPatternPathCall", () => {
       path: "src",
       cwd: "/repo",
       theme: mkTheme(),
+      width: 80,
     });
 
     expect(call.collapsedText).toContain("...");

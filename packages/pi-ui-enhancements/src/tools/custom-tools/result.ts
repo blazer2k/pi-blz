@@ -4,7 +4,6 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import {
   buildResultStatusParts,
-  getMaxCallWidth,
   getMaxExpandedEntries,
 } from "../rendering/state";
 import { extractTextContent, normalizeOutput } from "../rendering/text";
@@ -17,6 +16,7 @@ export function buildGenericResult(
   state: BaseRenderState,
   options: ToolRenderResultOptions,
   theme: Theme,
+  width: number,
 ): string {
   if (state.isError) {
     return formatSimpleErrorResult(
@@ -24,6 +24,7 @@ export function buildGenericResult(
       state,
       options,
       theme,
+      width,
     );
   }
 
@@ -57,8 +58,6 @@ export function buildGenericResult(
       formatTreeLine(line, {
         theme,
         prefix: isLast ? "╰─ " : "│  ",
-        width: getMaxCallWidth() - 1,
-        mode: "preserve",
       }).text,
     );
   });

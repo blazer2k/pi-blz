@@ -3,11 +3,7 @@ import { buildExpansionHint } from "../rendering/state";
 import { buildBashMetadataParts, joinMetadata } from "./metadata";
 import type { BashCommandErrorView, BashUnknownErrorView } from "./model";
 import type { BashRenderState } from "./types";
-import {
-  formatCollapsedBashOutput,
-  formatOutputLines,
-  getBashOutputWidth,
-} from "./output";
+import { formatCollapsedBashOutput, formatOutputLines } from "./output";
 
 function buildHint(
   expandable: boolean,
@@ -27,6 +23,7 @@ export function renderUnknownError(
   view: BashUnknownErrorView,
   theme: Theme,
   state: BashRenderState,
+  width: number,
 ): string {
   const expandable =
     view.callExpandable || view.body.collapsedTruncated || view.toolTruncated;
@@ -47,7 +44,7 @@ export function renderUnknownError(
     body || "error",
     theme,
     "error",
-    expanded ? undefined : getBashOutputWidth(),
+    expanded ? undefined : Math.max(1, width - 3),
     { closeLastLine: !footer },
   ).text;
 
@@ -60,8 +57,14 @@ export function renderCommandError(
   view: BashCommandErrorView,
   theme: Theme,
   state: BashRenderState,
+  width: number,
 ): string {
-  const collapsedOutput = formatCollapsedBashOutput(view.output, theme);
+  const collapsedOutput = formatCollapsedBashOutput(
+    view.output,
+    theme,
+    "toolOutput",
+    width,
+  );
   const expandable =
     view.callExpandable ||
     view.output.hiddenLines > 0 ||

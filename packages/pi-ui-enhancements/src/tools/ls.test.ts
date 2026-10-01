@@ -40,7 +40,7 @@ describe("ls renderCall", () => {
   it("expands and wraps a truncated path with result hints", () => {
     const def = setupLsTool();
     const state = {};
-    const path = `/tmp/${"segment/".repeat(12)}target`;
+    const path = `/tmp/${"segment/".repeat(20)}target`;
     const collapsedCtx = mkToolCtx({ state, args: { path } });
     const collapsed = def.renderCall!({ path }, mkTheme(), collapsedCtx)
       .render(120)

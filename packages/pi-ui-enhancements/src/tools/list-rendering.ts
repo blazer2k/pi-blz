@@ -1,6 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { getMaxCallWidth } from "./rendering/state";
 import { renderPath, sanitizeDisplayText } from "./rendering/text";
 
 const MIN_PATTERN_WIDTH = 4;
@@ -15,6 +14,7 @@ type PatternPathCallOptions = {
   suffix?: string;
   cwd: string;
   theme: Theme;
+  width: number;
 };
 
 export type PatternPathCall = {
@@ -32,10 +32,11 @@ export function buildPatternPathCall({
   suffix = "",
   cwd,
   theme,
+  width,
 }: PatternPathCallOptions): PatternPathCall {
   const visiblePathPrefix = path ? pathPrefix : "";
   const overhead = visibleWidth(prefix + title + visiblePathPrefix + suffix);
-  const remaining = Math.max(0, getMaxCallWidth() - overhead);
+  const remaining = Math.max(0, width - overhead);
 
   let patternBudget = remaining;
   let pathBudget = 0;

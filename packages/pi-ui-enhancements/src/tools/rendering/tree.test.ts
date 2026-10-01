@@ -84,8 +84,6 @@ describe("tree-aware text wrapping", () => {
         {
           theme,
           prefix: "│  ",
-          width: 120,
-          mode: "preserve",
           color: "error",
         },
       ).text,

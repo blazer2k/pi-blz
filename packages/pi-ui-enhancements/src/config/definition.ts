@@ -42,7 +42,6 @@ export interface Config {
   capitalizeToolNames: boolean;
   indicatorStyle: "dot" | "circle" | "diamond";
   indicatorColor: "success" | "text" | "toolTitle";
-  maxCallWidth: number;
   maxExpandedEntries: number;
   bashCollapsedDisplay: "preview" | "summary";
   showExpansionHint: boolean;
@@ -69,7 +68,6 @@ const DEFAULT_CONFIG: Config = {
   capitalizeToolNames: true,
   indicatorStyle: "circle",
   indicatorColor: "success",
-  maxCallWidth: 80,
   maxExpandedEntries: 20,
   bashCollapsedDisplay: "preview",
   showExpansionHint: true,
@@ -109,7 +107,6 @@ const ConfigSchema = Type.Object(
       Type.Literal("text"),
       Type.Literal("toolTitle"),
     ]),
-    maxCallWidth: Type.Number({ minimum: 40, maximum: 200 }),
     maxExpandedEntries: Type.Union([
       Type.Literal(-1),
       Type.Literal(10),
@@ -152,7 +149,6 @@ const BOOLEAN_CONFIG_KEYS: ReadonlySet<ConfigKey> = new Set([
 ]);
 
 const INTEGER_CONFIG_KEYS: ReadonlySet<ConfigKey> = new Set([
-  "maxCallWidth",
   "maxExpandedEntries",
 ]);
 

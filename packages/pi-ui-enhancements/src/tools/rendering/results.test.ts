@@ -26,22 +26,22 @@ const optsExpanded: ToolRenderResultOptions = {
 describe("formatErrorBody", () => {
   it("compacts long single-line errors when collapsed", () => {
     const error =
-      "A very long error message that definitely exceeds the maximum allowed line width limit";
-    const { text, truncated } = formatErrorBody(error, opts, "...");
+      "A very long error message that definitely exceeds the available viewport width";
+    const { text, truncated } = formatErrorBody(error, opts, 40, "...");
     expect(truncated).toBe(true);
     expect(text).not.toBe(error);
   });
 
   it("marks multi-line errors as truncated even when they fit", () => {
     const error = "line1\nline2\nline3";
-    const { text, truncated } = formatErrorBody(error, opts, "...");
+    const { text, truncated } = formatErrorBody(error, opts, 40, "...");
     expect(truncated).toBe(true);
     expect(text).toBe("line1 ...");
   });
 
   it("preserves full error when expanded", () => {
     const error = "line1\nline2\nline3";
-    const { text, truncated } = formatErrorBody(error, optsExpanded, "...");
+    const { text, truncated } = formatErrorBody(error, optsExpanded, 40, "...");
     expect(truncated).toBe(false);
     expect(text).toBe("line1\nline2\nline3");
   });
@@ -59,6 +59,7 @@ describe("formatSimpleErrorResult", () => {
       state,
       opts,
       theme,
+      80,
     );
     expect(output).toContain("╰─");
     expect(output).toContain("something went wrong");
@@ -74,6 +75,7 @@ describe("formatSimpleErrorResult", () => {
         state,
         options,
         theme,
+        80,
       );
       expect(output).toContain("truncated");
       expect(output).not.toContain("error •");
@@ -85,12 +87,18 @@ describe("formatSimpleErrorResult", () => {
     const state: BaseRenderState = { isError: true };
     const error = "rg: regex parse error:\n    (?:[)\n       ^";
 
-    const collapsed = formatSimpleErrorResult(error, state, opts, theme);
+    const collapsed = formatSimpleErrorResult(error, state, opts, theme, 80);
     expect(collapsed).toContain("╰─ rg: regex parse error: ...");
     expect(collapsed).toContain("to expand");
     expect(collapsed.split("\n")).toHaveLength(1);
 
-    const expanded = formatSimpleErrorResult(error, state, optsExpanded, theme);
+    const expanded = formatSimpleErrorResult(
+      error,
+      state,
+      optsExpanded,
+      theme,
+      80,
+    );
     expect(expanded).toContain("to collapse");
     expect(expanded).toContain("│      (?:[)");
     expect(expanded).toContain("│         ^");
@@ -103,6 +111,7 @@ describe("formatSimpleErrorResult", () => {
       { isError: true },
       opts,
       mkTheme(),
+      80,
     );
     expect(output).toContain("╰─ error");
     expect(output).not.toContain("ctrl+o");
@@ -129,7 +138,7 @@ describe("formatListResult", () => {
     const result = {
       content: [{ type: "text", text: "(empty)" }],
     };
-    const output = formatListResult(result, state, opts, theme, baseConfig);
+    const output = formatListResult(result, state, opts, theme, baseConfig, 80);
     expect(output).toContain("╰─");
     expect(output).toContain("(empty)");
   });
@@ -144,6 +153,7 @@ describe("formatListResult", () => {
       opts,
       mkTheme(),
       baseConfig,
+      80,
     );
 
     expect(output).toContain("truncated • (empty)");
@@ -155,7 +165,7 @@ describe("formatListResult", () => {
     const result = {
       content: [{ type: "text", text: "a.txt\nb.txt\nc.txt" }],
     };
-    const output = formatListResult(result, state, opts, theme, baseConfig);
+    const output = formatListResult(result, state, opts, theme, baseConfig, 80);
     expect(output).toContain("3 files");
     expect(output).toContain("to expand");
   });
@@ -170,6 +180,7 @@ describe("formatListResult", () => {
       optsExpanded,
       mkTheme(),
       baseConfig,
+      80,
     );
     const rendered = output.split("\n");
 
@@ -195,6 +206,7 @@ describe("formatListResult", () => {
         optsExpanded,
         mkTheme(),
         baseConfig,
+        80,
       );
 
       expect(output).toContain("file0.txt");
@@ -215,7 +227,7 @@ describe("formatListResult", () => {
       content: [{ type: "text", text: "a.txt\nb.txt" }],
       details: { resultLimitReached: 1000 },
     };
-    const output = formatListResult(result, state, opts, theme, baseConfig);
+    const output = formatListResult(result, state, opts, theme, baseConfig, 80);
     expect(output).toContain("muted:2 files");
     expect(output).not.toContain("1000 limit");
   });
@@ -227,7 +239,7 @@ describe("formatListResult", () => {
       content: [{ type: "text", text: "a.txt\nb.txt" }],
       details: { resultLimitReached: 1000 },
     };
-    const output = formatListResult(result, state, opts, theme, baseConfig);
+    const output = formatListResult(result, state, opts, theme, baseConfig, 80);
     expect(output).toContain("truncated • 2 files");
     expect(output).not.toContain("1000 limit");
   });
@@ -245,6 +257,7 @@ describe("formatListResult", () => {
         opts,
         theme,
         baseConfig,
+        80,
       ),
     ).toContain("dim:╰─ ");
 
@@ -255,6 +268,7 @@ describe("formatListResult", () => {
         opts,
         theme,
         baseConfig,
+        80,
       ),
     ).toContain("dim:╰─ ");
   });

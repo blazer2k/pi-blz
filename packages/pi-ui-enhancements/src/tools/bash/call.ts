@@ -4,9 +4,12 @@ import {
   visibleWidth,
   type Text,
 } from "@earendil-works/pi-tui";
-import { getBlinkIndicator, getMaxCallWidth } from "../rendering/state";
-import { sanitizeMultilineDisplayText } from "../rendering/text";
-import { getCallRenderParts } from "../rendering/tree";
+import { getBlinkIndicator, invalidateIfChanged } from "../rendering/state";
+import {
+  sanitizeMultilineDisplayText,
+  safeTruncateToWidth,
+} from "../rendering/text";
+import { getCallText, getCallPrefix } from "../rendering/tree";
 import type { BashRenderState, BashToolInput } from "./types";
 
 type BashCallContext = {
@@ -62,36 +65,47 @@ export function renderBashCall(
     visibleWidth("Bash ") +
     visibleWidth("$ ") +
     visibleWidth(inlineTimeoutSuffix);
-  const commandBudget = Math.max(1, getMaxCallWidth() - staticWidth);
-  const commandTruncated = visibleWidth(collapsedSource) > commandBudget;
-  state.callExpandable = commandTruncated || command.includes("\n");
-  const expanded =
-    toolContext.expanded &&
-    (state.callExpandable || state.resultExpandable === true);
-  const { text, prefix } = getCallRenderParts(state, theme, toolContext, {
-    staticActive: expanded,
-  });
-
-  const visibleCommand = expanded
-    ? expandedCommand
-    : truncateToWidth(
-        highlightedCollapsedCommand,
-        commandBudget,
-        theme.fg("dim", "..."),
-      );
-  const commandDisplay = theme.fg("dim", "$ ") + visibleCommand;
-  const finalCommandLine = visibleCommand.split("\n").at(-1) ?? "";
-  const expandedCommandBudget =
-    commandBudget + visibleWidth(inlineTimeoutSuffix);
-  const timeoutOnOwnLine =
-    expanded &&
-    timeoutText.length > 0 &&
-    visibleWidth(finalCommandLine + ` ${timeoutText}`) > expandedCommandBudget;
-
-  const timeoutDisplay = timeoutOnOwnLine
-    ? `\n${theme.fg("dim", timeoutText)}`
-    : inlineTimeoutSuffix;
+  const text = getCallText(theme);
   const title = theme.fg("toolTitle", theme.bold("Bash "));
-  text.setText(prefix + title + commandDisplay + timeoutDisplay);
+  text.setText((width) => {
+    const commandBudget = Math.max(1, width - 3 - staticWidth);
+    const callExpandable =
+      staticWidth + visibleWidth(collapsedSource) > Math.max(1, width - 3) ||
+      command.includes("\n");
+    const changed = (state.callExpandable === true) !== callExpandable;
+    state.callExpandable = callExpandable;
+    invalidateIfChanged(changed, toolContext.invalidate);
+    const expanded =
+      toolContext.expanded &&
+      (callExpandable || state.resultExpandable === true);
+    const { prefix } = getCallPrefix(state, theme, toolContext, {
+      staticActive: expanded,
+    });
+    const visibleCommand = expanded
+      ? expandedCommand
+      : truncateToWidth(
+          highlightedCollapsedCommand,
+          commandBudget,
+          theme.fg("dim", "..."),
+        );
+    const finalCommandLine = visibleCommand.split("\n").at(-1) ?? "";
+    const timeoutOnOwnLine =
+      expanded &&
+      timeoutText.length > 0 &&
+      visibleWidth(finalCommandLine + ` ${timeoutText}`) >
+        commandBudget + visibleWidth(inlineTimeoutSuffix);
+    const timeoutDisplay = timeoutOnOwnLine
+      ? `\n${theme.fg("dim", timeoutText)}`
+      : inlineTimeoutSuffix;
+    const display =
+      prefix + title + theme.fg("dim", "$ ") + visibleCommand + timeoutDisplay;
+    return expanded
+      ? display
+      : safeTruncateToWidth(
+          display,
+          Math.max(1, width - 3),
+          theme.fg("dim", "..."),
+        );
+  });
   return text;
 }
