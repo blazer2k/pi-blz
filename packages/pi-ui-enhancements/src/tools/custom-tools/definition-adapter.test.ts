@@ -8,6 +8,7 @@ import { Text, visibleWidth } from "@earendil-works/pi-tui";
 import { getConfig, loadConfig, saveConfig } from "../../config/store";
 import { cleanRunnerProto, mkTheme, mkToolCtx } from "../../testing/helpers";
 import { clearBlinkTimers } from "../rendering/state";
+import type { BaseRenderState } from "../rendering/types";
 import { patchCustomToolRendering } from "./patch-manager";
 import { createWrappedDefinition } from "./definition-adapter";
 import { stripAnsi } from "../rendering/text";
@@ -424,6 +425,48 @@ describe("wrapped custom tool definitions", () => {
     expect((state as any)._uiEnhancements.blinkTimer).toBeDefined();
     clearBlinkTimers();
     handle.dispose();
+  });
+
+  it("keeps active custom calls blinking through partial results", () => {
+    const tool = mkRegisteredTool("codemode").definition;
+    tool.renderResult = () => new Text("native result", 0, 0);
+    const wrapped = createWrappedDefinition(tool, {
+      isToolCallActive: () => true,
+      reportIssue: () => {},
+    });
+    const state: BaseRenderState = {};
+    const context = mkToolCtx({
+      state: { _uiEnhancements: state },
+      isPartial: true,
+    });
+    const theme = mkTheme();
+
+    wrapped.renderCall!({}, theme, context).render(80);
+    const timer = state.blinkTimer;
+    expect(timer).toBeDefined();
+
+    for (const output of ["working", "still working"]) {
+      wrapped.renderResult!(
+        { content: [{ type: "text", text: output }], details: undefined },
+        { expanded: false, isPartial: true },
+        theme,
+        context,
+      ).render(80);
+      expect(state.hasResult).toBe(false);
+      wrapped.renderCall!({}, theme, context).render(80);
+      expect(state.blinkTimer).toBe(timer);
+    }
+
+    const finalContext = { ...context, isPartial: false };
+    wrapped.renderResult!(
+      { content: [{ type: "text", text: "done" }], details: undefined },
+      { expanded: false, isPartial: false },
+      theme,
+      finalContext,
+    ).render(80);
+    expect(state.hasResult).toBe(true);
+    wrapped.renderCall!({}, theme, finalContext).render(80);
+    expect(state.blinkTimer).toBeUndefined();
   });
 
   it("marks generic results truncated from tool details", () => {

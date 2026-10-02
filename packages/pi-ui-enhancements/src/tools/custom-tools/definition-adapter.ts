@@ -182,6 +182,7 @@ function createResultRenderer(
       | { truncation?: { truncated?: boolean } }
       | undefined;
     const changed = updateResultState(state, {
+      hasResult: !options.isPartial,
       truncated: details?.truncation?.truncated === true,
       isError: toolContext.isError,
     });
