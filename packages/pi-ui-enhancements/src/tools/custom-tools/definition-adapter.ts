@@ -36,7 +36,7 @@ type StateWithCustom = {
   _uiEnhancements?: CustomRenderState;
 };
 
-function getCustomState(state: unknown): CustomRenderState {
+export function getCustomState(state: unknown): CustomRenderState {
   const root = state as StateWithCustom;
   root._uiEnhancements ??= {};
   return root._uiEnhancements;
@@ -48,7 +48,7 @@ export function shouldWrapDefinition(
   return !definition[WRAPPED_TOOL] && definition.renderShell !== "self";
 }
 
-type DefinitionAdapterOptions = {
+export type DefinitionAdapterOptions = {
   isToolCallActive: (toolCallId: string) => boolean;
   reportIssue: CustomToolRenderingReporter;
 };

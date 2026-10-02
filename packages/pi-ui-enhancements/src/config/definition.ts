@@ -43,7 +43,7 @@ export interface Config {
   indicatorStyle: "dot" | "circle" | "diamond";
   indicatorColor: "success" | "text" | "toolTitle";
   maxExpandedEntries: number;
-  bashCollapsedDisplay: "preview" | "summary";
+  collapsedOutputDisplay: "preview" | "summary";
   showExpansionHint: boolean;
 
   // Editor
@@ -69,7 +69,7 @@ const DEFAULT_CONFIG: Config = {
   indicatorStyle: "circle",
   indicatorColor: "success",
   maxExpandedEntries: 20,
-  bashCollapsedDisplay: "preview",
+  collapsedOutputDisplay: "preview",
   showExpansionHint: true,
   roundedEditorColor: "dim",
   roundedEditorShowThinkingLevel: true,
@@ -114,7 +114,7 @@ const ConfigSchema = Type.Object(
       Type.Literal(50),
       Type.Literal(100),
     ]),
-    bashCollapsedDisplay: Type.Union([
+    collapsedOutputDisplay: Type.Union([
       Type.Literal("preview"),
       Type.Literal("summary"),
     ]),

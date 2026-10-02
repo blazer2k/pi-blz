@@ -3,7 +3,7 @@ import type {
   ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
 import { buildResultStatusParts } from "../rendering/state";
-import { formatDuration } from "./output";
+import { formatDuration } from "../rendering/output";
 import type { BashDetailsWithTiming, BashRenderState } from "./types";
 
 type MetadataOptions = {

@@ -85,14 +85,15 @@ const SETTING_DEFINITIONS: SettingDefinition[] = [
   {
     id: "patchCustomTools",
     label: "Patch custom tools",
-    description: "Apply compact rendering to third-party tools",
+    description:
+      "Apply compact rendering to extension tools, including Codemode",
     values: BOOLEAN_VALUES,
   },
   {
     id: "capitalizeToolNames",
     label: "Capitalize tool names",
     description:
-      "Capitalize first letter of custom tool names (e.g. mcp → Mcp)",
+      "Capitalize wrapped tool names, including Codemode (e.g. mcp → Mcp)",
     values: BOOLEAN_VALUES,
   },
   {
@@ -115,9 +116,10 @@ const SETTING_DEFINITIONS: SettingDefinition[] = [
     values: ["-1", "10", "20", "50", "100"],
   },
   {
-    id: "bashCollapsedDisplay",
-    label: "Collapsed Bash output",
-    description: "Show a three-row preview or summary-only Bash result",
+    id: "collapsedOutputDisplay",
+    label: "Collapsed output",
+    description:
+      "Show a three-row output preview or a summary for Bash and wrapped Codemode",
     values: ["preview", "summary"],
   },
   {

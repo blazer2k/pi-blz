@@ -231,7 +231,13 @@ class TreeText extends Text {
       this.renderedSource = this.sourceText;
       this.renderedWidth = width;
     }
-    return super.render(width);
+    return super
+      .render(width)
+      .map((line) =>
+        visibleWidth(line) > width
+          ? safeTruncateToWidth(line, width, "")
+          : line,
+      );
   }
 }
 

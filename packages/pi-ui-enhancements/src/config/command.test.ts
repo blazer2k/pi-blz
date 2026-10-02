@@ -92,7 +92,7 @@ describe("registerConfigCommand", () => {
       { key: "indicatorStyle", invalidates: true },
       { key: "indicatorColor", invalidates: true },
       { key: "maxExpandedEntries", invalidates: true },
-      { key: "bashCollapsedDisplay", invalidates: true },
+      { key: "collapsedOutputDisplay", invalidates: true },
       { key: "showExpansionHint", invalidates: true },
       { key: "asciiHeaderEnabled", invalidates: false },
     ];

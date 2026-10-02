@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, beforeEach, afterEach } from "bun:test";
 import type {
   ExtensionAPI,
@@ -11,6 +14,7 @@ import {
   mkToolCtx,
 } from "./testing/helpers";
 import ext from "./index";
+import { loadConfig } from "./config/store";
 
 beforeEach(cleanRunnerProto);
 afterEach(cleanRunnerProto);
@@ -92,6 +96,47 @@ function mkCtx(overrides?: Partial<ExtensionContext>) {
 }
 
 describe("extension lifecycle", () => {
+  it("keeps core renderers without Codemode registration or the hook when disabled", () => {
+    const directory = mkdtempSync(join(tmpdir(), "pi-ui-codemode-lifecycle-"));
+    const originalPath = process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH;
+    process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH = join(
+      directory,
+      "settings.json",
+    );
+    writeFileSync(
+      process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH,
+      JSON.stringify({ patchCustomTools: false }),
+    );
+    const pi = mkPi();
+    const registryMethod = ExtensionRunner.prototype.getAllRegisteredTools;
+    try {
+      ext(pi);
+      expect(ExtensionRunner.prototype.getAllRegisteredTools).toBe(
+        registryMethod,
+      );
+      expect(
+        (ExtensionRunner.prototype as unknown as Record<symbol, unknown>)[
+          CUSTOM_TOOL_PATCH_STATE
+        ],
+      ).toBeUndefined();
+      expect(pi._registeredTools()).not.toContain("codemode");
+      expect(
+        pi._registeredToolDefinitions().find((tool) => tool.name === "bash")
+          ?.renderShell,
+      ).toBe("self");
+      pi._handlers.session_start![0]!({}, mkCtx({ hasUI: false }));
+      expect(ExtensionRunner.prototype.getAllRegisteredTools).toBe(
+        registryMethod,
+      );
+    } finally {
+      pi._handlers.session_shutdown?.[0]?.({});
+      if (originalPath === undefined)
+        delete process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH;
+      else process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH = originalPath;
+      rmSync(directory, { recursive: true, force: true });
+      loadConfig();
+    }
+  });
   it("session_start does not override active tools", () => {
     const pi = mkPi();
     (pi as any)._setActiveTools(["custom"]);

@@ -3,6 +3,7 @@ import type {
   Theme,
   ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
+import { visibleWidth } from "@earendil-works/pi-tui";
 import { clearBlinkTimers } from "./state";
 import {
   formatOmissionRow,
@@ -32,6 +33,17 @@ describe("formatOmissionRow", () => {
 });
 
 describe("tree-aware text wrapping", () => {
+  it("bounds wide characters at the one-column minimum without losing resized content", () => {
+    const text = getResultText({}, optsExpanded, undefined);
+    text.setText("│  界界界");
+    for (const width of [1, 2, 3, 4, 5]) {
+      expect(
+        text.render(width).every((line) => visibleWidth(line) <= width),
+      ).toBe(true);
+    }
+    expect(text.render(40).join("\n")).toContain("界界界");
+  });
+
   it("evaluates width-aware text on resize and invalidation", () => {
     const widths: number[] = [];
     const text = getResultText({}, optsExpanded, undefined);

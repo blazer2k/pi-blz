@@ -49,6 +49,62 @@ function mkRegisteredTool(name: string) {
 }
 
 describe("patchCustomToolRendering", () => {
+  it("specializes only native Codemode and preserves self-rendering ownership", () => {
+    const native = {
+      ...mkRegisteredTool("codemode"),
+      sourceInfo: { source: "builtin", path: "builtin:codemode" },
+    };
+    const custom = mkRegisteredTool("codemode");
+    const wrongPath = {
+      ...mkRegisteredTool("codemode"),
+      sourceInfo: { source: "builtin", path: "builtin:other" },
+    };
+    const wrongSource = {
+      ...mkRegisteredTool("codemode"),
+      sourceInfo: { source: "extension", path: "builtin:codemode" },
+    };
+    const self = {
+      ...mkRegisteredTool("codemode"),
+      sourceInfo: native.sourceInfo,
+    };
+    self.definition.renderShell = "self";
+    proto.getAllRegisteredTools = () => [
+      native,
+      custom,
+      wrongPath,
+      wrongSource,
+      self,
+    ];
+    const handle = patchCustomToolRendering();
+    try {
+      const get = () =>
+        (proto.getAllRegisteredTools as Function).call({}) as Array<{
+          definition: ToolDefinition;
+        }>;
+      const tools = get();
+      expect(get()[0]!.definition).toBe(tools[0]!.definition);
+      for (let i = 0; i < 4; i++) {
+        const output = tools[i]!.definition.renderResult!(
+          {
+            content: [{ type: "text", text: "a\nb\nc\nd" }],
+            details: { calls: [] },
+          },
+          { expanded: false, isPartial: false },
+          mkTheme(),
+          mkToolCtx(),
+        )
+          .render(120)
+          .join("\n");
+        expect(output.includes("+2 lines")).toBe(i === 0);
+      }
+      expect(tools[4]!.definition).toBe(self.definition);
+      handle.dispose();
+      expect(get()[0]!.definition).toBe(native.definition);
+    } finally {
+      handle.dispose();
+    }
+  });
+
   it("wraps third-party tools", () => {
     proto.getAllRegisteredTools = function () {
       return [mkRegisteredTool("myTool")];

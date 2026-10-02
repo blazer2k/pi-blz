@@ -2,7 +2,7 @@ import type {
   Theme,
   ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
-import { getBashCollapsedDisplay } from "../rendering/state";
+import { getCollapsedOutputDisplay } from "../rendering/state";
 import { renderCommandError, renderUnknownError } from "./error-result";
 import { buildBashResultView } from "./model";
 import { renderBashSuccess } from "./success-result";
@@ -16,7 +16,7 @@ export function formatBashResult(
   width: number,
 ): string {
   const view = buildBashResultView(result, state, options, {
-    collapsedDisplay: getBashCollapsedDisplay(),
+    collapsedDisplay: getCollapsedOutputDisplay(),
     errorEllipsis: theme.fg("error", "..."),
     errorWidth: Math.max(1, width - 3),
   });

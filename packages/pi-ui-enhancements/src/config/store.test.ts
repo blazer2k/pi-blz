@@ -129,21 +129,39 @@ describe("config numeric values", () => {
     expect(getConfig().maxExpandedEntries).toBe(20);
   });
 
-  it("validates bashCollapsedDisplay against allowed values", () => {
-    expect(getConfig().bashCollapsedDisplay).toBe("preview");
+  it("validates collapsedOutputDisplay against allowed values", () => {
+    expect(getConfig().collapsedOutputDisplay).toBe("preview");
 
-    saveConfig("bashCollapsedDisplay", "summary");
-    expect(getConfig().bashCollapsedDisplay).toBe("summary");
-    expect(() => saveConfig("bashCollapsedDisplay", "tail")).toThrow(
+    saveConfig("collapsedOutputDisplay", "summary");
+    expect(getConfig().collapsedOutputDisplay).toBe("summary");
+    loadConfig();
+    expect(getConfig().collapsedOutputDisplay).toBe("summary");
+    expect(() => saveConfig("collapsedOutputDisplay", "tail")).toThrow(
       "Invalid config update",
     );
 
     writeFileSync(
       process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH!,
-      JSON.stringify({ bashCollapsedDisplay: "tail" }),
+      JSON.stringify({ collapsedOutputDisplay: "tail" }),
     );
     loadConfig();
-    expect(getConfig().bashCollapsedDisplay).toBe("preview");
+    expect(getConfig().collapsedOutputDisplay).toBe("preview");
+  });
+});
+
+describe("obsolete settings", () => {
+  it("ignores the old Bash setting without resetting valid settings", () => {
+    writeFileSync(
+      process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH!,
+      JSON.stringify({
+        bashCollapsedDisplay: "summary",
+        indicatorColor: "text",
+      }),
+    );
+    loadConfig();
+    expect(getConfig()).not.toHaveProperty("bashCollapsedDisplay");
+    expect(getConfig().collapsedOutputDisplay).toBe("preview");
+    expect(getConfig().indicatorColor).toBe("text");
   });
 });
 

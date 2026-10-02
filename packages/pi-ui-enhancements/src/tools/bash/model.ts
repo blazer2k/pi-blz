@@ -1,10 +1,7 @@
 import type { ToolRenderResultOptions } from "@earendil-works/pi-coding-agent";
 import { formatErrorBody } from "../rendering/results";
-import {
-  countLines,
-  extractTextContent,
-  normalizeOutput,
-} from "../rendering/text";
+import { extractTextContent } from "../rendering/text";
+import { selectOutputWindow, type OutputWindow } from "../rendering/output";
 import { getDurationSummary } from "./metadata";
 import { parseBashErrorText, stripBashTruncationNotice } from "./native-output";
 import type {
@@ -12,17 +9,6 @@ import type {
   BashRenderState,
   BashResult,
 } from "./types";
-
-const BASH_PREVIEW_ROWS = 3;
-const BASH_PREVIEW_EDGE_LINES = 1;
-
-export type BashOutputWindow = {
-  fullText: string;
-  previewHeadLines: string[];
-  previewTailLines: string[];
-  totalLines: number;
-  hiddenLines: number;
-};
 
 type BaseBashResultView = {
   expanded: boolean;
@@ -34,12 +20,12 @@ type BaseBashResultView = {
 
 export type BashSuccessView = BaseBashResultView & {
   kind: "success";
-  output: BashOutputWindow;
+  output: OutputWindow;
 };
 
 export type BashCommandErrorView = BaseBashResultView & {
   kind: "command-error";
-  output: BashOutputWindow;
+  output: OutputWindow;
   status: string;
 };
 
@@ -63,43 +49,6 @@ export type BashResultPolicy = {
   errorWidth: number;
 };
 
-export function selectBashOutputWindow(
-  text: string,
-  collapsedDisplay: "preview" | "summary",
-): BashOutputWindow {
-  const fullText = normalizeOutput(text).replace(/\n+$/g, "");
-  const totalLines = countLines(fullText);
-  const lines = totalLines === 0 ? [] : fullText.split("\n");
-
-  if (collapsedDisplay === "summary" || totalLines === 0) {
-    return {
-      fullText,
-      previewHeadLines: [],
-      previewTailLines: [],
-      totalLines,
-      hiddenLines: totalLines,
-    };
-  }
-
-  if (totalLines <= BASH_PREVIEW_ROWS) {
-    return {
-      fullText,
-      previewHeadLines: lines,
-      previewTailLines: [],
-      totalLines,
-      hiddenLines: 0,
-    };
-  }
-
-  return {
-    fullText,
-    previewHeadLines: lines.slice(0, BASH_PREVIEW_EDGE_LINES),
-    previewTailLines: lines.slice(-BASH_PREVIEW_EDGE_LINES),
-    totalLines,
-    hiddenLines: totalLines - BASH_PREVIEW_EDGE_LINES * 2,
-  };
-}
-
 function buildErrorView(
   rawText: string,
   state: BashRenderState,
@@ -112,7 +61,7 @@ function buildErrorView(
     return {
       ...base,
       kind: "command-error",
-      output: selectBashOutputWindow(error.output, policy.collapsedDisplay),
+      output: selectOutputWindow(error.output, policy.collapsedDisplay),
       status: error.status,
     };
   }
@@ -165,6 +114,6 @@ export function buildBashResultView(
   return {
     ...base,
     kind: "success",
-    output: selectBashOutputWindow(output, policy.collapsedDisplay),
+    output: selectOutputWindow(output, policy.collapsedDisplay),
   };
 }

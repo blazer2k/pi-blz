@@ -1,11 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { PI_0_84_3_OUTPUT } from "../test-fixtures/pi-0.84.3";
 import { PI_0_86_0_OUTPUT } from "../test-fixtures/pi-0.86.0";
-import {
-  buildBashResultView,
-  selectBashOutputWindow,
-  type BashResultPolicy,
-} from "./model";
+import { buildBashResultView, type BashResultPolicy } from "./model";
+import { selectOutputWindow } from "../rendering/output";
 
 const policy: BashResultPolicy = {
   collapsedDisplay: "preview",
@@ -13,9 +10,9 @@ const policy: BashResultPolicy = {
   errorWidth: 75,
 };
 
-describe("selectBashOutputWindow", () => {
+describe("selectOutputWindow", () => {
   it("shows every line when preview output has three lines or fewer", () => {
-    const output = selectBashOutputWindow("one\ntwo\nthree", "preview");
+    const output = selectOutputWindow("one\ntwo\nthree", "preview");
 
     expect(output.previewHeadLines).toEqual(["one", "two", "three"]);
     expect(output.previewTailLines).toEqual([]);
@@ -23,7 +20,7 @@ describe("selectBashOutputWindow", () => {
   });
 
   it("uses one head and one tail line beyond the preview limit", () => {
-    const output = selectBashOutputWindow(
+    const output = selectOutputWindow(
       "one\ntwo\nthree\nfour\nfive\nsix\nseven",
       "preview",
     );
@@ -34,7 +31,7 @@ describe("selectBashOutputWindow", () => {
   });
 
   it("preserves blank lines selected at preview boundaries", () => {
-    const output = selectBashOutputWindow("\none\ntwo\nthree\nfour", "preview");
+    const output = selectOutputWindow("\none\ntwo\nthree\nfour", "preview");
 
     expect(output.previewHeadLines).toEqual([""]);
     expect(output.previewTailLines).toEqual(["four"]);
@@ -42,7 +39,7 @@ describe("selectBashOutputWindow", () => {
   });
 
   it("hides all nonempty output in summary mode", () => {
-    const output = selectBashOutputWindow("one\ntwo\nthree", "summary");
+    const output = selectOutputWindow("one\ntwo\nthree", "summary");
 
     expect(output.previewHeadLines).toEqual([]);
     expect(output.previewTailLines).toEqual([]);

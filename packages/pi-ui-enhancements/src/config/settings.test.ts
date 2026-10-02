@@ -17,6 +17,19 @@ describe("getSettingItems", () => {
     expect(settingIds).toHaveLength(configKeys.length);
   });
 
+  it("keeps the menu size and exposes the shared output mode", () => {
+    const items = getSettingItems(getDefaultConfig());
+    expect(items).toHaveLength(19);
+    expect(
+      items.find((item) => item.id === "collapsedOutputDisplay"),
+    ).toMatchObject({
+      label: "Collapsed output",
+      currentValue: "preview",
+      values: ["preview", "summary"],
+    });
+    expect(items.map((item) => item.id)).not.toContain("bashCollapsedDisplay");
+  });
+
   it("reads current values from the supplied config", () => {
     const config = {
       ...getConfig(),

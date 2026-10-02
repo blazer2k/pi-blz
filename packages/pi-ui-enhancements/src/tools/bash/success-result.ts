@@ -3,7 +3,7 @@ import { buildExpansionHint } from "../rendering/state";
 import { buildBashMetadataParts, joinMetadata } from "./metadata";
 import type { BashSuccessView } from "./model";
 import type { BashRenderState } from "./types";
-import { formatCollapsedBashOutput, formatOutputLines } from "./output";
+import { formatCollapsedOutput, formatOutputLines } from "../rendering/output";
 
 function buildHint(
   expandable: boolean,
@@ -25,7 +25,7 @@ export function renderBashSuccess(
   state: BashRenderState,
   width: number,
 ): string {
-  const collapsedOutput = formatCollapsedBashOutput(
+  const collapsedOutput = formatCollapsedOutput(
     view.output,
     theme,
     "toolOutput",

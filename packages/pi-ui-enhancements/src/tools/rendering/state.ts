@@ -23,8 +23,8 @@ export function getMaxExpandedEntries(): number {
 
 export const MAX_EXPANDED_ENTRIES = getMaxExpandedEntries;
 
-export function getBashCollapsedDisplay(): "preview" | "summary" {
-  return getConfig().bashCollapsedDisplay;
+export function getCollapsedOutputDisplay(): "preview" | "summary" {
+  return getConfig().collapsedOutputDisplay;
 }
 
 const BLINK_INTERVAL_MS = 500;

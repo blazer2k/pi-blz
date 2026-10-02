@@ -408,7 +408,7 @@ describe("bash renderResult", () => {
   });
 
   afterEach(() => {
-    saveConfig("bashCollapsedDisplay", "preview");
+    saveConfig("collapsedOutputDisplay", "preview");
   });
 
   it("preview mode shows one head and one tail line around an omission row", () => {
@@ -481,7 +481,7 @@ describe("bash renderResult", () => {
   });
 
   it("summary mode hides output and includes its line count", () => {
-    saveConfig("bashCollapsedDisplay", "summary");
+    saveConfig("collapsedOutputDisplay", "summary");
     const def = setupBashTool();
     const output = def.renderResult!(
       {
@@ -501,7 +501,7 @@ describe("bash renderResult", () => {
   });
 
   it("puts normalized errors before the metadata footer", () => {
-    saveConfig("bashCollapsedDisplay", "summary");
+    saveConfig("collapsedOutputDisplay", "summary");
     const def = setupBashTool();
     const output = def.renderResult!(
       {

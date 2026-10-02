@@ -1,7 +1,51 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { normalizeOutput } from "../rendering/text";
-import { formatOmissionRow, formatTreeLine } from "../rendering/tree";
-import type { BashOutputWindow } from "./model";
+import { countLines, normalizeOutput } from "./text";
+import { formatOmissionRow, formatTreeLine } from "./tree";
+
+export type OutputWindow = {
+  fullText: string;
+  previewHeadLines: string[];
+  previewTailLines: string[];
+  totalLines: number;
+  hiddenLines: number;
+};
+
+export function selectOutputWindow(
+  text: string,
+  collapsedDisplay: "preview" | "summary",
+): OutputWindow {
+  const fullText = normalizeOutput(text).replace(/\n+$/g, "");
+  const totalLines = countLines(fullText);
+  const lines = totalLines === 0 ? [] : fullText.split("\n");
+
+  if (collapsedDisplay === "summary" || totalLines === 0) {
+    return {
+      fullText,
+      previewHeadLines: [],
+      previewTailLines: [],
+      totalLines,
+      hiddenLines: totalLines,
+    };
+  }
+
+  if (totalLines <= 3) {
+    return {
+      fullText,
+      previewHeadLines: lines,
+      previewTailLines: [],
+      totalLines,
+      hiddenLines: 0,
+    };
+  }
+
+  return {
+    fullText,
+    previewHeadLines: lines.slice(0, 1),
+    previewTailLines: lines.slice(-1),
+    totalLines,
+    hiddenLines: totalLines - 2,
+  };
+}
 
 export function formatDuration(milliseconds: number): string {
   if (milliseconds < 1000) return `${milliseconds}ms`;
@@ -59,8 +103,8 @@ export function formatOutputLines(
   return { text: renderedLines.join("\n"), truncated };
 }
 
-export function formatCollapsedBashOutput(
-  output: BashOutputWindow,
+export function formatCollapsedOutput(
+  output: OutputWindow,
   theme: Theme,
   color: "toolOutput" | "error",
   width: number,

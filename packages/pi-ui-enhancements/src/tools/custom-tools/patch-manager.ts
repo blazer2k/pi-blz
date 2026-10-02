@@ -4,6 +4,8 @@ import {
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import type { Handle } from "../../shared/handle";
+import { createCodemodeDefinition } from "../codemode";
+import { clearCodemodeTimers } from "../codemode/timing";
 import {
   createWrappedDefinition,
   shouldWrapDefinition,
@@ -104,13 +106,17 @@ function isAnyToolCallActive(
 function wrapDefinition<T extends ToolDefinition>(
   state: PatchState,
   definition: T,
+  nativeCodemode: boolean,
 ): T {
   if (!shouldWrapDefinition(definition)) return definition;
 
   const cached = state.definitions.get(definition);
   if (cached) return cached as T;
 
-  const wrapped = createWrappedDefinition(definition, {
+  const createDefinition = nativeCodemode
+    ? createCodemodeDefinition
+    : createWrappedDefinition;
+  const wrapped = createDefinition(definition, {
     isToolCallActive: (toolCallId) =>
       isAnyToolCallActive(state, definition, toolCallId),
     reportIssue: (issue) => reportIssue(state, issue, definition),
@@ -142,7 +148,11 @@ function wrapRegisteredTool(
   }
 
   try {
-    const definition = wrapDefinition(state, value.definition);
+    const nativeCodemode =
+      value.definition.name === "codemode" &&
+      value.sourceInfo?.source === "builtin" &&
+      value.sourceInfo.path === "builtin:codemode";
+    const definition = wrapDefinition(state, value.definition, nativeCodemode);
     return definition === value.definition ? value : { ...value, definition };
   } catch (error) {
     reportIssue(
@@ -253,6 +263,7 @@ function deactivatePatch(
   reporter: CustomToolRenderingReporter,
 ): void {
   if (state.clients.size > 0) return;
+  clearCodemodeTimers();
 
   if (prototype.getAllRegisteredTools === state.patched) {
     try {

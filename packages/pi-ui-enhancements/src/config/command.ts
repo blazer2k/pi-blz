@@ -12,7 +12,7 @@ const TOOL_RENDER_SETTINGS = new Set<ConfigKey>([
   "indicatorStyle",
   "indicatorColor",
   "maxExpandedEntries",
-  "bashCollapsedDisplay",
+  "collapsedOutputDisplay",
   "showExpansionHint",
 ]);
 
