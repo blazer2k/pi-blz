@@ -13,6 +13,7 @@ import type { Handle } from "./shared/handle";
 import { patchTools } from "./tools/built-ins";
 import { patchCustomToolRendering } from "./tools/custom-tools/patch-manager";
 import { clearBlinkTimers } from "./tools/rendering/state";
+import { registerTuiCapture } from "./tools/rendering/tui-runtime";
 import { registerWorkingIndicator } from "./working-indicator/indicator";
 
 function hasTui(ctx: { hasUI: boolean; mode?: string }): boolean {
@@ -99,6 +100,7 @@ export default function (pi: ExtensionAPI) {
     syncCustomToolRenderingPatch();
 
     if (hasTui(ctx)) {
+      uiHandles.push(registerTuiCapture(ctx));
       uiHandles.push(
         registerAsciiHeader(pi, ctx, (fn) => {
           headerReregister = fn;

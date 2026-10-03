@@ -7,6 +7,7 @@ import type {
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { ExtensionRunner } from "@earendil-works/pi-coding-agent";
+import type { TUI } from "@earendil-works/pi-tui";
 import {
   cleanRunnerProto,
   CUSTOM_TOOL_PATCH_STATE,
@@ -15,6 +16,7 @@ import {
 } from "./testing/helpers";
 import ext from "./index";
 import { loadConfig } from "./config/store";
+import { isFullscreenTui } from "./tools/rendering/tui-runtime";
 
 beforeEach(cleanRunnerProto);
 afterEach(cleanRunnerProto);
@@ -67,6 +69,7 @@ function mkCtx(overrides?: Partial<ExtensionContext>) {
     cwd: process.cwd(),
     hasUI: true,
     ui: {
+      setWidget: overrides?.ui?.setWidget ?? (() => {}),
       setEditorComponent: overrides?.ui?.setEditorComponent ?? (() => {}),
       getEditorComponent:
         overrides?.ui?.getEditorComponent ?? (() => undefined),
@@ -183,6 +186,7 @@ describe("extension lifecycle", () => {
     const ctx = mkCtx({
       hasUI: true,
       ui: {
+        setWidget: () => {},
         setEditorComponent: () => {
           editorSet = true;
         },
@@ -211,6 +215,57 @@ describe("extension lifecycle", () => {
     // Working indicator registers agent_start/agent_end handlers
     expect((pi as any)._handlers.agent_start).toBeDefined();
     expect((pi as any)._handlers.agent_end).toBeDefined();
+  });
+
+  for (const mode of ["rpc", "json", "print"] as const) {
+    it(`does not capture a TUI in ${mode} mode`, async () => {
+      const pi = mkPi();
+      ext(pi);
+      const ctx = mkCtx({ mode, hasUI: mode === "rpc" });
+      let widgetSet = false;
+      ctx.ui.setWidget = () => {
+        widgetSet = true;
+      };
+      try {
+        await pi._handlers.session_start![0]!({}, ctx);
+        expect(widgetSet).toBe(false);
+        expect(isFullscreenTui()).toBe(false);
+      } finally {
+        await pi._handlers.session_shutdown![0]!({});
+      }
+    });
+  }
+
+  it("captures before the editor and clears capture on shutdown and reinstall", async () => {
+    const pi = mkPi();
+    ext(pi);
+    const widgets = new Map<string, { dispose?(): void }>();
+    const tui = { mode: "fullscreen", requestRender() {} } as TUI;
+    const ctx = mkCtx({ mode: "tui" });
+    let editorRegistrations = 0;
+    ctx.ui.setWidget = (key, content) => {
+      widgets.get(key)?.dispose?.();
+      widgets.delete(key);
+      if (typeof content === "function")
+        widgets.set(key, content(tui, mkTheme()));
+    };
+    ctx.ui.setEditorComponent = () => {
+      expect(isFullscreenTui()).toBe(true);
+      editorRegistrations++;
+    };
+    try {
+      for (let session = 0; session < 2; session++) {
+        await pi._handlers.session_start![0]!({}, ctx);
+        expect(isFullscreenTui()).toBe(true);
+        expect(widgets.size).toBe(1);
+        await pi._handlers.session_shutdown![0]!({});
+        expect(widgets.size).toBe(0);
+        expect(isFullscreenTui()).toBe(false);
+      }
+      expect(editorRegistrations).toBe(2);
+    } finally {
+      await pi._handlers.session_shutdown![0]!({});
+    }
   });
 
   it("session_shutdown disposes all handles", () => {

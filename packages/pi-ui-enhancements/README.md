@@ -66,6 +66,8 @@ The extension replaces the renderers for read, write, edit, bash, ls, find, and 
 
 UI settings apply immediately. Tool calls and output adapt to the available terminal width, including after resizing.
 
+Expanded Bash, Write, and wrapped Codemode indicators blink in fullscreen TUI mode. In regular mode they stay static and dim while unfinished to avoid repeated scrollback repainting. Mode detection follows Pi's live TUI, independently of the rounded editor; completed indicators remain static in either mode. Calls that remain compact keep their existing indicator behavior.
+
 Expanded Write and Bash calls show their complete output. Expanded list tools show a head/tail split capped by `maxExpandedEntries`, with an omission marker between the two sections. Generic custom-tool output retains its existing capped rendering.
 
 `collapsedOutputDisplay` controls collapsed Bash and wrapped Codemode results. Codemode follows this setting only while `patchCustomTools` is enabled. `preview` shows up to three logical output lines, or the first line, an omission marker, and the last line for longer output. Long lines are shortened to fit the available width. `summary` hides ordinary output and reports its line count in the footer. Failed Codemode scripts still show a short diagnostic.

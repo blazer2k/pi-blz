@@ -20,6 +20,7 @@ import {
 } from "./state";
 import { safeTruncateToWidth, stripAnsi } from "./text";
 import type { BaseRenderState } from "./types";
+import { isFullscreenTui } from "./tui-runtime";
 
 export function formatOmissionRow(
   hiddenCount: number,
@@ -117,7 +118,8 @@ export function getCallPrefix(
   const isDone =
     state.hasResult ||
     (!toolContext.executionStarted && !toolContext.isPartial);
-  const staticActive = renderOptions?.staticActive === true && !isDone;
+  const staticActive =
+    renderOptions?.staticActive === true && !isDone && !isFullscreenTui();
   const animate = (renderOptions?.animate ?? true) && !staticActive;
   const blinkOn = animate ? isBlinkOn() : false;
   state.blinkOn = blinkOn;
