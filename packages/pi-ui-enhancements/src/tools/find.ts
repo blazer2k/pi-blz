@@ -4,6 +4,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { createFindToolDefinition } from "@earendil-works/pi-coding-agent";
 import type { Handle } from "../shared/handle";
+import { formatToolLabel } from "./rendering/labels";
 import {
   createCwdDeferredTool,
   registerPatchedTool,
@@ -31,11 +32,14 @@ export function patchFindTool(pi: ExtensionAPI): Handle {
       const { text, prefix } = getCallRenderParts(state, theme, toolCtx);
 
       const renderArgs = args as FindToolInput;
-      const title = theme.fg("toolTitle", theme.bold("Find "));
       const limit = renderArgs.limit
         ? theme.fg("dim", ` (limit ${renderArgs.limit})`)
         : "";
       text.setText((width) => {
+        const title = theme.fg(
+          "toolTitle",
+          theme.bold(formatToolLabel("find") + " "),
+        );
         const callWidth = Math.max(1, width - 3);
         const call = buildPatternPathCall({
           prefix,

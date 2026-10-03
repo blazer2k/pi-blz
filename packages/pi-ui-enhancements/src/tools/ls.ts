@@ -5,6 +5,7 @@ import type {
 import { createLsToolDefinition } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import type { Handle } from "../shared/handle";
+import { formatToolLabel } from "./rendering/labels";
 import {
   createCwdDeferredTool,
   registerPatchedTool,
@@ -33,12 +34,15 @@ export function patchLsTool(pi: ExtensionAPI): Handle {
       const { text, prefix } = getCallRenderParts(state, theme, toolCtx);
 
       const renderArgs = args as LsToolInput;
-      const title = theme.fg("toolTitle", theme.bold("Ls "));
       const limit = renderArgs.limit
         ? theme.fg("dim", ` (limit ${renderArgs.limit})`)
         : "";
       const path = renderArgs.path || ".";
       text.setText((width) => {
+        const title = theme.fg(
+          "toolTitle",
+          theme.bold(formatToolLabel("ls") + " "),
+        );
         const callWidth = Math.max(1, width - 3);
         const pathWidth = Math.max(
           1,

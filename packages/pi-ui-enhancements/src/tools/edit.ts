@@ -13,6 +13,7 @@ import {
   registerPatchedTool,
 } from "./tool-registration";
 import type { Handle } from "../shared/handle";
+import { formatToolLabel } from "./rendering/labels";
 import {
   buildRenderResult,
   formatSimpleErrorResult,
@@ -126,9 +127,12 @@ export function patchEditTool(pi: ExtensionAPI): Handle {
       const renderArgs = args as EditToolInput;
       const { text, prefix } = getCallRenderParts(state, theme, toolCtx);
 
-      const title = theme.fg("toolTitle", theme.bold("Edit "));
       const fullPath = renderPath(renderArgs.path, theme, toolCtx.cwd);
       text.setText((width) => {
+        const title = theme.fg(
+          "toolTitle",
+          theme.bold(formatToolLabel("edit") + " "),
+        );
         const callWidth = Math.max(1, width - 3);
         const pathWidth = Math.max(1, callWidth - visibleWidth(prefix + title));
         return formatExpandableCallText(

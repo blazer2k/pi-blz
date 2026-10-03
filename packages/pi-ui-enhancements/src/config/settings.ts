@@ -93,7 +93,7 @@ const SETTING_DEFINITIONS: SettingDefinition[] = [
     id: "capitalizeToolNames",
     label: "Capitalize tool names",
     description:
-      "Capitalize wrapped tool names, including Codemode (e.g. mcp → Mcp)",
+      "Capitalize core and wrapped tool labels; preserve original spelling when off",
     values: BOOLEAN_VALUES,
   },
   {

@@ -24,6 +24,7 @@ import {
 } from "./rendering/tree";
 import type { BaseRenderState } from "./rendering/types";
 import type { Handle } from "../shared/handle";
+import { formatToolLabel } from "./rendering/labels";
 import {
   createCwdDeferredTool,
   registerPatchedTool,
@@ -205,9 +206,12 @@ export function patchWriteTool(pi: ExtensionAPI): Handle {
         staticActive: toolCtx.expanded,
       });
 
-      const title = theme.fg("toolTitle", theme.bold("Write "));
       const fullPath = renderPath(renderArgs.path, theme, toolCtx.cwd);
       text.setText((width) => {
+        const title = theme.fg(
+          "toolTitle",
+          theme.bold(formatToolLabel("write") + " "),
+        );
         const callWidth = Math.max(1, width - 3);
         const pathWidth = Math.max(1, callWidth - visibleWidth(prefix + title));
         const call = formatExpandableCallText(

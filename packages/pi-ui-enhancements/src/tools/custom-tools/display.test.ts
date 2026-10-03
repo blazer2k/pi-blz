@@ -8,7 +8,6 @@ import { mkTheme } from "../../testing/helpers";
 import {
   applyArgumentHyperlinks,
   buildGenericCallHeader,
-  capitalizeFirstVisibleChar,
   sanitizeRenderedText,
 } from "./display";
 
@@ -31,18 +30,6 @@ describe("sanitizeRenderedText", () => {
     expect(sanitizeRenderedText("one\u0000\ttwo\r\nthree")).toBe(
       "one two three",
     );
-  });
-});
-
-describe("capitalizeFirstVisibleChar", () => {
-  it("skips whitespace and ANSI sequences", () => {
-    expect(capitalizeFirstVisibleChar(" \x1b[31msearch\x1b[0m")).toBe(
-      " \x1b[31mSearch\x1b[0m",
-    );
-  });
-
-  it("leaves text without a lowercase first character unchanged", () => {
-    expect(capitalizeFirstVisibleChar(" 2 results")).toBe(" 2 results");
   });
 });
 

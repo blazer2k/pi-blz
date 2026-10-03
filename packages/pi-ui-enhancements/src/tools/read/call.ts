@@ -22,6 +22,7 @@ import {
   formatExpandableCallText,
 } from "../rendering/tree";
 import type { BaseRenderState } from "../rendering/types";
+import { formatToolLabel } from "../rendering/labels";
 
 const COMPACT_RESOURCE_FILE_NAMES = new Set([
   "AGENTS.md",
@@ -133,7 +134,7 @@ function formatCompactReadCall(
 
   const title = theme.fg(
     "toolTitle",
-    theme.bold(`Read ${classification.kind} `),
+    theme.bold(`${formatToolLabel("read")} ${classification.kind} `),
   );
   const label = truncateToWidth(
     classification.label,
@@ -152,12 +153,15 @@ export function renderReadCall(
   const state = toolContext.state as BaseRenderState;
   const { text, prefix } = getCallRenderParts(state, theme, toolContext);
   const classification = getCompactReadClassification(args, toolContext.cwd);
-  const title = theme.fg("toolTitle", theme.bold("Read "));
   const lineRange = formatReadLineRange(args, theme);
   const fullPath = renderPath(args.path, theme, toolContext.cwd);
-  const fullText = prefix + title + fullPath + lineRange;
 
   text.setText((width) => {
+    const title = theme.fg(
+      "toolTitle",
+      theme.bold(formatToolLabel("read") + " "),
+    );
+    const fullText = prefix + title + fullPath + lineRange;
     const callWidth = Math.max(1, width - 3);
     let collapsedText: string;
     let compactIsLossy = classification !== undefined;

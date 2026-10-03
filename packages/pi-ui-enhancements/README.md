@@ -49,7 +49,7 @@ Run `/ui-settings` in pi to open the settings menu. The list is searchable: type
 | Show interrupt hint   | Show "esc to interrupt" next to the working indicator                      |
 | Show run duration     | Show elapsed time while working, toast on completion                       |
 | Patch custom tools    | Apply compact rendering to extension tools, including Codemode             |
-| Capitalize tool names | Capitalize custom tool call labels (default: true, e.g. search → Search)   |
+| Capitalize tool names | Capitalize core and wrapped tool labels (default: true)                    |
 | Indicator style       | Symbol style of tool-call status indicators (dot, circle, diamond)         |
 | Indicator color       | Color of filled and completed indicators (success, text, toolTitle)        |
 | Max expanded entries  | Maximum entries shown by capped list and custom results (-1 for unlimited) |
@@ -92,9 +92,9 @@ Pi still loads and registers its own Codemode extension. We do not replace its r
 
 The compatibility layer tracks each extension instance independently and restores Pi's original method only while it still owns the prototype slot. Unexpected registry shapes leave Pi's values unchanged, renderer failures use generic output, and each compatibility problem is reported once instead of interrupting tool execution. A prototype patch installed later by another extension is never overwritten during cleanup.
 
-Custom tool call labels are capitalized by default while preserving the tool's own `renderCall()` layout when possible. For example, `mcp` becomes `Mcp`.
+`capitalizeToolNames` controls every tool-call header rendered by this extension: Read, Write, Edit, Bash, Ls, Find, Grep, and wrapped Codemode/third-party tools. It defaults to `true` and capitalizes the first visible character, for example `read` to `Read` and `mcp` to `Mcp`. Disabling it preserves original spelling rather than forcing lowercase. Wrapped tools keep their own `renderCall()` wording and layout when possible. Tool IDs, arguments, resource tags such as `[skill]`, result content, and native nested-call details are unchanged.
 
-Disable `patchCustomTools` to use native rendering for extension tools, including Codemode. Core Read/Bash/etc. enhancements remain independent of that switch. If you prefer lowercase wrapped tool labels, including Codemode, disable `capitalizeToolNames`.
+Disable `patchCustomTools` to use native rendering for extension tools, including Codemode. Core Read/Bash/etc. enhancements remain independent of that switch. Self-rendering tools retain their own labels and do not follow `capitalizeToolNames`.
 
 ## Persistence
 

@@ -89,6 +89,7 @@ describe("registerConfigCommand", () => {
     const previousKeybindings = getKeybindings();
     setKeybindings(new KeybindingsManager(TUI_KEYBINDINGS));
     const cases: Array<{ key: ConfigKey; invalidates: boolean }> = [
+      { key: "capitalizeToolNames", invalidates: true },
       { key: "indicatorStyle", invalidates: true },
       { key: "indicatorColor", invalidates: true },
       { key: "maxExpandedEntries", invalidates: true },

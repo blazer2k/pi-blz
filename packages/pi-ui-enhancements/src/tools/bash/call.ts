@@ -11,6 +11,7 @@ import {
 } from "../rendering/text";
 import { getCallText, getCallPrefix } from "../rendering/tree";
 import type { BashRenderState, BashToolInput } from "./types";
+import { formatToolLabel } from "../rendering/labels";
 
 type BashCallContext = {
   state: unknown;
@@ -60,14 +61,17 @@ export function renderBashCall(
   const inlineTimeoutSuffix = timeoutText
     ? theme.fg("dim", ` ${timeoutText}`)
     : "";
-  const staticWidth =
-    visibleWidth(`${getBlinkIndicator().filled} `) +
-    visibleWidth("Bash ") +
-    visibleWidth("$ ") +
-    visibleWidth(inlineTimeoutSuffix);
   const text = getCallText(theme);
-  const title = theme.fg("toolTitle", theme.bold("Bash "));
   text.setText((width) => {
+    const title = theme.fg(
+      "toolTitle",
+      theme.bold(formatToolLabel("bash") + " "),
+    );
+    const staticWidth =
+      visibleWidth(`${getBlinkIndicator().filled} `) +
+      visibleWidth(title) +
+      visibleWidth("$ ") +
+      visibleWidth(inlineTimeoutSuffix);
     const commandBudget = Math.max(1, width - 3 - staticWidth);
     const callExpandable =
       staticWidth + visibleWidth(collapsedSource) > Math.max(1, width - 3) ||

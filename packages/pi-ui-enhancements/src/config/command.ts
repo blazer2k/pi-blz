@@ -9,6 +9,7 @@ import { getSettingItems } from "./settings";
 import { getConfig, saveConfig } from "./store";
 
 const TOOL_RENDER_SETTINGS = new Set<ConfigKey>([
+  "capitalizeToolNames",
   "indicatorStyle",
   "indicatorColor",
   "maxExpandedEntries",

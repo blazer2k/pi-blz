@@ -5,6 +5,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { createGrepToolDefinition } from "@earendil-works/pi-coding-agent";
 import type { Handle } from "../shared/handle";
+import { formatToolLabel } from "./rendering/labels";
 import {
   createCwdDeferredTool,
   registerPatchedTool,
@@ -33,7 +34,6 @@ export function patchGrepTool(pi: ExtensionAPI): Handle {
       const { text, prefix } = getCallRenderParts(state, theme, toolCtx);
 
       const renderArgs = args as GrepToolInput;
-      const title = theme.fg("toolTitle", theme.bold("Grep "));
       const glob = renderArgs.glob
         ? theme.fg("dim", ` ${sanitizeDisplayText(renderArgs.glob)}`)
         : "";
@@ -44,6 +44,10 @@ export function patchGrepTool(pi: ExtensionAPI): Handle {
         ? theme.fg("dim", ` (limit ${renderArgs.limit})`)
         : "";
       text.setText((width) => {
+        const title = theme.fg(
+          "toolTitle",
+          theme.bold(formatToolLabel("grep") + " "),
+        );
         const callWidth = Math.max(1, width - 3);
         const call = buildPatternPathCall({
           prefix,

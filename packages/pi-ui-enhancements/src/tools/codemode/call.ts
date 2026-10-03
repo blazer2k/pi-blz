@@ -4,7 +4,7 @@ import {
   type Theme,
 } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
-import { getConfig } from "../../config/store";
+import { formatToolLabel } from "../rendering/labels";
 import { getBlinkIndicator, invalidateIfChanged } from "../rendering/state";
 import {
   safeTruncateToWidth,
@@ -27,7 +27,6 @@ export function renderCodemodeCall(
     state.nativeCall = undefined;
     reportIssue({ stage: "renderCall", toolName: native.name, error });
   };
-  const label = getConfig().capitalizeToolNames ? "Codemode" : "codemode";
   const code = (args as { code?: unknown } | undefined)?.code;
   const source =
     typeof code === "string" ? sanitizeMultilineDisplayText(code) : "...";
@@ -46,7 +45,6 @@ export function renderCodemodeCall(
     };
   }
   const preview = state.callHighlightCache.preview;
-  const title = theme.fg("toolTitle", theme.bold(label));
   const text = getCallText(theme);
   let nativeCall: CodemodeRenderState["nativeCall"];
   if (context.expanded) {
@@ -61,6 +59,8 @@ export function renderCodemodeCall(
     }
   }
   text.setText((width) => {
+    const label = formatToolLabel("codemode");
+    const title = theme.fg("toolTitle", theme.bold(label));
     const callWidth = Math.max(1, width - 3);
     const expandable =
       source.includes("\n") ||

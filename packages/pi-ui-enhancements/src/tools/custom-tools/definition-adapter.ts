@@ -4,7 +4,7 @@ import type {
   ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
-import { getConfig } from "../../config/store";
+import { formatToolLabel } from "../rendering/labels";
 import {
   buildResultStatusParts,
   invalidateIfChanged,
@@ -17,7 +17,6 @@ import type { BaseRenderState } from "../rendering/types";
 import {
   applyArgumentHyperlinks,
   buildGenericCallHeader,
-  capitalizeFirstVisibleChar,
   sanitizeRenderedText,
 } from "./display";
 import { buildGenericResult } from "./result";
@@ -94,12 +93,8 @@ function createCallRenderer(
     const { text, prefix } = getCallRenderParts(state, theme, toolContext, {
       animate: options.isToolCallActive(toolContext.toolCallId),
     });
-    const config = getConfig();
     const renderFallback = (width: number): string => {
-      const label =
-        config.capitalizeToolNames && definition.label
-          ? capitalizeFirstVisibleChar(definition.label)
-          : definition.label;
+      const label = formatToolLabel(definition.label);
       const header = buildGenericCallHeader(
         args as Record<string, unknown>,
         label,
@@ -139,9 +134,7 @@ function createCallRenderer(
             let innerText = toolContext.expanded
               ? lines.map(sanitizeRenderedText).join("\n")
               : sanitizeRenderedText(lines.join(" "));
-            if (config.capitalizeToolNames) {
-              innerText = capitalizeFirstVisibleChar(innerText);
-            }
+            innerText = formatToolLabel(innerText);
             innerText = applyArgumentHyperlinks(
               innerText,
               args,
