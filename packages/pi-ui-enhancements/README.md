@@ -1,18 +1,18 @@
 # @blazer2k/pi-ui-enhancements
 
-Visual polish and compact tool rendering for [pi](https://pi.dev).
+Compact tool output and a configurable terminal interface for [pi](https://pi.dev).
 
 **Current version:** 0.1.0
 
 ## Overview
 
-This extension adds visual improvements to pi's TUI:
+This extension adds:
 
-- Configurable ASCII art header at session start, rendered via figlet or the bundled Greek pi fonts.
-- Rounded border around the editor showing cwd, git branch, model, token usage, and context percentage.
-- Shimmer animation on the "Working" label with elapsed duration and an interrupt hint.
-- Compact tree-drawing summaries for tool output instead of verbose raw output. Paths are hyperlinked when your terminal supports it. Third-party tools get wrapped too (see below).
-- Optional capitalization for custom tool call labels, enabled by default.
+- An ASCII art header at session start, using figlet or the bundled Greek pi fonts.
+- A rounded editor border showing the working directory, git branch, model, token usage, and context percentage.
+- A shimmer animation on the "Working" label, with elapsed time and an interrupt hint.
+- Compact tool output with tree-style lines and clickable paths when your terminal supports them. This also works with eligible third-party tools.
+- Optional capitalization of tool headers, enabled by default.
 
 ![Example: compact tool output with ASCII header](images/example.webp)
 
@@ -24,7 +24,7 @@ This extension adds visual improvements to pi's TUI:
 pi install npm:@blazer2k/pi-ui-enhancements
 ```
 
-Or install locally for development:
+For local development:
 
 ```bash
 git clone https://github.com/blazer2k/pi-blz.git
@@ -33,74 +33,103 @@ npm install
 pi -e ./packages/pi-ui-enhancements/src/index.ts
 ```
 
-## Configuration
+## Settings
 
-Run `/ui-settings` in pi to open the settings menu. The list is searchable: type to filter settings.
+Run `/ui-settings` in pi. Type in the menu to filter the settings list.
 
-### Available Settings
+| Setting               | Description                                                           |
+| --------------------- | --------------------------------------------------------------------- |
+| Enable ASCII header   | Show ASCII art at session start                                       |
+| Header font           | Choose from 19 figlet fonts and 2 bundled fonts (default: Greek)      |
+| Header color          | Header text color (text, accent, dim)                                 |
+| Header alignment      | Place the header on the left, in the center, or on the right          |
+| Show version          | Show the pi version below the ASCII header                            |
+| Show interrupt hint   | Show "esc to interrupt" next to the working indicator                 |
+| Show run duration     | Show elapsed time while working and a brief message on completion     |
+| Patch custom tools    | Use compact output for extension tools, including Codemode            |
+| Capitalize tool names | Capitalize headers drawn by this extension (default: true)            |
+| Indicator style       | Tool status symbol (dot, circle, diamond)                             |
+| Indicator color       | Color of filled and completed symbols (success, text, toolTitle)      |
+| Max expanded entries  | Limit entries in expanded lists and custom results (-1 for unlimited) |
+| Collapsed output      | Bash and Codemode output style: preview or summary (default: preview) |
+| Editor frame color    | Color of editor borders and their status text (thinking, dim, muted)  |
+| Show thinking level   | Show the thinking level at the bottom of the editor                   |
+| Show cache tokens     | Show cache read/write token counts                                    |
+| Show cost             | Show the total session cost at the bottom of the editor               |
+| Show git branch       | Show the current git branch at the top of the editor                  |
 
-| Setting               | Description                                                                |
-| --------------------- | -------------------------------------------------------------------------- |
-| Enable ASCII header   | Show ASCII art header at session start                                     |
-| Header font           | Font for ASCII art header (19 figlet fonts + 2 bundled, default: Greek)    |
-| Header color          | Theme color of ASCII header (text, accent, dim)                            |
-| Header alignment      | Horizontal alignment (left, center, right)                                 |
-| Show version          | Display pi version below ASCII header                                      |
-| Show interrupt hint   | Show "esc to interrupt" next to the working indicator                      |
-| Show run duration     | Show elapsed time while working, toast on completion                       |
-| Patch custom tools    | Apply compact rendering to extension tools, including Codemode             |
-| Capitalize tool names | Capitalize core and wrapped tool labels (default: true)                    |
-| Indicator style       | Symbol style of tool-call status indicators (dot, circle, diamond)         |
-| Indicator color       | Color of filled and completed indicators (success, text, toolTitle)        |
-| Max expanded entries  | Maximum entries shown by capped list and custom results (-1 for unlimited) |
-| Collapsed output      | Bash and Codemode: preview or summary output (default: preview)            |
-| Editor frame color    | Color of editor borders and embedded status text (thinking, dim, muted)    |
-| Show thinking level   | Display thinking level in editor footer                                    |
-| Show cache tokens     | Display cache read/write token counts                                      |
-| Show cost             | Display total session cost in editor footer                                |
-| Show git branch       | Display current git branch in editor header                                |
+Settings are saved to `~/.pi/agent/ui-settings.json` and loaded at the start of each session. Use `PI_UI_ENHANCEMENTS_CONFIG_PATH` to choose a different settings file.
 
-### Built-in Tool Patches
+## Built-in tool display
 
-The extension replaces the renderers for read, write, edit, bash, ls, find, and grep without enabling those tools. Pi's `defaultTools` setting and CLI options control which tools are active. A fresh Pi configuration uses our renderers for read, bash, edit, and write; ls, find, and grep use our renderers when enabled.
+The extension changes how read, write, edit, bash, ls, find, and grep look. Pi still runs the original tools and controls their arguments, source information, and availability. Your `defaultTools` setting and CLI options decide which tools are active; this extension does not enable them.
 
-UI settings apply immediately. Tool calls and output adapt to the available terminal width, including after resizing.
+Tool calls and output fit the available terminal width and adjust when you resize it. Drawing settings, such as capitalization and indicator colors, update existing tool displays immediately.
 
-Expanded Bash, Write, and wrapped Codemode indicators blink in fullscreen TUI mode. In regular mode they stay static and dim while unfinished to avoid repeated scrollback repainting. Mode detection follows Pi's live TUI, independently of the rounded editor; completed indicators remain static in either mode. Calls that remain compact keep their existing indicator behavior.
+Expanded Bash and Write show their full content. Expanded list tools show the beginning and end of a list, with an omission marker between them. `maxExpandedEntries` controls that limit and also applies to generic custom-tool results.
 
-Expanded Write and Bash calls show their complete output. Expanded list tools show a head/tail split capped by `maxExpandedEntries`, with an omission marker between the two sections. Generic custom-tool output retains its existing capped rendering.
+Unfinished indicators in expanded Bash, Write, and wrapped Codemode blink in fullscreen mode. In regular mode they stay dim and still, avoiding repeated redraws of terminal scrollback. Completed indicators stay still in both modes. These mode rules apply only to expanded calls, and work even when the rounded editor is disabled.
 
-`collapsedOutputDisplay` controls collapsed Bash and wrapped Codemode results. Codemode follows this setting only while `patchCustomTools` is enabled. `preview` shows up to three logical output lines, or the first line, an omission marker, and the last line for longer output. Long lines are shortened to fit the available width. `summary` hides ordinary output and reports its line count in the footer. Failed Codemode scripts still show a short diagnostic.
+Bash duration is measured from execution events. Small extension-only records in the session file keep those durations available when you reopen a session or Pi rebuilds the conversation display. These records are not sent to the model and do not change tool results. Saved results with `details.durationMs` also remain supported.
 
-### Codemode Rendering
+## Collapsed Bash and Codemode output
 
-When `patchCustomTools` is enabled, collapsed Codemode shows a highlighted script preview and summarizes nested calls by count. Bottom metadata includes running/failed/cancelled counts when present, duration, available model-call costs, and expansion hints. Live duration starts when execution is observed; Pi's reported wall time supplies the final duration when available. Historical results without timing data do not get an invented duration.
+`collapsedOutputDisplay` has two options:
 
-Expanded Codemode retains native script rendering, nested-call details, and all returned output, followed by our metadata footer. Native costs remain visible, so costs can appear in both native details and our footer. `maxExpandedEntries` does not cap Codemode. Full-output links and failed-spill warnings remain visible in both collapsed modes; expansion does not read spilled files or recover content omitted by Pi. Image display remains Pi-owned.
+- `preview`: Show up to three output lines. For longer output, show the first line, an omission marker, and the last line. Long lines are shortened to fit the terminal.
+- `summary`: Hide ordinary output and show its line count below the tool call.
 
-### Editor and Footer Ownership
+This setting applies to Codemode while `patchCustomTools` is enabled. Failed Codemode scripts still show a short error message in either mode.
 
-Pi supports one custom editor and one custom footer at a time; extensions do not compose these components automatically. This extension installs a `CustomEditor` subclass for each TUI session and uses the footer only for extension-provided status messages already not shown in the editor border.
+## Codemode display
 
-The editor factory active during registration is restored on shutdown only when the rounded editor is still active. An editor installed later by another extension is therefore not overwritten during disposal. Changing UI settings re-registers the rounded editor, so extension load order and later settings changes determine which custom editor is active.
+With `patchCustomTools` enabled, collapsed Codemode shows a syntax-highlighted script preview and a count of nested tool calls. Below the output, it shows running, failed, and cancelled call counts when available, along with duration, available model-call costs, and hints for expanding the display.
 
-When another footer replaces this extension's footer, Pi disposes the previous footer component and releases its ownership. The extension only clears the footer during shutdown while its own component still owns that slot.
+The live timer starts when script execution is observed. Pi's reported wall time supplies the final duration when available. Saved results without timing information do not get an estimated duration.
 
-### Extension Tool Monkey-Patching
+Expanding Codemode shows Pi's script display, nested-call details, and all returned output, followed by the extension's summary line. `maxExpandedEntries` does not limit Codemode output. Costs can appear both in Pi's nested-call details and in the extension's summary.
 
-By default, the extension monkey-patches `ExtensionRunner.prototype.getAllRegisteredTools` to wrap eligible extension-tool definitions. Native Codemode gets specialized rendering through this same hook, identified by Pi's built-in source metadata. Third-party replacements named `codemode` keep ordinary custom-tool behavior. Core tools with our own renderers and tools with `renderShell: "self"` are left alone.
+Links to full output files remain visible in both preview and summary mode, as do warnings about failed saves. Expanding the display does not read those files or restore output that Pi omitted. Pi handles image display.
 
-Pi still loads and registers its own Codemode extension. We do not replace its registration, so no Codemode replacement warning or built-in configuration change is needed.
+## Custom-tool display
 
-The compatibility layer tracks each extension instance independently and restores Pi's original method only while it still owns the prototype slot. Unexpected registry shapes leave Pi's values unchanged, renderer failures use generic output, and each compatibility problem is reported once instead of interrupting tool execution. A prototype patch installed later by another extension is never overwritten during cleanup.
+A tool-call block is the part of the conversation showing one tool's header, arguments, and output. It can span several terminal lines.
 
-`capitalizeToolNames` controls every tool-call header rendered by this extension: Read, Write, Edit, Bash, Ls, Find, Grep, and wrapped Codemode/third-party tools. It defaults to `true` and capitalizes the first visible character, for example `read` to `Read` and `mcp` to `Mcp`. Disabling it preserves original spelling rather than forcing lowercase. Wrapped tools keep their own `renderCall()` wording and layout when possible. Tool IDs, arguments, resource tags such as `[skill]`, result content, and native nested-call details are unchanged.
+`patchCustomTools` controls compact display for eligible extension tools, including Codemode. Turning it off uses their normal display. This setting does not affect the seven built-in tool displays.
 
-Disable `patchCustomTools` to use native rendering for extension tools, including Codemode. Core Read/Bash/etc. enhancements remain independent of that switch. Self-rendering tools retain their own labels and do not follow `capitalizeToolNames`.
+Pi checks this setting when it creates or rebuilds a tool-call block. Changing it affects those blocks; blocks already on screen keep their existing layout and drawing functions. Other drawing settings can update existing blocks without rebuilding them.
 
-## Persistence
+If a custom tool has a working `renderCall()` function, the extension keeps its header wording. If that function is missing or fails, the extension builds a simple header using the tool identifier, such as `web_search`. A separate display label such as "Web Search" is not available through Pi's public renderer API.
 
-Settings are saved to `~/.pi/agent/ui-settings.json` and restored on each session. Override the path with `PI_UI_ENHANCEMENTS_CONFIG_PATH`.
+Tools that provide their own layout with `renderShell: "self"` keep that layout and their own labels.
+
+## Tool-name capitalization
+
+`capitalizeToolNames` applies to headers drawn by this extension: Read, Write, Edit, Bash, Ls, Find, Grep, and wrapped Codemode or third-party tools.
+
+It defaults to `true` and capitalizes the first visible character, for example `read` becomes `Read` and `mcp` becomes `Mcp`. Turning it off preserves the original spelling; it does not force lowercase. Tools that draw their own layout keep their own capitalization.
+
+This setting changes only the displayed header. Tool identifiers, arguments, resource tags such as `[skill]`, output text, and Pi's nested-call details stay unchanged.
+
+## Compatibility with other extensions
+
+Tool display uses Pi's public `registerToolRenderer()` API. The extension does not monkey-patch Pi's methods or prototypes, or replace tool registrations. Pi continues to load its own Codemode extension without replacement warnings or built-in configuration changes.
+
+The extension uses `getAllTools()` to identify built-in tools from their source information. A third-party tool named `codemode` gets ordinary custom-tool treatment. If source information is unavailable, the extension leaves the tool's display unchanged.
+
+Pi checks renderer overrides in extension load order. This extension consults the next renderer in the chain once per tool lookup. If reading tool or renderer information fails, it leaves that renderer unchanged. If a custom renderer fails while drawing, it uses a simple fallback display. Each problem is reported once per tool and failure type until session cleanup.
+
+Each loaded copy of this extension tracks and cleans up its own custom-tool timers.
+
+## Editor and footer compatibility
+
+Pi allows one custom editor and one custom footer at a time. Extensions cannot automatically combine their editors or footers.
+
+This extension installs a `CustomEditor` subclass for each terminal session. Its footer shows extension-provided status messages that are not already in the editor border.
+
+On shutdown, it restores the previous editor only if its rounded editor is still active. An editor installed later by another extension is left alone. Changing UI settings reinstalls the rounded editor, so extension load order and later settings changes decide which editor is active.
+
+If another extension replaces the footer, Pi disposes this extension's footer. During shutdown, this extension clears the footer only if it still owns it.
 
 ## License
 
