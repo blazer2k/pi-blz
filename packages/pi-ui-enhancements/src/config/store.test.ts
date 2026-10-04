@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import { getDefaultConfig } from "./definition";
 import {
   clearOnConfigChange,
@@ -76,6 +76,51 @@ describe("config compatibility", () => {
   });
 });
 
+describe("config validation", () => {
+  it("recovers invalid settings individually and normalizes the file", () => {
+    const report = spyOn(console, "error").mockImplementation(() => {});
+    let normalized = "";
+    try {
+      loadConfig(
+        undefined,
+        createStorage({
+          read: () =>
+            JSON.stringify({
+              asciiHeaderEnabled: "false",
+              asciiHeaderFont: "not-a-font",
+              asciiHeaderAlign: "right",
+              maxExpandedEntries: 25,
+              roundedEditorShowCost: true,
+            }),
+          write(_path, contents) {
+            normalized = contents;
+          },
+        }),
+      );
+
+      expect(getConfig()).toEqual({
+        ...getDefaultConfig(),
+        asciiHeaderAlign: "right",
+        roundedEditorShowCost: true,
+      });
+      expect(JSON.parse(normalized)).toEqual(getConfig());
+      expect(report).toHaveBeenCalledWith(
+        `Invalid font "not-a-font", falling back to "${getDefaultConfig().asciiHeaderFont}"`,
+      );
+    } finally {
+      report.mockRestore();
+    }
+  });
+
+  it("rejects unsupported fonts without changing the current config", () => {
+    const original = getConfig();
+    expect(() => saveConfig("asciiHeaderFont", "not-a-font")).toThrow(
+      "Invalid config update",
+    );
+    expect(getConfig()).toEqual(original);
+  });
+});
+
 describe("config value parsing", () => {
   it("saves boolean settings", () => {
     saveConfig("asciiHeaderEnabled", "false");
@@ -103,12 +148,20 @@ describe("config numeric values", () => {
   });
 
   it("accepts only configured maxExpandedEntries values", () => {
-    for (const value of ["-1", "10", "20", "50", "100"]) {
-      saveConfig("maxExpandedEntries", value);
-      expect(getConfig().maxExpandedEntries).toBe(Number(value));
+    for (const value of [-1, 10, 20, 50, 100] as const) {
+      saveConfig("maxExpandedEntries", String(value));
+      expect(getConfig().maxExpandedEntries).toBe(value);
     }
 
-    for (const value of ["0", "25", "99"]) {
+    for (const value of [
+      "0",
+      "25",
+      "99",
+      "NaN",
+      "Infinity",
+      "-Infinity",
+      "nope",
+    ]) {
       expect(() => saveConfig("maxExpandedEntries", value)).toThrow(
         "Invalid config update",
       );

@@ -1,4 +1,4 @@
-import { Type } from "typebox";
+import { Type, type Static } from "typebox";
 import { Compile } from "typebox/compile";
 
 export const ALLOWED_FONTS: string[] = [
@@ -25,34 +25,7 @@ export const ALLOWED_FONTS: string[] = [
   "Univers",
 ];
 
-export interface Config {
-  // ASCII header
-  asciiHeaderEnabled: boolean;
-  asciiHeaderFont: string;
-  asciiHeaderColor: "text" | "accent" | "dim";
-  asciiHeaderAlign: "left" | "center" | "right";
-  asciiHeaderShowVersion: boolean;
-
-  // Working indicator
-  workingIndicatorShowInterruptMsg: boolean;
-  workingIndicatorShowDuration: boolean;
-
-  // Tool rendering
-  patchCustomTools: boolean;
-  capitalizeToolNames: boolean;
-  indicatorStyle: "dot" | "circle" | "diamond";
-  indicatorColor: "success" | "text" | "toolTitle";
-  maxExpandedEntries: number;
-  collapsedOutputDisplay: "preview" | "summary";
-  showExpansionHint: boolean;
-
-  // Editor
-  roundedEditorColor: "thinking" | "dim" | "muted";
-  roundedEditorShowThinkingLevel: boolean;
-  roundedEditorShowCacheTokens: boolean;
-  roundedEditorShowCost: boolean;
-  roundedEditorShowBranch: boolean;
-}
+export type Config = Static<typeof ConfigSchema>;
 
 export type ConfigKey = keyof Config;
 
@@ -134,33 +107,8 @@ const ConfigSchema = Type.Object(
 
 const validator = Compile(ConfigSchema);
 
-const BOOLEAN_CONFIG_KEYS: ReadonlySet<ConfigKey> = new Set([
-  "asciiHeaderEnabled",
-  "asciiHeaderShowVersion",
-  "workingIndicatorShowInterruptMsg",
-  "workingIndicatorShowDuration",
-  "patchCustomTools",
-  "capitalizeToolNames",
-  "showExpansionHint",
-  "roundedEditorShowThinkingLevel",
-  "roundedEditorShowCacheTokens",
-  "roundedEditorShowCost",
-  "roundedEditorShowBranch",
-]);
-
-const INTEGER_CONFIG_KEYS: ReadonlySet<ConfigKey> = new Set([
-  "maxExpandedEntries",
-]);
-
 export function getDefaultConfig(): Config {
   return { ...DEFAULT_CONFIG };
-}
-
-function isIntegerConstrainedValue(key: ConfigKey, value: unknown): boolean {
-  return (
-    !INTEGER_CONFIG_KEYS.has(key) ||
-    (typeof value === "number" && Number.isInteger(value))
-  );
 }
 
 export function validateConfig(raw: unknown): Config {
@@ -170,9 +118,7 @@ export function validateConfig(raw: unknown): Config {
   const validated = getDefaultConfig();
 
   for (const key of Object.keys(DEFAULT_CONFIG) as ConfigKey[]) {
-    if (!(key in input) || !isIntegerConstrainedValue(key, input[key])) {
-      continue;
-    }
+    if (!(key in input)) continue;
 
     const candidate = { ...validated, [key]: input[key] };
     if (validator.Check(candidate)) {
@@ -191,9 +137,12 @@ export function validateConfig(raw: unknown): Config {
   return validated;
 }
 
-function parseConfigValue(key: ConfigKey, value: string): Config[ConfigKey] {
-  if (BOOLEAN_CONFIG_KEYS.has(key)) return value === "true";
-  if (INTEGER_CONFIG_KEYS.has(key)) return Number(value);
+function parseConfigValue(
+  key: ConfigKey,
+  value: string,
+): string | number | boolean {
+  if (typeof DEFAULT_CONFIG[key] === "boolean") return value === "true";
+  if (typeof DEFAULT_CONFIG[key] === "number") return Number(value);
   return value;
 }
 
@@ -205,7 +154,7 @@ export function applyConfigUpdate(
   const parsed = parseConfigValue(key, value);
   const updated = { ...current, [key]: parsed };
 
-  if (!isIntegerConstrainedValue(key, parsed) || !validator.Check(updated)) {
+  if (!validator.Check(updated)) {
     throw new Error(`Invalid config update: ${key}=${value}`);
   }
   if (key === "asciiHeaderFont" && !ALLOWED_FONTS.includes(String(parsed))) {

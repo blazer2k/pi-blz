@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   applyConfigUpdate,
   getDefaultConfig,
+  type Config,
   type ConfigKey,
 } from "./definition";
 import { getSettingItems } from "./settings";
@@ -31,11 +32,11 @@ describe("getSettingItems", () => {
   });
 
   it("reads current values from the supplied config", () => {
-    const config = {
+    const config: Config = {
       ...getConfig(),
       asciiHeaderEnabled: false,
       maxExpandedEntries: 100,
-      roundedEditorColor: "muted" as const,
+      roundedEditorColor: "muted",
     };
     const items = getSettingItems(config);
 
