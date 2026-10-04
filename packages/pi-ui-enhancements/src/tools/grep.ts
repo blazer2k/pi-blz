@@ -1,15 +1,9 @@
 import type {
-  ExtensionAPI,
+  ToolRenderers,
   GrepToolDetails,
   GrepToolInput,
 } from "@earendil-works/pi-coding-agent";
-import { createGrepToolDefinition } from "@earendil-works/pi-coding-agent";
-import type { Handle } from "../shared/handle";
 import { formatToolLabel } from "./rendering/labels";
-import {
-  createCwdDeferredTool,
-  registerPatchedTool,
-} from "./tool-registration";
 import { buildPatternPathCall, splitNativeListOutput } from "./list-rendering";
 import { buildRenderResult, formatListResult } from "./rendering/results";
 import { sanitizeDisplayText } from "./rendering/text";
@@ -23,12 +17,9 @@ const GREP_CONFIG: ListResultConfig = {
   preprocess: splitNativeListOutput,
 };
 
-export function patchGrepTool(pi: ExtensionAPI): Handle {
-  const tool = createCwdDeferredTool(createGrepToolDefinition);
-
-  return registerPatchedTool({
-    pi,
-    tool,
+export function patchGrepTool(): ToolRenderers {
+  return {
+    renderShell: "self",
     renderCall(args, theme, toolCtx) {
       const state = toolCtx.state as BaseRenderState;
       const { text, prefix } = getCallRenderParts(state, theme, toolCtx);
@@ -80,5 +71,5 @@ export function patchGrepTool(pi: ExtensionAPI): Handle {
         return d?.truncation?.truncated === true || d?.linesTruncated === true;
       },
     ),
-  });
+  };
 }

@@ -1,6 +1,6 @@
 import type {
   Theme,
-  ToolDefinition,
+  ToolRenderers,
   ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
@@ -41,15 +41,16 @@ export function getCustomState(state: unknown): CustomRenderState {
   return root._uiEnhancements;
 }
 
-export function shouldWrapDefinition(
-  definition: ToolDefinition & { [WRAPPED_TOOL]?: boolean },
+export function shouldWrapRenderers(
+  renderers: ToolRenderers & { [WRAPPED_TOOL]?: boolean },
 ): boolean {
-  return !definition[WRAPPED_TOOL] && definition.renderShell !== "self";
+  return !renderers[WRAPPED_TOOL] && renderers.renderShell !== "self";
 }
 
 export type DefinitionAdapterOptions = {
   isToolCallActive: (toolCallId: string) => boolean;
   reportIssue: CustomToolRenderingReporter;
+  trackState?: (state: BaseRenderState) => void;
 };
 
 function renderComponentLines(
@@ -84,17 +85,18 @@ function formatEmptyResult(
 }
 
 function createCallRenderer(
-  definition: ToolDefinition,
-  originalRenderCall: ToolDefinition["renderCall"],
+  toolName: string,
+  originalRenderCall: ToolRenderers["renderCall"],
   options: DefinitionAdapterOptions,
-): NonNullable<ToolDefinition["renderCall"]> {
+): NonNullable<ToolRenderers["renderCall"]> {
   return (args, theme, toolContext) => {
     const state = getCustomState(toolContext.state);
+    options.trackState?.(state);
     const { text, prefix } = getCallRenderParts(state, theme, toolContext, {
       animate: options.isToolCallActive(toolContext.toolCallId),
     });
     const renderFallback = (width: number): string => {
-      const label = formatToolLabel(definition.label);
+      const label = formatToolLabel(toolName);
       const header = buildGenericCallHeader(
         args as Record<string, unknown>,
         label,
@@ -110,7 +112,7 @@ function createCallRenderer(
       state.callComponent = undefined;
       options.reportIssue({
         stage: "renderCall",
-        toolName: definition.name,
+        toolName,
         error,
       });
     };
@@ -164,10 +166,11 @@ function createCallRenderer(
 }
 
 function createResultRenderer(
-  definition: ToolDefinition,
-  originalRenderResult: ToolDefinition["renderResult"],
-  reportIssue: CustomToolRenderingReporter,
-): NonNullable<ToolDefinition["renderResult"]> {
+  toolName: string,
+  originalRenderResult: ToolRenderers["renderResult"],
+  adapterOptions: DefinitionAdapterOptions,
+): NonNullable<ToolRenderers["renderResult"]> {
+  const { reportIssue } = adapterOptions;
   return (result, options, theme, toolContext) => {
     const state = getCustomState(toolContext.state);
     const text = getResultText(state, options, toolContext.lastComponent);
@@ -180,6 +183,7 @@ function createResultRenderer(
       isError: toolContext.isError,
     });
     invalidateIfChanged(changed, toolContext.invalidate);
+    adapterOptions.trackState?.(state);
 
     if (!originalRenderResult) {
       text.setText((width) =>
@@ -197,7 +201,7 @@ function createResultRenderer(
     } catch (error) {
       reportIssue({
         stage: "renderResult",
-        toolName: definition.name,
+        toolName,
         error,
       });
       text.setText((width) =>
@@ -231,7 +235,7 @@ function createResultRenderer(
       } catch (error) {
         reportIssue({
           stage: "renderResult",
-          toolName: definition.name,
+          toolName,
           error,
         });
         return buildGenericResult(result, state, options, theme, width);
@@ -241,19 +245,19 @@ function createResultRenderer(
   };
 }
 
-export function createWrappedDefinition<T extends ToolDefinition>(
-  definition: T,
+export function createWrappedRenderers(
+  toolName: string,
+  renderers: ToolRenderers,
   options: DefinitionAdapterOptions,
-): T {
+): ToolRenderers & { [WRAPPED_TOOL]: true } {
   return {
-    ...definition,
     [WRAPPED_TOOL]: true,
     renderShell: "self",
-    renderCall: createCallRenderer(definition, definition.renderCall, options),
+    renderCall: createCallRenderer(toolName, renderers.renderCall, options),
     renderResult: createResultRenderer(
-      definition,
-      definition.renderResult,
-      options.reportIssue,
+      toolName,
+      renderers.renderResult,
+      options,
     ),
-  } as T;
+  };
 }

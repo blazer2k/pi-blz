@@ -10,6 +10,7 @@ import {
   ToolExecutionComponent,
   type ExtensionAPI,
   type ToolDefinition,
+  type ToolRenderers,
 } from "@earendil-works/pi-coding-agent";
 import {
   getKeybindings,
@@ -23,11 +24,15 @@ import {
 import { registerConfigCommand } from "../../config/command";
 import { getSettingItems } from "../../config/settings";
 import { getConfig, loadConfig, saveConfig } from "../../config/store";
-import { mkTheme, mkToolCtx, setupTool } from "../../testing/helpers";
+import {
+  mkTheme,
+  mkToolCtx,
+  setupTool,
+  setupCustomTool,
+} from "../../testing/helpers";
 import { patchBashTool } from "../bash";
-import { createCodemodeDefinition } from "../codemode";
-import { createWrappedDefinition } from "../custom-tools/definition-adapter";
-import { patchCustomToolRendering } from "../custom-tools/patch-manager";
+import { createCodemodeRenderers } from "../codemode";
+import { createWrappedRenderers } from "../custom-tools/definition-adapter";
 import { patchEditTool } from "../edit";
 import { patchFindTool } from "../find";
 import { patchGrepTool } from "../grep";
@@ -110,10 +115,8 @@ function label(name: string, enabled: boolean) {
 
 describe("tool-call capitalization", () => {
   for (const testCase of coreCases) {
-    it(`applies both values to ${testCase.name} without changing execution or arguments`, () => {
+    it(`applies both values to ${testCase.name} without changing arguments`, () => {
       const definition = setupTool(testCase.patch);
-      const execute = definition.execute;
-      const parameters = definition.parameters;
       const originalArgs = structuredClone(testCase.args);
       for (const enabled of [true, false]) {
         saveConfig("capitalizeToolNames", String(enabled));
@@ -131,9 +134,11 @@ describe("tool-call capitalization", () => {
           expect(text(component)).toContain(
             ` ${label(testCase.name, enabled)} `,
           );
-          expect(definition.name).toBe(testCase.name);
-          expect(definition.execute).toBe(execute);
-          expect(definition.parameters).toBe(parameters);
+          expect(Object.keys(definition).sort()).toEqual([
+            "renderCall",
+            "renderResult",
+            "renderShell",
+          ]);
           expect(testCase.args).toEqual(originalArgs);
         }
       }
@@ -222,7 +227,7 @@ describe("tool-call capitalization", () => {
 
   it("refreshes Codemode without restarting its blink or changing native details", () => {
     const native = nativeCodemode();
-    const wrapped = createCodemodeDefinition(native, adapterOptions);
+    const wrapped = createCodemodeRenderers(native, adapterOptions);
     const state: BaseRenderState = {};
     const context = mkToolCtx({
       executionStarted: false,
@@ -273,7 +278,7 @@ describe("tool-call capitalization", () => {
       expect(output).toContain("read");
       expect(output).toContain("output remains lowercase");
       expect(result).toEqual(snapshot);
-      expect(wrapped.execute).toBe(native.execute);
+      expect("execute" in wrapped).toBe(false);
     }
   });
 
@@ -304,7 +309,11 @@ describe("tool-call capitalization", () => {
         label: "searchAPI",
         renderCall,
       };
-      const wrapped = createWrappedDefinition(definition, adapterOptions);
+      const wrapped = createWrappedRenderers(
+        definition.name,
+        definition,
+        adapterOptions,
+      );
       const args = { query: "mixed Case" };
       for (const expanded of [false, true]) {
         const component = wrapped.renderCall!(
@@ -320,27 +329,23 @@ describe("tool-call capitalization", () => {
           expect(output).toContain("mixed Case");
           if (renderCall === renderers[1] && expanded)
             expect(output).toContain("  detail staysLower");
-          expect(wrapped.name).toBe("searchAPI");
-          expect(wrapped.execute).toBe(definition.execute);
+          expect("execute" in wrapped).toBe(false);
+          expect(definition.name).toBe("searchAPI");
         }
       }
     }
-    const proper = createWrappedDefinition<ToolDefinition>(
-      { ...native, label: "Web Search", renderCall: undefined },
+    const proper = createWrappedRenderers(
+      "searchAPI",
+      { renderCall: undefined },
       adapterOptions,
     );
     saveConfig("capitalizeToolNames", "false");
     expect(text(proper.renderCall!({}, mkTheme(), mkToolCtx()))).toContain(
-      "Web Search",
+      "searchAPI",
     );
   });
 
   it("leaves self-rendering third-party labels untouched with either setting", () => {
-    const prototype = ExtensionRunner.prototype;
-    const originalDescriptor = Object.getOwnPropertyDescriptor(
-      prototype,
-      "getAllRegisteredTools",
-    )!;
     const native = {
       ...nativeCodemode(),
       name: "searchAPI",
@@ -348,34 +353,25 @@ describe("tool-call capitalization", () => {
       renderShell: "self" as const,
       renderCall: () => new Text("searchAPI", 0, 0),
     };
-    Object.defineProperty(prototype, "getAllRegisteredTools", {
-      ...originalDescriptor,
-      value: () => [{ definition: native }],
-    });
-    const handle = patchCustomToolRendering();
+    const fixture = setupCustomTool(native);
     try {
       for (const enabled of [true, false]) {
         saveConfig("capitalizeToolNames", String(enabled));
-        const registered = prototype.getAllRegisteredTools()[0]!.definition;
+        const registered = fixture.renderers;
         expect(registered).toBe(native);
         expect(
           text(registered.renderCall!({}, mkTheme(), mkToolCtx())).trimEnd(),
         ).toBe("searchAPI");
       }
     } finally {
-      handle.dispose();
-      Object.defineProperty(
-        prototype,
-        "getAllRegisteredTools",
-        originalDescriptor,
-      );
+      fixture.dispose();
     }
   });
 
   it("fits resized core, Codemode and third-party headers with both settings", () => {
     const native = nativeCodemode();
     const cases: Array<{
-      definition: ToolDefinition;
+      definition: ToolRenderers;
       args: Record<string, unknown>;
     }> = coreCases.map((testCase) => ({
       definition: setupTool(testCase.patch),
@@ -386,14 +382,13 @@ describe("tool-call capitalization", () => {
       },
     }));
     cases.push({
-      definition: createCodemodeDefinition(native, adapterOptions),
+      definition: createCodemodeRenderers(native, adapterOptions),
       args: { code: 'text("' + "x".repeat(300) + '");\ntext("last");' },
     });
     cases.push({
-      definition: createWrappedDefinition(
+      definition: createWrappedRenderers(
+        "searchAPI",
         {
-          ...native,
-          label: "searchAPI",
           renderCall: () => new Text("searchAPI " + "界".repeat(70), 0, 0),
         },
         adapterOptions,
@@ -437,16 +432,14 @@ describe("tool-call capitalization", () => {
           name: "read",
         },
         {
-          definition: createCodemodeDefinition(native, adapterOptions),
+          definition: createCodemodeRenderers(native, adapterOptions),
           args: { code: 'text("case Sensitive");' },
           name: "codemode",
         },
         {
-          definition: createWrappedDefinition(
+          definition: createWrappedRenderers(
+            "searchAPI",
             {
-              ...native,
-              name: "searchAPI",
-              label: "searchAPI",
               renderCall: () => new Text("searchAPI case Sensitive", 0, 0),
             },
             adapterOptions,
@@ -457,9 +450,9 @@ describe("tool-call capitalization", () => {
       ];
       const ui = { requestRender() {} } as unknown as TUI;
       const components = definitions.map(
-        ({ definition, args }) =>
+        ({ definition, args, name }) =>
           new ToolExecutionComponent(
-            definition.name,
+            name,
             "label-toggle",
             args,
             { showImages: false },

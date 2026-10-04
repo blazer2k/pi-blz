@@ -1,31 +1,27 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it, beforeEach, afterEach } from "bun:test";
+import { describe, expect, it, spyOn } from "bun:test";
 import type {
   ExtensionAPI,
   ExtensionContext,
+  ToolRendererResolver,
 } from "@earendil-works/pi-coding-agent";
 import { ExtensionRunner } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
-import {
-  cleanRunnerProto,
-  CUSTOM_TOOL_PATCH_STATE,
-  mkTheme,
-  mkToolCtx,
-} from "./testing/helpers";
+import { mkTheme, mkToolCtx } from "./testing/helpers";
 import ext from "./index";
 import { loadConfig } from "./config/store";
 import { isFullscreenTui } from "./tools/rendering/tui-runtime";
-
-beforeEach(cleanRunnerProto);
-afterEach(cleanRunnerProto);
 
 function mkPi() {
   const registeredTools: string[] = [];
   const registeredToolDefinitions: Array<
     Parameters<ExtensionAPI["registerTool"]>[0]
   > = [];
+  const resolvers: ToolRendererResolver[] = [];
+  const entries: Array<{ type: "custom"; customType: string; data: unknown }> =
+    [];
   const activeTools: string[] = [];
   const handlers: Record<string, Array<(...args: unknown[]) => void>> = {};
   let activeToolsArg: string[] | undefined;
@@ -39,7 +35,16 @@ function mkPi() {
       registeredTools.push(tool.name);
       registeredToolDefinitions.push(tool);
     },
+    registerToolRenderer: (resolver: ToolRendererResolver) =>
+      resolvers.push(resolver),
+    getAllTools: () =>
+      ["read", "write", "edit", "bash", "ls", "find", "grep"].map((name) => ({
+        name,
+        sourceInfo: { source: "builtin", path: `builtin:${name}` },
+      })),
     registerCommand: () => {},
+    appendEntry: (customType: string, data: unknown) =>
+      entries.push({ type: "custom", customType, data }),
     getActiveTools: () => [...activeTools],
     setActiveTools: (tools: string[]) => {
       activeToolsArg = tools;
@@ -49,6 +54,9 @@ function mkPi() {
     _handlers: handlers,
     _registeredTools: () => registeredTools,
     _registeredToolDefinitions: () => registeredToolDefinitions,
+    _resolve: (name: string) => resolvers[0]!(name, () => ({}))!,
+    _resolverCount: () => resolvers.length,
+    _entries: () => entries,
     _setActiveToolsArg: () => activeToolsArg,
     _setActiveTools: (tools: string[]) => {
       activeTools.push(...tools);
@@ -56,6 +64,13 @@ function mkPi() {
   } as unknown as ExtensionAPI & {
     _handlers: Record<string, Array<(...args: unknown[]) => void>>;
     _registeredTools: () => string[];
+    _resolve: (name: string) => ReturnType<ToolRendererResolver>;
+    _resolverCount: () => number;
+    _entries: () => Array<{
+      type: "custom";
+      customType: string;
+      data: unknown;
+    }>;
     _registeredToolDefinitions: () => Array<
       Parameters<ExtensionAPI["registerTool"]>[0]
     >;
@@ -117,16 +132,10 @@ describe("extension lifecycle", () => {
       expect(ExtensionRunner.prototype.getAllRegisteredTools).toBe(
         registryMethod,
       );
-      expect(
-        (ExtensionRunner.prototype as unknown as Record<symbol, unknown>)[
-          CUSTOM_TOOL_PATCH_STATE
-        ],
-      ).toBeUndefined();
+      expect(pi._resolverCount()).toBe(1);
+      expect(pi._registeredTools()).toEqual([]);
       expect(pi._registeredTools()).not.toContain("codemode");
-      expect(
-        pi._registeredToolDefinitions().find((tool) => tool.name === "bash")
-          ?.renderShell,
-      ).toBe("self");
+      expect(pi._resolve("bash")?.renderShell).toBe("self");
       pi._handlers.session_start![0]!({}, mkCtx({ hasUI: false }));
       expect(ExtensionRunner.prototype.getAllRegisteredTools).toBe(
         registryMethod,
@@ -277,18 +286,115 @@ describe("extension lifecycle", () => {
     startHandler({} as any, ctx);
 
     const registeredBefore = (pi as any)._registeredTools();
-    expect(registeredBefore.length).toBeGreaterThan(0);
+    expect(registeredBefore).toEqual([]);
+    expect(pi._resolverCount()).toBe(1);
 
     // Trigger shutdown
     const shutdownHandler = (pi as any)._handlers.session_shutdown[0];
     shutdownHandler({} as any);
 
-    // The custom tool rendering patch should be disposed
-    const proto = ExtensionRunner.prototype as unknown as Record<
-      string | symbol,
-      unknown
-    >;
-    expect(proto[CUSTOM_TOOL_PATCH_STATE]).toBeUndefined();
+    expect(pi._resolve("bash")?.renderShell).toBeUndefined();
+    expect(pi._resolverCount()).toBe(1);
+  });
+
+  for (const isError of [false, true]) {
+    it(`uses execution-event timing without wrapping Bash execute, isError=${isError}`, async () => {
+      const pi = mkPi();
+      const clock = spyOn(Date, "now").mockReturnValue(1000);
+      ext(pi);
+      try {
+        const renderer = pi._resolve("bash")!;
+        const context = mkToolCtx({ args: { command: "echo result" } });
+        await pi._handlers.tool_execution_start![0]!({
+          toolCallId: "call-1",
+          toolName: "bash",
+        });
+        clock.mockReturnValue(2250);
+        await pi._handlers.tool_execution_end![0]!({
+          toolCallId: "call-1",
+          toolName: "bash",
+        });
+        const output = renderer.renderResult!(
+          {
+            content: [
+              { type: "text", text: isError ? "Command aborted" : "result" },
+            ],
+            details: undefined,
+          },
+          { expanded: false, isPartial: false },
+          mkTheme(),
+          { ...context, isError },
+        )
+          .render(80)
+          .join("\n");
+        expect(output).toContain("took 1.3s");
+        expect(pi._registeredTools()).toEqual([]);
+      } finally {
+        await pi._handlers.session_shutdown![0]!({});
+        clock.mockRestore();
+      }
+    });
+  }
+
+  it("keeps Bash durations across history rebuilds and restores only valid branch timing records", async () => {
+    const pi = mkPi();
+    const clock = spyOn(Date, "now").mockReturnValue(1000);
+    ext(pi);
+    const ctx = mkCtx({ hasUI: false });
+    ctx.sessionManager.getBranch = () =>
+      pi._entries() as ReturnType<typeof ctx.sessionManager.getBranch>;
+    const render = () =>
+      pi._resolve("bash")!.renderResult!(
+        { content: [{ type: "text", text: "result" }], details: undefined },
+        { expanded: false, isPartial: false },
+        mkTheme(),
+        mkToolCtx({ executionStarted: false }),
+      )
+        .render(80)
+        .join("\n");
+    try {
+      await pi._handlers.tool_execution_start![0]!({
+        toolCallId: "call-1",
+        toolName: "bash",
+      });
+      clock.mockReturnValue(2250);
+      await pi._handlers.tool_execution_end![0]!({
+        toolCallId: "call-1",
+        toolName: "bash",
+      });
+      expect(pi._entries()).toEqual([
+        {
+          type: "custom",
+          customType: "pi-ui-enhancements:bash-timing",
+          data: { toolCallId: "call-1", durationMs: 1250 },
+        },
+      ]);
+      for (let rebuild = 0; rebuild < 2; rebuild++)
+        expect(render()).toContain("took 1.3s");
+      await pi._handlers.session_shutdown![0]!({});
+      pi._entries().push({
+        type: "custom",
+        customType: "pi-ui-enhancements:bash-timing",
+        data: { toolCallId: "call-1", durationMs: -10 },
+      });
+      await pi._handlers.session_start![0]!({}, ctx);
+      expect(render()).toContain("took 1.3s");
+      const historical = mkToolCtx({ executionStarted: false });
+      pi._resolve("bash")!.renderCall!(
+        { command: "echo result" },
+        mkTheme(),
+        historical,
+      ).render(80);
+      expect(
+        (historical.state as { startedAt?: number }).startedAt,
+      ).toBeUndefined();
+      expect((historical.state as { durationMs?: number }).durationMs).toBe(
+        1250,
+      );
+    } finally {
+      await pi._handlers.session_shutdown![0]!({});
+      clock.mockRestore();
+    }
   });
 
   it("session_shutdown clears tool timers on later sessions", () => {
@@ -314,12 +420,11 @@ describe("extension lifecycle", () => {
       shutdownHandler({} as any);
       startHandler({} as any, ctx);
 
-      const bashTool = (pi as any)
-        ._registeredToolDefinitions()
-        .find((tool: { name: string }) => tool.name === "bash");
+      const bashTool = pi._resolve("bash")!;
+      expect(pi._resolverCount()).toBe(1);
 
-      bashTool.renderResult(
-        { content: [{ type: "text", text: "running" }] },
+      bashTool.renderResult!(
+        { content: [{ type: "text", text: "running" }], details: undefined },
         { expanded: false, isPartial: true },
         mkTheme(),
         mkToolCtx({ state: { startedAt: Date.now() } }),

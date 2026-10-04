@@ -19,8 +19,10 @@ function stopTiming(state: CodemodeRenderState): void {
   activeStates.delete(state);
 }
 
-export function clearCodemodeTimers(): void {
-  for (const state of activeStates) stopTiming(state);
+export function clearCodemodeTimers(
+  states: Iterable<CodemodeRenderState> = activeStates,
+): void {
+  for (const state of states) stopTiming(state);
 }
 
 export function updateCodemodeTiming(

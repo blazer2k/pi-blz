@@ -1,54 +1,118 @@
 import type {
   ExtensionAPI,
-  ToolDefinition,
+  ToolRendererResolver,
+  ToolRenderers,
 } from "@earendil-works/pi-coding-agent";
-import type { Handle } from "../shared/handle";
-import { clearBlinkTimers } from "./rendering/state";
+import { getConfig } from "../config/store";
+import type { BashTimingLookup } from "./bash";
+import { patchTools } from "./built-ins";
+import { createCodemodeRenderers } from "./codemode";
+import { clearCodemodeTimers } from "./codemode/timing";
+import {
+  createWrappedRenderers,
+  shouldWrapRenderers,
+  type DefinitionAdapterOptions,
+} from "./custom-tools/definition-adapter";
+import type {
+  CustomToolRenderingIssue,
+  CustomToolRenderingReporter,
+} from "./custom-tools/types";
+import { updateBlinkTimer } from "./rendering/state";
+import type { BaseRenderState } from "./rendering/types";
 
-// Loose tool type: concrete tool definitions (with their own parameter,
-// details, and state generics) are all assignable to it, while any remains
-// bidirectional so renderers and execute keep working through it.
-type AnyToolDefinition = ToolDefinition<any, any, any>;
-
-export function createCwdDeferredTool(
-  createTool: (cwd: string) => AnyToolDefinition,
-): AnyToolDefinition {
-  const meta = createTool(process.cwd());
-  const execute: NonNullable<AnyToolDefinition["execute"]> = (
-    toolCallId,
-    params,
-    signal,
-    onUpdate,
-    ctx,
-  ) => createTool(ctx.cwd).execute(toolCallId, params, signal, onUpdate, ctx);
-
-  return { ...meta, execute };
+function defaultReporter(issue: CustomToolRenderingIssue): void {
+  const tool = issue.toolName ? ` for ${issue.toolName}` : "";
+  console.warn(
+    `[pi-ui-enhancements] Tool rendering ${issue.stage} failed${tool}; continuing without that enhancement.`,
+    issue.error,
+  );
 }
 
-/**
- * Re-register a native tool with custom rendering. All native properties
- * (description, parameters, prompt metadata, constrained sampling, ...) are
- * kept as-is; activation stays with Pi, and execute may be replaced.
- */
-export function registerPatchedTool(config: {
-  pi: ExtensionAPI;
-  tool: AnyToolDefinition;
-  execute?: AnyToolDefinition["execute"];
-  renderCall: NonNullable<AnyToolDefinition["renderCall"]>;
-  renderResult: NonNullable<AnyToolDefinition["renderResult"]>;
-}): Handle {
-  config.pi.registerTool({
-    ...config.tool,
-    defaultActive: false,
-    renderShell: "self",
-    execute: config.execute ?? config.tool.execute,
-    renderCall: config.renderCall,
-    renderResult: config.renderResult,
-  });
+export function createToolRendering(
+  pi: Pick<ExtensionAPI, "getAllTools">,
+  options: {
+    isToolCallActive: (toolCallId: string) => boolean;
+    isEnabled: () => boolean;
+    getBashTiming?: BashTimingLookup;
+    reportIssue?: CustomToolRenderingReporter;
+  },
+) {
+  const core = patchTools(options.getBashTiming);
+  const customStates = new Set<BaseRenderState>();
+  const reported = new Set<string>();
+  const reportIssue = (issue: CustomToolRenderingIssue): void => {
+    const key = `${issue.toolName ?? ""}:${issue.stage}`;
+    if (reported.has(key)) return;
+    reported.add(key);
+    try {
+      (options.reportIssue ?? defaultReporter)(issue);
+    } catch {
+      /* Diagnostics must not interrupt rendering. */
+    }
+  };
+  const customEnabled = () =>
+    options.isEnabled() && getConfig().patchCustomTools;
+  function createAdapterOptions(toolName: string): DefinitionAdapterOptions {
+    return {
+      isToolCallActive(toolCallId) {
+        try {
+          return customEnabled() && options.isToolCallActive(toolCallId);
+        } catch (error) {
+          reportIssue({ stage: "activity", toolName, error });
+          return false;
+        }
+      },
+      reportIssue,
+      trackState(state) {
+        if (state.hasResult === true) {
+          if (state.blinkTimer)
+            updateBlinkTimer(state, false, state.blinkTimer.invalidate);
+          customStates.delete(state);
+        } else customStates.add(state);
+      },
+    };
+  }
+
+  const resolve: ToolRendererResolver = (toolName, next) => {
+    const native = next();
+    if (!native || !options.isEnabled()) return native;
+    try {
+      const source = pi
+        .getAllTools()
+        .find((tool) => tool.name === toolName)?.sourceInfo;
+      const builtin =
+        source?.source === "builtin" && source.path === `builtin:${toolName}`;
+      const coreRenderers = builtin ? core.get(toolName) : undefined;
+      if (coreRenderers) return coreRenderers;
+      if (
+        !getConfig().patchCustomTools ||
+        !source ||
+        !shouldWrapRenderers(native)
+      )
+        return native;
+      const adapterOptions = createAdapterOptions(toolName);
+      const enhanced =
+        builtin && toolName === "codemode"
+          ? createCodemodeRenderers(native, adapterOptions)
+          : createWrappedRenderers(toolName, native, adapterOptions);
+      return enhanced;
+    } catch (error) {
+      reportIssue({ stage: "metadata", toolName, error });
+      return native;
+    }
+  };
+
+  function clearCustomTimers(): void {
+    clearCodemodeTimers(customStates);
+    customStates.clear();
+  }
 
   return {
-    dispose() {
-      clearBlinkTimers();
+    resolve,
+    clearCustomTimers,
+    reset() {
+      clearCustomTimers();
+      reported.clear();
     },
   };
 }

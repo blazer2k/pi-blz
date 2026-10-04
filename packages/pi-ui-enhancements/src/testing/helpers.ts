@@ -1,9 +1,12 @@
 import {
-  ExtensionRunner,
-  type ExtensionAPI,
-  type ExtensionContext,
   type Theme,
+  type ToolDefinition,
+  type ToolInfo,
+  type ToolRenderers,
+  type SourceInfo,
 } from "@earendil-works/pi-coding-agent";
+import { createToolRendering } from "../tools/tool-registration";
+import type { CustomToolRenderingReporter } from "../tools/custom-tools/types";
 
 export function mkTheme(): Theme {
   return {
@@ -22,23 +25,43 @@ export function mkTheme(): Theme {
   } as unknown as Theme;
 }
 
-export function setupTool(
-  patchFn: (pi: ExtensionAPI, ctx: ExtensionContext) => void,
-) {
-  let definition: Parameters<ExtensionAPI["registerTool"]>[0] | undefined;
-  const pi = {
-    registerTool: (tool: Parameters<ExtensionAPI["registerTool"]>[0]) => {
-      definition = tool;
-    },
-  } as unknown as ExtensionAPI;
-  const ctx = { cwd: process.cwd() } as ExtensionContext;
-  patchFn(pi, ctx);
-  return definition!;
+export function setupTool(createRenderers: () => ToolRenderers) {
+  return createRenderers();
 }
 
-export const CUSTOM_TOOL_PATCH_STATE = Symbol.for(
-  "@blazer2k/pi-ui-enhancements/custom-tools/patch-state/v1",
-);
+export function setupCustomTool(
+  definition: ToolDefinition,
+  isToolCallActive: (toolCallId: string) => boolean = () => false,
+  reportIssue: CustomToolRenderingReporter = () => {},
+  sourceInfo: SourceInfo = {
+    source: "inline",
+    path: "<inline:test>",
+    scope: "temporary",
+    origin: "top-level",
+  },
+) {
+  let enabled = true;
+  const rendering = createToolRendering(
+    {
+      getAllTools: () => [
+        {
+          ...definition,
+          exposure: definition.exposure ?? "direct",
+          sourceInfo,
+        } as ToolInfo,
+      ],
+    },
+    { isToolCallActive, isEnabled: () => enabled, reportIssue },
+  );
+  return {
+    renderers: rendering.resolve(definition.name, () => definition)!,
+    clearCustomTimers: rendering.clearCustomTimers,
+    dispose() {
+      enabled = false;
+      rendering.reset();
+    },
+  };
+}
 
 export function mkToolCtx(overrides: Record<string, unknown> = {}) {
   return {
@@ -56,22 +79,4 @@ export function mkToolCtx(overrides: Record<string, unknown> = {}) {
     showImages: false,
     ...overrides,
   };
-}
-
-export function cleanRunnerProto() {
-  const proto = ExtensionRunner.prototype as unknown as Record<
-    string | symbol,
-    unknown
-  >;
-  const state = proto[CUSTOM_TOOL_PATCH_STATE] as
-    | { originalDescriptor?: PropertyDescriptor }
-    | undefined;
-  if (state?.originalDescriptor) {
-    Object.defineProperty(
-      proto,
-      "getAllRegisteredTools",
-      state.originalDescriptor,
-    );
-  }
-  delete proto[CUSTOM_TOOL_PATCH_STATE];
 }

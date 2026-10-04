@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import {
   createAgentSession,
   createCodemodeExtension,
-  createReadTool,
   DefaultResourceLoader,
   ModelRuntime,
   SessionManager,
@@ -15,14 +14,13 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import extension from "../index";
 import { loadConfig, saveConfig } from "../config/store";
-import { cleanRunnerProto, mkTheme, mkToolCtx } from "../testing/helpers";
-import { createCodemodeDefinition } from "./codemode";
-import { shouldWrapDefinition } from "./custom-tools/definition-adapter";
+import { mkTheme, mkToolCtx } from "../testing/helpers";
+import { createCodemodeRenderers } from "./codemode";
+import { shouldWrapRenderers } from "./custom-tools/definition-adapter";
 
 const originalPath = process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH;
 let directory: string;
 beforeEach(() => {
-  cleanRunnerProto();
   directory = mkdtempSync(join(tmpdir(), "pi-ui-codemode-wrapper-"));
   process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH = join(
     directory,
@@ -31,7 +29,6 @@ beforeEach(() => {
   loadConfig();
 });
 afterEach(() => {
-  cleanRunnerProto();
   rmSync(directory, { recursive: true, force: true });
   if (originalPath === undefined)
     delete process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH;
@@ -53,31 +50,23 @@ function nativeDefinition() {
 }
 
 describe("Codemode wrapper integration", () => {
-  it("changes only renderer ownership while preserving native properties by reference", () => {
+  it("returns only renderer overrides without modifying the native definition", () => {
     const native = nativeDefinition();
-    const wrapped = createCodemodeDefinition(native, {
+    const original = { ...native };
+    const wrapped = createCodemodeRenderers(native, {
       isToolCallActive: () => false,
       reportIssue: () => {},
     });
-    for (const key of Object.keys(native) as Array<keyof ToolDefinition>) {
-      if (["renderShell", "renderCall", "renderResult"].includes(key)) continue;
-      expect(wrapped[key]).toBe(native[key]);
-    }
+    expect(Object.keys(wrapped).sort()).toEqual([
+      "renderCall",
+      "renderResult",
+      "renderShell",
+    ]);
+    expect(native).toEqual(original);
     expect(wrapped.renderShell).toBe("self");
     expect(wrapped.renderCall).not.toBe(native.renderCall);
     expect(wrapped.renderResult).not.toBe(native.renderResult);
-    expect(shouldWrapDefinition(wrapped)).toBe(false);
-    const read = createReadTool(directory);
-    const loadout = {
-      declared: [read],
-      callable: [read],
-      registered: [read],
-      getExposure: () => "direct" as const,
-      getNamespace: () => undefined,
-    };
-    expect(wrapped.prepareLoadout!(loadout)).toEqual(
-      native.prepareLoadout!(loadout),
-    );
+    expect(shouldWrapRenderers(wrapped)).toBe(false);
   });
 
   it("retains Pi's built-in extension without duplicate registration or startup warnings", async () => {
@@ -147,8 +136,9 @@ describe("Codemode wrapper integration", () => {
         active: false,
       },
     ]) {
-      settings.applyOverrides({ defaultTools });
       saveConfig("patchCustomTools", "false");
+      await loader.reload();
+      settings.applyOverrides({ defaultTools });
       const { session } = await createAgentSession({
         cwd: directory,
         agentDir: directory,
@@ -191,11 +181,16 @@ describe("Codemode wrapper integration", () => {
           expect(registered.definition.prepareLoadout).toBe(
             native.prepareLoadout,
           );
-          if (enabled) {
-            expect(registered.definition).not.toBe(native);
-            expect(getRegistered().definition).toBe(registered.definition);
+          expect(registered.definition).toBe(native);
+          const resolved = session.extensionRunner.resolveToolRenderers(
+            "codemode",
+            () => session.getToolDefinition("codemode"),
+          );
+          if (!available) expect(resolved).toBeUndefined();
+          else if (enabled) {
+            expect(resolved!.renderCall).not.toBe(native.renderCall);
             expect(
-              registered.definition.renderResult!(
+              resolved!.renderResult!(
                 {
                   content: [{ type: "text", text: "a\nb\nc\nd" }],
                   details: { calls: [] },
@@ -207,7 +202,7 @@ describe("Codemode wrapper integration", () => {
                 .render(120)
                 .join("\n"),
             ).toContain("+2 lines");
-          } else expect(registered.definition).toBe(native);
+          } else expect(resolved!.renderCall).toBe(native.renderCall);
           expect(session.getActiveToolNames().includes("codemode")).toBe(
             active,
           );
@@ -223,6 +218,15 @@ describe("Codemode wrapper integration", () => {
             .extensions.find((entry) => entry.path === "builtin:codemode"),
         ).toBeDefined();
         expect(loader.getExtensions().warnings ?? []).toEqual([]);
+        if (available) {
+          const reloadedNative = session.getToolDefinition("codemode")!;
+          expect(
+            session.extensionRunner.resolveToolRenderers(
+              "codemode",
+              () => reloadedNative,
+            )!.renderCall,
+          ).not.toBe(reloadedNative.renderCall);
+        }
         expect(session.getActiveToolNames().includes("codemode")).toBe(
           available,
         );

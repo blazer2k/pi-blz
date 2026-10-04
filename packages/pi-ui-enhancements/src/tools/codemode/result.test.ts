@@ -16,7 +16,7 @@ import {
 import type { AgentToolResult } from "@earendil-works/pi-agent-core";
 import { loadConfig, saveConfig } from "../../config/store";
 import { mkTheme, mkToolCtx } from "../../testing/helpers";
-import { createCodemodeDefinition } from "../codemode";
+import { createCodemodeRenderers } from "../codemode";
 import { clearBlinkTimers } from "../rendering/state";
 import { stripAnsi } from "../rendering/text";
 import { buildCodemodeResultView } from "./model";
@@ -53,13 +53,13 @@ function setup(
     getAllTools: () => [],
     appendEntry() {},
   } as unknown as ExtensionAPI);
-  return createCodemodeDefinition(
-    { ...definition, ...renderers },
-    {
-      isToolCallActive,
-      reportIssue,
-    },
-  );
+  return {
+    ...createCodemodeRenderers(
+      { ...definition, ...renderers },
+      { isToolCallActive, reportIssue },
+    ),
+    execute: definition.execute,
+  };
 }
 function result(
   output: string,

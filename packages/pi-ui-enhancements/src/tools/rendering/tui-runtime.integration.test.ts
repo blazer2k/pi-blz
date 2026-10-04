@@ -5,12 +5,13 @@ import {
   type ExtensionAPI,
   type ExtensionContext,
   type ToolDefinition,
+  type ToolRenderers,
 } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import type { Handle } from "../../shared/handle";
 import { mkTheme, mkToolCtx, setupTool } from "../../testing/helpers";
 import { patchBashTool } from "../bash";
-import { createCodemodeDefinition } from "../codemode";
+import { createCodemodeRenderers } from "../codemode";
 import { clearCodemodeTimers } from "../codemode/timing";
 import type { CodemodeRenderState } from "../codemode/types";
 import { patchWriteTool } from "../write";
@@ -59,7 +60,7 @@ function capture(initial: TUI["mode"]) {
     },
   };
 }
-function codemode(active: () => boolean): ToolDefinition {
+function codemode(active: () => boolean): ToolRenderers {
   let native!: ToolDefinition;
   createCodemodeExtension()({
     registerTool(tool: ToolDefinition) {
@@ -69,7 +70,7 @@ function codemode(active: () => boolean): ToolDefinition {
     getAllTools: () => [],
     appendEntry() {},
   } as unknown as ExtensionAPI);
-  return createCodemodeDefinition(native, {
+  return createCodemodeRenderers(native, {
     isToolCallActive: active,
     reportIssue: () => {},
   });

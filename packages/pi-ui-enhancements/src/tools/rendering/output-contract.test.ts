@@ -1,19 +1,15 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import {
-  ExtensionRunner,
-  type ToolDefinition,
-} from "@earendil-works/pi-coding-agent";
+import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Text, visibleWidth } from "@earendil-works/pi-tui";
 import {
-  cleanRunnerProto,
+  setupCustomTool,
   mkTheme,
   mkToolCtx,
   setupTool,
 } from "../../testing/helpers";
 import { patchBashTool } from "../bash";
-import { patchCustomToolRendering } from "../custom-tools/patch-manager";
 import { patchEditTool } from "../edit";
 import { patchFindTool } from "../find";
 import { patchGrepTool } from "../grep";
@@ -50,7 +46,6 @@ beforeAll(async () => {
 afterAll(() => {
   restorePiKeybindings?.();
   clearBlinkTimers();
-  cleanRunnerProto();
 });
 
 function meaningfulLines(component: Renderable, width = 80): string[] {
@@ -180,11 +175,6 @@ describe("built-in tool output", () => {
 
 describe("custom tool output", () => {
   it("pins wrapped renderer output", () => {
-    cleanRunnerProto();
-    const prototype = ExtensionRunner.prototype as unknown as Record<
-      string,
-      unknown
-    >;
     const definition: ToolDefinition = {
       name: "Lookup",
       label: "Lookup",
@@ -194,18 +184,10 @@ describe("custom tool output", () => {
       renderCall: () => new Text("Lookup pi", 0, 0),
       renderResult: () => new Text("2 matches", 0, 0),
     };
-    prototype.getAllRegisteredTools = () => [
-      { definition, sourceInfo: undefined },
-    ];
-    const handle = patchCustomToolRendering();
+    const handle = setupCustomTool(definition);
 
     try {
-      const tools = (prototype.getAllRegisteredTools as Function).call(
-        {},
-      ) as Array<{
-        definition: ToolDefinition;
-      }>;
-      const wrapped = tools[0]!.definition;
+      const wrapped = handle.renderers;
       const state = {};
       const toolCtx = mkToolCtx({ state, args: { query: "pi" } });
       const result = wrapped.renderResult!(
@@ -222,7 +204,6 @@ describe("custom tool output", () => {
       ]);
     } finally {
       handle.dispose();
-      cleanRunnerProto();
     }
   });
 });

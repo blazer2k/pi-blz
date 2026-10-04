@@ -1,4 +1,4 @@
-import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
+import type { ToolRenderers } from "@earendil-works/pi-coding-agent";
 import { renderCodemodeCall } from "./codemode/call";
 import { formatCodemodeResult } from "./codemode/result";
 import type { CodemodeRenderState } from "./codemode/types";
@@ -17,21 +17,21 @@ import {
 } from "./rendering/output";
 import { invalidateIfChanged, updateResultState } from "./rendering/state";
 
-export function createCodemodeDefinition<T extends ToolDefinition>(
-  definition: T,
+export function createCodemodeRenderers(
+  native: ToolRenderers,
   adapterOptions: DefinitionAdapterOptions,
-): T {
+): ToolRenderers & { [WRAPPED_TOOL]: true } {
   return {
-    ...definition,
     [WRAPPED_TOOL]: true,
     renderShell: "self",
     renderCall(args, theme, context) {
       const state = getCustomState(context.state) as CodemodeRenderState;
+      adapterOptions.trackState?.(state);
       const active = adapterOptions.isToolCallActive(context.toolCallId);
       if (active && context.executionStarted && state.hasResult !== true)
         state.startedAt ??= Date.now();
       return renderCodemodeCall(
-        definition,
+        native,
         args,
         theme,
         { ...context, state },
@@ -56,18 +56,19 @@ export function createCodemodeDefinition<T extends ToolDefinition>(
         }),
         context.invalidate,
       );
+      adapterOptions.trackState?.(state);
       const reportError = (error: unknown) => {
         state.nativeResult = undefined;
         adapterOptions.reportIssue({
           stage: "renderResult",
-          toolName: definition.name,
+          toolName: "codemode",
           error,
         });
       };
       let nativeResult: CodemodeRenderState["nativeResult"];
-      if (options.expanded) {
+      if (options.expanded && native.renderResult) {
         try {
-          nativeResult = definition.renderResult!(result, options, theme, {
+          nativeResult = native.renderResult(result, options, theme, {
             ...context,
             lastComponent: state.nativeResult,
           });

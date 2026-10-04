@@ -1,14 +1,8 @@
 import type {
-  ExtensionAPI,
+  ToolRenderers,
   FindToolInput,
 } from "@earendil-works/pi-coding-agent";
-import { createFindToolDefinition } from "@earendil-works/pi-coding-agent";
-import type { Handle } from "../shared/handle";
 import { formatToolLabel } from "./rendering/labels";
-import {
-  createCwdDeferredTool,
-  registerPatchedTool,
-} from "./tool-registration";
 import { buildPatternPathCall, splitNativeListOutput } from "./list-rendering";
 import { buildRenderResult, formatListResult } from "./rendering/results";
 import { getCallRenderParts, formatExpandableCallText } from "./rendering/tree";
@@ -21,12 +15,9 @@ const FIND_CONFIG: ListResultConfig = {
   preprocess: splitNativeListOutput,
 };
 
-export function patchFindTool(pi: ExtensionAPI): Handle {
-  const tool = createCwdDeferredTool(createFindToolDefinition);
-
-  return registerPatchedTool({
-    pi,
-    tool,
+export function patchFindTool(): ToolRenderers {
+  return {
+    renderShell: "self",
     renderCall(args, theme, toolCtx) {
       const state = toolCtx.state as BaseRenderState;
       const { text, prefix } = getCallRenderParts(state, theme, toolCtx);
@@ -67,5 +58,5 @@ export function patchFindTool(pi: ExtensionAPI): Handle {
     renderResult: buildRenderResult((result, state, options, theme, width) =>
       formatListResult(result, state, options, theme, FIND_CONFIG, width),
     ),
-  });
+  };
 }

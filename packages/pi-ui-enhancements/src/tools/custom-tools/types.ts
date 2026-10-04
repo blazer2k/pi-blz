@@ -1,7 +1,5 @@
 export type CustomToolRenderingStage =
-  | "install"
-  | "registry"
-  | "definition"
+  | "metadata"
   | "activity"
   | "renderCall"
   | "renderResult";

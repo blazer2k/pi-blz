@@ -1,19 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { patchTools } from "./built-ins";
 
-describe("patchTools", () => {
-  it("registers all supported built-in renderers without activating tools", () => {
-    const registered: Array<Parameters<ExtensionAPI["registerTool"]>[0]> = [];
-    const pi = {
-      registerTool: (tool: Parameters<ExtensionAPI["registerTool"]>[0]) => {
-        registered.push(tool);
-      },
-    } as unknown as ExtensionAPI;
-
-    const handles = patchTools(pi);
-
-    expect(registered.map((tool) => tool.name)).toEqual([
+describe("core renderer bundles", () => {
+  it("contains only presentation overrides for all seven supported core tools", () => {
+    const bundles = patchTools();
+    expect([...bundles.keys()]).toEqual([
       "read",
       "write",
       "edit",
@@ -22,7 +13,15 @@ describe("patchTools", () => {
       "find",
       "grep",
     ]);
-    expect(registered.every((tool) => tool.defaultActive === false)).toBe(true);
-    handles.forEach((handle) => handle.dispose());
+    for (const bundle of bundles.values()) {
+      expect(Object.keys(bundle).sort()).toEqual([
+        "renderCall",
+        "renderResult",
+        "renderShell",
+      ]);
+      expect(bundle.renderShell).toBe("self");
+      expect(typeof bundle.renderCall).toBe("function");
+      expect(typeof bundle.renderResult).toBe("function");
+    }
   });
 });

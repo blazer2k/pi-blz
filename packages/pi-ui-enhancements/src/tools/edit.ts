@@ -1,18 +1,12 @@
 import {
-  createEditToolDefinition,
   renderDiff,
   Theme,
   type EditToolDetails,
   type EditToolInput,
-  type ExtensionAPI,
+  type ToolRenderers,
   type ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
-import {
-  createCwdDeferredTool,
-  registerPatchedTool,
-} from "./tool-registration";
-import type { Handle } from "../shared/handle";
 import { formatToolLabel } from "./rendering/labels";
 import {
   buildRenderResult,
@@ -116,12 +110,9 @@ function formatEditResult(
   return renderedLines.join("\n");
 }
 
-export function patchEditTool(pi: ExtensionAPI): Handle {
-  const tool = createCwdDeferredTool(createEditToolDefinition);
-
-  return registerPatchedTool({
-    pi,
-    tool,
+export function patchEditTool(): ToolRenderers {
+  return {
+    renderShell: "self",
     renderCall(args, theme, toolCtx) {
       const state = toolCtx.state as BaseRenderState;
       const renderArgs = args as EditToolInput;
@@ -154,5 +145,5 @@ export function patchEditTool(pi: ExtensionAPI): Handle {
       return text;
     },
     renderResult: buildRenderResult(formatEditResult),
-  });
+  };
 }

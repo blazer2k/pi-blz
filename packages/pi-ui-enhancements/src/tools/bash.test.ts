@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import {
   initTheme,
+  createBashToolDefinition,
   type ExtensionToolContext,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
@@ -253,8 +254,8 @@ describe("bash renderResult", () => {
   });
 
   it("retains duration when execution is aborted", async () => {
-    const def = setupBashTool();
-    const execute = def.execute!;
+    const execute = createBashToolDefinition(process.cwd()).execute;
+    const startedAt = Date.now();
     const controller = new AbortController();
     controller.abort();
     let errorText = "";
@@ -278,6 +279,8 @@ describe("bash renderResult", () => {
     }
 
     expect(errorText).toContain("Command aborted");
+    const endedAt = Date.now();
+    const def = patchBashTool(() => ({ startedAt, endedAt }));
 
     const component = def.renderResult!(
       { content: [{ type: "text", text: errorText }], details: undefined },
@@ -294,8 +297,8 @@ describe("bash renderResult", () => {
   });
 
   it("preserves nonzero exit results and their duration", async () => {
-    const def = setupBashTool();
-    const result = await def.execute!(
+    const startedAt = Date.now();
+    const result = await createBashToolDefinition(process.cwd()).execute(
       "nonzero-call",
       { command: "echo before failure; exit 4" },
       undefined,
@@ -314,7 +317,12 @@ describe("bash renderResult", () => {
       output: "before failure\n",
       exit_code: 4,
     });
-    expect(result.details).toMatchObject({ durationMs: expect.any(Number) });
+    expect(
+      (result.details as { durationMs?: number } | undefined)?.durationMs,
+    ).toBeUndefined();
+    const snapshot = structuredClone(result);
+    const endedAt = Date.now();
+    const def = patchBashTool(() => ({ startedAt, endedAt }));
 
     const component = def.renderResult!(
       result,
@@ -327,6 +335,7 @@ describe("bash renderResult", () => {
     expect(text).toContain("before failure");
     expect(text).toContain("exited with code 4");
     expect(text).toContain("took ");
+    expect(result).toEqual(snapshot);
   });
 
   it("puts duration before truncation metadata", () => {

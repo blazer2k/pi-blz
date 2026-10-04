@@ -10,11 +10,13 @@ import {
 import { registerRoundedEditor } from "./editor/registration";
 import { registerAsciiHeader } from "./header/header";
 import type { Handle } from "./shared/handle";
-import { patchTools } from "./tools/built-ins";
-import { patchCustomToolRendering } from "./tools/custom-tools/patch-manager";
+import type { BashTiming } from "./tools/bash";
+import { createToolRendering } from "./tools/tool-registration";
 import { clearBlinkTimers } from "./tools/rendering/state";
 import { registerTuiCapture } from "./tools/rendering/tui-runtime";
 import { registerWorkingIndicator } from "./working-indicator/indicator";
+
+const BASH_TIMING_ENTRY = "pi-ui-enhancements:bash-timing";
 
 function hasTui(ctx: { hasUI: boolean; mode?: string }): boolean {
   return ctx.mode === "tui" || (ctx.mode === undefined && ctx.hasUI);
@@ -32,38 +34,48 @@ function disposeHandles(handles: readonly Handle[], description: string): void {
 
 export default function (pi: ExtensionAPI) {
   loadConfig();
-  const builtInToolHandles = patchTools(pi);
   let uiHandles: Handle[] = [];
-
+  let renderingEnabled = true;
+  const bashTimings = new Map<string, BashTiming>();
   const activeToolCallIds = new Set<string>();
   const isToolCallActive = (toolCallId: string) =>
     activeToolCallIds.has(toolCallId);
   pi.on("tool_execution_start", async (event) => {
     activeToolCallIds.add(event.toolCallId);
+    if (event.toolName === "bash" && !event.parentToolCallId) {
+      const source = pi
+        .getAllTools()
+        .find((tool) => tool.name === "bash")?.sourceInfo;
+      if (source?.source === "builtin" && source.path === "builtin:bash")
+        bashTimings.set(event.toolCallId, { startedAt: Date.now() });
+    }
   });
   pi.on("tool_execution_end", async (event) => {
     activeToolCallIds.delete(event.toolCallId);
+    const timing = bashTimings.get(event.toolCallId);
+    if (timing?.startedAt !== undefined) {
+      const durationMs = Math.max(0, Date.now() - timing.startedAt);
+      bashTimings.set(event.toolCallId, { durationMs });
+      pi.appendEntry(BASH_TIMING_ENTRY, {
+        toolCallId: event.toolCallId,
+        durationMs,
+      });
+    }
   });
 
-  let customToolRenderingHandle: Handle | null = getConfig().patchCustomTools
-    ? patchCustomToolRendering(isToolCallActive)
-    : null;
+  const toolRendering = createToolRendering(pi, {
+    isToolCallActive,
+    isEnabled: () => renderingEnabled,
+    getBashTiming: (toolCallId) => bashTimings.get(toolCallId),
+  });
+  pi.registerToolRenderer(toolRendering.resolve);
 
   let headerReregister: (() => void) | null = null;
   let editorReregister: (() => void) | null = null;
   let settingsUiActive = false;
 
-  function syncCustomToolRenderingPatch() {
-    if (getConfig().patchCustomTools && !customToolRenderingHandle) {
-      customToolRenderingHandle = patchCustomToolRendering(isToolCallActive);
-    } else if (!getConfig().patchCustomTools && customToolRenderingHandle) {
-      customToolRenderingHandle.dispose();
-      customToolRenderingHandle = null;
-    }
-  }
-
   function handleConfigChange() {
-    syncCustomToolRenderingPatch();
+    if (!getConfig().patchCustomTools) toolRendering.clearCustomTimers();
     headerReregister?.();
     if (!settingsUiActive) {
       editorReregister?.();
@@ -83,6 +95,22 @@ export default function (pi: ExtensionAPI) {
   );
 
   pi.on("session_start", async (_event, ctx) => {
+    renderingEnabled = true;
+    bashTimings.clear();
+    for (const entry of ctx.sessionManager.getBranch()) {
+      if (entry.type !== "custom" || entry.customType !== BASH_TIMING_ENTRY)
+        continue;
+      const data = entry.data as
+        | { toolCallId?: unknown; durationMs?: unknown }
+        | undefined;
+      if (
+        typeof data?.toolCallId === "string" &&
+        typeof data.durationMs === "number" &&
+        Number.isFinite(data.durationMs) &&
+        data.durationMs >= 0
+      )
+        bashTimings.set(data.toolCallId, { durationMs: data.durationMs });
+    }
     // Reset in case settings UI was force-closed last session
     settingsUiActive = false;
     loadConfig((err) => {
@@ -95,9 +123,7 @@ export default function (pi: ExtensionAPI) {
     // Reinstall after the previous session_shutdown cleared the global callback.
     setOnConfigChange(handleConfigChange);
 
-    // Apply config changes made before session start while keeping the patch early
-    // enough for history rendering after /reload
-    syncCustomToolRenderingPatch();
+    if (!getConfig().patchCustomTools) toolRendering.clearCustomTimers();
 
     if (hasTui(ctx)) {
       uiHandles.push(registerTuiCapture(ctx));
@@ -120,19 +146,14 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("session_shutdown", async () => {
+    renderingEnabled = false;
     activeToolCallIds.clear();
+    bashTimings.clear();
+    toolRendering.reset();
     clearBlinkTimers();
 
     disposeHandles(uiHandles, "UI enhancement");
     uiHandles = [];
-    disposeHandles(builtInToolHandles, "built-in tool");
-
-    try {
-      customToolRenderingHandle?.dispose();
-    } catch (error) {
-      console.error("Failed to dispose custom tool rendering patch:", error);
-    }
-    customToolRenderingHandle = null;
     headerReregister = null;
     editorReregister = null;
     clearOnConfigChange();

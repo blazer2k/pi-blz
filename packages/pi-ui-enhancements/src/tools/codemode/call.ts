@@ -1,6 +1,6 @@
 import {
   highlightCode,
-  type ToolDefinition,
+  type ToolRenderers,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
@@ -15,17 +15,17 @@ import type { CodemodeRenderState } from "./types";
 import type { CustomToolRenderingReporter } from "../custom-tools/types";
 
 export function renderCodemodeCall(
-  native: ToolDefinition<any, any, any>,
+  native: ToolRenderers,
   args: unknown,
   theme: Theme,
-  context: Parameters<NonNullable<ToolDefinition["renderCall"]>>[2],
+  context: Parameters<NonNullable<ToolRenderers["renderCall"]>>[2],
   active: boolean,
   reportIssue: CustomToolRenderingReporter,
 ) {
   const state = context.state as CodemodeRenderState;
   const reportError = (error: unknown) => {
     state.nativeCall = undefined;
-    reportIssue({ stage: "renderCall", toolName: native.name, error });
+    reportIssue({ stage: "renderCall", toolName: "codemode", error });
   };
   const code = (args as { code?: unknown } | undefined)?.code;
   const source =
@@ -47,9 +47,9 @@ export function renderCodemodeCall(
   const preview = state.callHighlightCache.preview;
   const text = getCallText(theme);
   let nativeCall: CodemodeRenderState["nativeCall"];
-  if (context.expanded) {
+  if (context.expanded && native.renderCall) {
     try {
-      nativeCall = native.renderCall!(args, theme, {
+      nativeCall = native.renderCall(args, theme, {
         ...context,
         lastComponent: state.nativeCall,
       });

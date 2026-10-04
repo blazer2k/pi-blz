@@ -1,15 +1,9 @@
 import type {
-  ExtensionAPI,
+  ToolRenderers,
   LsToolInput,
 } from "@earendil-works/pi-coding-agent";
-import { createLsToolDefinition } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
-import type { Handle } from "../shared/handle";
 import { formatToolLabel } from "./rendering/labels";
-import {
-  createCwdDeferredTool,
-  registerPatchedTool,
-} from "./tool-registration";
 import { splitNativeListOutput } from "./list-rendering";
 import { buildRenderResult, formatListResult } from "./rendering/results";
 import { renderPath } from "./rendering/text";
@@ -23,12 +17,9 @@ const LS_CONFIG: ListResultConfig = {
   preprocess: splitNativeListOutput,
 };
 
-export function patchLsTool(pi: ExtensionAPI): Handle {
-  const tool = createCwdDeferredTool(createLsToolDefinition);
-
-  return registerPatchedTool({
-    pi,
-    tool,
+export function patchLsTool(): ToolRenderers {
+  return {
+    renderShell: "self",
     renderCall(args, theme, toolCtx) {
       const state = toolCtx.state as BaseRenderState;
       const { text, prefix } = getCallRenderParts(state, theme, toolCtx);
@@ -70,5 +61,5 @@ export function patchLsTool(pi: ExtensionAPI): Handle {
     renderResult: buildRenderResult((result, state, options, theme, width) =>
       formatListResult(result, state, options, theme, LS_CONFIG, width),
     ),
-  });
+  };
 }

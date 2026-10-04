@@ -1,9 +1,8 @@
 import {
-  createWriteToolDefinition,
   Theme,
   highlightCode,
   getLanguageFromPath,
-  type ExtensionAPI,
+  type ToolRenderers,
   type ToolRenderResultOptions,
   type WriteToolInput,
 } from "@earendil-works/pi-coding-agent";
@@ -23,12 +22,7 @@ import {
   formatExpandableCallText,
 } from "./rendering/tree";
 import type { BaseRenderState } from "./rendering/types";
-import type { Handle } from "../shared/handle";
 import { formatToolLabel } from "./rendering/labels";
-import {
-  createCwdDeferredTool,
-  registerPatchedTool,
-} from "./tool-registration";
 
 type WriteHighlightCache = {
   rawPath: string | null;
@@ -193,12 +187,9 @@ function formatWriteResult(
   return theme.fg("dim", "╰─ ") + metadata + hint;
 }
 
-export function patchWriteTool(pi: ExtensionAPI): Handle {
-  const tool = createCwdDeferredTool(createWriteToolDefinition);
-
-  return registerPatchedTool({
-    pi,
-    tool,
+export function patchWriteTool(): ToolRenderers {
+  return {
+    renderShell: "self",
     renderCall(args, theme, toolCtx) {
       const state = toolCtx.state as WriteRenderState;
       const renderArgs = args as WriteToolInput;
@@ -267,5 +258,5 @@ export function patchWriteTool(pi: ExtensionAPI): Handle {
 
       return text;
     },
-  });
+  };
 }

@@ -1,8 +1,4 @@
-import {
-  createBashToolDefinition,
-  type ExtensionAPI,
-} from "@earendil-works/pi-coding-agent";
-import type { Handle } from "../shared/handle";
+import type { ToolRenderers } from "@earendil-works/pi-coding-agent";
 import { renderBashCall } from "./bash/call";
 import { formatBashResult } from "./bash/result";
 import type {
@@ -10,10 +6,6 @@ import type {
   BashRenderState,
   BashToolInput,
 } from "./bash/types";
-import {
-  createCwdDeferredTool,
-  registerPatchedTool,
-} from "./tool-registration";
 import {
   invalidateIfChanged,
   registerToolTimer,
@@ -24,47 +16,41 @@ import { getResultText } from "./rendering/tree";
 
 const DURATION_UPDATE_INTERVAL_MS = 250;
 
-export function patchBashTool(pi: ExtensionAPI): Handle {
-  const tool = createCwdDeferredTool(createBashToolDefinition);
-  const failedDurations = new Map<string, number>();
+export type BashTiming = {
+  startedAt?: number;
+  endedAt?: number;
+  durationMs?: number;
+};
+export type BashTimingLookup = (toolCallId: string) => BashTiming | undefined;
 
-  const registration = registerPatchedTool({
-    pi,
-    tool,
-    async execute(toolCallId, params, signal, onUpdate, context) {
-      const startedAt = Date.now();
-      try {
-        const result = await tool.execute(
-          toolCallId,
-          params as BashToolInput,
-          signal,
-          onUpdate,
-          context,
-        );
-        const details = (result.details ?? {}) as BashDetailsWithTiming;
+export function patchBashTool(
+  getTiming: BashTimingLookup = () => undefined,
+): ToolRenderers {
+  function updateTiming(state: BashRenderState, toolCallId: string): void {
+    const timing = getTiming(toolCallId);
+    if (!timing) return;
+    if (timing.startedAt !== undefined) state.startedAt = timing.startedAt;
+    if (timing.endedAt !== undefined && timing.startedAt !== undefined) {
+      state.endedAt = timing.endedAt;
+      state.durationMs = timing.endedAt - timing.startedAt;
+    }
+    if (timing.durationMs !== undefined) state.durationMs = timing.durationMs;
+  }
 
-        return {
-          ...result,
-          details: { ...details, durationMs: Date.now() - startedAt },
-        };
-      } catch (error) {
-        failedDurations.set(toolCallId, Date.now() - startedAt);
-        throw error;
-      }
-    },
+  return {
+    renderShell: "self",
     renderCall(args, theme, toolContext) {
+      updateTiming(
+        toolContext.state as BashRenderState,
+        toolContext.toolCallId,
+      );
       return renderBashCall(args as BashToolInput, theme, toolContext);
     },
     renderResult(result, options, theme, toolContext) {
       const state = toolContext.state as BashRenderState;
+      updateTiming(state, toolContext.toolCallId);
       const text = getResultText(state, options, toolContext.lastComponent);
       const details = result.details as BashDetailsWithTiming | undefined;
-      const failedDuration = failedDurations.get(toolContext.toolCallId);
-
-      if (failedDuration !== undefined) {
-        state.durationMs = failedDuration;
-        if (!options.isPartial) failedDurations.delete(toolContext.toolCallId);
-      }
 
       if (
         state.startedAt !== undefined &&
@@ -103,13 +89,6 @@ export function patchBashTool(pi: ExtensionAPI): Handle {
         return output;
       });
       return text;
-    },
-  });
-
-  return {
-    dispose() {
-      failedDurations.clear();
-      registration.dispose();
     },
   };
 }

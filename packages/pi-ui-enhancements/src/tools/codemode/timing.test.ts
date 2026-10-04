@@ -1,17 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { loadConfig, saveConfig } from "../../config/store";
 import {
   createCodemodeExtension,
   type ExtensionAPI,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import type { Handle } from "../../shared/handle";
-import { createCodemodeDefinition } from "../codemode";
-import { patchCustomToolRendering } from "../custom-tools/patch-manager";
 import { clearCodemodeTimers } from "./timing";
-import { mkTheme, mkToolCtx } from "../../testing/helpers";
+import { mkTheme, mkToolCtx, setupCustomTool } from "../../testing/helpers";
 import { clearBlinkTimers, registerToolTimer } from "../rendering/state";
 import type { CodemodeRenderState } from "./types";
 
+const originalPath = process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH;
+let directory: string;
 let now: number;
 let nextId: number;
 const intervals = new Map<ReturnType<typeof setInterval>, () => void>();
@@ -21,6 +25,9 @@ const originalInterval = globalThis.setInterval;
 const originalClear = globalThis.clearInterval;
 let clock: ReturnType<typeof spyOn>;
 beforeEach(() => {
+  directory = mkdtempSync(join(tmpdir(), "pi-ui-codemode-timing-"));
+  process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH = join(directory, "settings.json");
+  loadConfig();
   clearBlinkTimers();
   now = 1000;
   nextId = 0;
@@ -45,6 +52,11 @@ afterEach(() => {
   clock.mockRestore();
   globalThis.setInterval = originalInterval;
   globalThis.clearInterval = originalClear;
+  rmSync(directory, { recursive: true, force: true });
+  if (originalPath === undefined)
+    delete process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH;
+  else process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH = originalPath;
+  loadConfig();
 });
 function setup(executionStarted = true, expanded = false) {
   let definition!: ToolDefinition;
@@ -57,12 +69,14 @@ function setup(executionStarted = true, expanded = false) {
     appendEntry() {},
   } as unknown as ExtensionAPI);
   let active = executionStarted;
-  const handle = patchCustomToolRendering(() => active);
-  handles.push(handle);
-  definition = createCodemodeDefinition(definition, {
-    isToolCallActive: () => active,
-    reportIssue: () => {},
+  const handle = setupCustomTool(definition, () => active, undefined, {
+    source: "builtin",
+    path: "builtin:codemode",
+    scope: "temporary",
+    origin: "top-level",
   });
+  handles.push(handle);
+  const renderers = handle.renderers;
   const state: CodemodeRenderState = {};
   let invalidations = 0;
   const context = mkToolCtx({
@@ -76,9 +90,9 @@ function setup(executionStarted = true, expanded = false) {
   });
   const args = { code: "text(1);\ntext(2);" };
   const renderCall = () =>
-    definition.renderCall!(args, mkTheme(), context).render(120);
+    renderers.renderCall!(args, mkTheme(), context).render(120);
   const progress = () =>
-    definition.renderResult!(
+    renderers.renderResult!(
       { content: [], details: { calls: [] } },
       { expanded, isPartial: true },
       mkTheme(),
@@ -86,7 +100,7 @@ function setup(executionStarted = true, expanded = false) {
     );
   renderCall();
   return {
-    definition,
+    definition: renderers,
     handle,
     state,
     context,
@@ -205,25 +219,26 @@ describe("Codemode timing", () => {
     expect(state.blinkTimer).toBeUndefined();
   });
 
-  it("cleans timers on hook removal and permits resuming after reinstall", () => {
+  it("cleans timers when wrapping is disabled and resumes the same bundle when enabled", () => {
     const { handle, state, progress } = setup();
     progress();
     const timer = state.durationTimer;
-    handle.dispose();
+    saveConfig("patchCustomTools", "false");
+    handle.clearCustomTimers();
     expect(state.durationTimer).toBeUndefined();
     expect(state.blinkTimer).toBeUndefined();
+    progress();
     expect(intervals.size).toBe(0);
-    const replacement = patchCustomToolRendering(() => true);
-    handles.push(replacement);
+    saveConfig("patchCustomTools", "true");
     progress();
     expect(state.durationTimer).toBeDefined();
     expect(state.durationTimer).not.toBe(timer);
     expect(intervals.size).toBe(1);
-    replacement.dispose();
+    handle.dispose();
     expect(intervals.size).toBe(0);
   });
 
-  it("does not clear unrelated Bash duration timers when the hook is disposed", () => {
+  it("does not clear unrelated Bash duration timers when custom rendering is disposed", () => {
     const { handle, progress } = setup();
     progress();
     const bashTimer = setInterval(() => {}, 250);
