@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import type {
   Theme,
   ToolRenderResultOptions,
@@ -14,7 +14,7 @@ import type {
   ListResultConfig,
   ResultStatusState,
 } from "./types";
-import { saveConfig } from "../../config/store";
+import { getConfig, saveConfig } from "../../config/store";
 import { mkTheme } from "../../testing/helpers";
 
 const opts: ToolRenderResultOptions = { expanded: false, isPartial: false };
@@ -132,6 +132,15 @@ function resultStatusState(
 }
 
 describe("formatListResult", () => {
+  let originalMaxEntries: number;
+  beforeEach(() => {
+    originalMaxEntries = getConfig().maxExpandedEntries;
+    saveConfig("maxExpandedEntries", "20");
+  });
+  afterEach(() => {
+    saveConfig("maxExpandedEntries", String(originalMaxEntries));
+  });
+
   it("renders empty message", () => {
     const theme = mkTheme();
     const state = resultStatusState();
@@ -196,25 +205,18 @@ describe("formatListResult", () => {
 
   it("renders every item when maxExpandedEntries is unlimited", () => {
     saveConfig("maxExpandedEntries", "-1");
-    try {
-      const lines = Array.from({ length: 25 }, (_, i) => `file${i}.txt`).join(
-        "\n",
-      );
-      const output = formatListResult(
-        { content: [{ type: "text", text: lines }] },
-        resultStatusState(),
-        optsExpanded,
-        mkTheme(),
-        baseConfig,
-        80,
-      );
+    const items = Array.from({ length: 25 }, (_, i) => `file${i}.txt`);
+    const output = formatListResult(
+      { content: [{ type: "text", text: items.join("\n") }] },
+      resultStatusState(),
+      optsExpanded,
+      mkTheme(),
+      baseConfig,
+      80,
+    ).split("\n");
 
-      expect(output).toContain("file0.txt");
-      expect(output).toContain("file24.txt");
-      expect(output).not.toContain("hidden files");
-    } finally {
-      saveConfig("maxExpandedEntries", "20");
-    }
+    expect(output.slice(0, -1)).toEqual(items.map((item) => `│  ${item}`));
+    expect(output.at(-1)).toContain(`╰─ ${items.length} files`);
   });
 
   it("colors counts as muted and omits redundant result limits", () => {

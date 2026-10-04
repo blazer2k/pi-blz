@@ -1,12 +1,16 @@
-import { describe, expect, it } from "bun:test";
-import type { Theme } from "@earendil-works/pi-coding-agent";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { initTheme, type Theme } from "@earendil-works/pi-coding-agent";
 import { patchWriteTool } from "./write";
-import { getBlinkIndicator } from "./rendering/state";
+import { clearBlinkTimers, getBlinkIndicator } from "./rendering/state";
+import { stripAnsi } from "./rendering/text";
 import { mkTheme, mkToolCtx, setupTool } from "../testing/helpers";
 
 function setupWriteTool() {
   return setupTool(patchWriteTool);
 }
+
+beforeEach(() => initTheme("dark", false));
+afterEach(() => clearBlinkTimers());
 
 describe("write renderCall", () => {
   it("renders path", () => {
@@ -183,9 +187,9 @@ describe("write renderResult", () => {
     const lines = Array.from(
       { length: totalLines },
       (_, i) => `L${String(i + 1).padStart(2, "0")}`,
-    ).join("\n");
+    );
     const ctx = mkToolCtx({
-      args: { path: "big.ts", content: lines },
+      args: { path: "big.ts", content: lines.join("\n") },
     });
 
     const component = def.renderResult!(
@@ -198,11 +202,9 @@ describe("write renderResult", () => {
       ctx,
     );
 
-    const output = component.render(120).join("\n");
-    expect(output).toContain("L01");
-    expect(output).toContain("L25");
-    expect(output).not.toContain("hidden lines");
-    expect(output.split("\n").at(-1)).toContain(`╰─ ${totalLines} lines`);
+    const output = component.render(120).map((line) => stripAnsi(line).trim());
+    expect(output.slice(0, -1)).toEqual(lines.map((line) => `│  ${line}`));
+    expect(output.at(-1)).toContain(`╰─ ${totalLines} lines`);
   });
 
   it("preserves prior highlighted lines across append-only partial updates", () => {
@@ -211,11 +213,11 @@ describe("write renderResult", () => {
     const ctx = mkToolCtx({ expanded: true, isPartial: true, state });
     const theme = mkTheme();
 
-    def.renderCall!(
+    const previous = def.renderCall!(
       { path: "append.ts", content: "const first = 1;" },
       theme,
       ctx,
-    );
+    ).render(120);
     const updated = def.renderCall!(
       {
         path: "append.ts",
@@ -223,13 +225,14 @@ describe("write renderResult", () => {
       },
       theme,
       ctx,
-    )
-      .render(120)
-      .join("\n");
+    ).render(120);
 
-    expect(updated).toContain("const first");
-    expect(updated).toContain("const second");
-    expect(updated.split("\n").at(-1)).toContain("╰─ 2 lines");
+    expect(previous[1]).toContain("\x1b[");
+    expect(updated[1]).toBe(previous[1]);
+    const visible = updated.map(stripAnsi).join("\n");
+    expect(visible).toContain("const first = 1;");
+    expect(visible).toContain("const second = 2;");
+    expect(visible.split("\n").at(-1)).toContain("╰─ 2 lines");
   });
 
   it("uses a static dim indicator while expanded and success when done", () => {

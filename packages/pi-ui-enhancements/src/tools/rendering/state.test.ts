@@ -88,13 +88,14 @@ describe("buildExpansionHint", () => {
   });
 
   it("returns empty hints when showExpansionHint is disabled", () => {
+    const originalHint = getConfig().showExpansionHint;
     saveConfig("showExpansionHint", "false");
     try {
       const theme = mkTheme();
       expect(buildExpansionHint(theme, "expand")).toBe("");
       expect(buildExpansionHint(theme, "collapse")).toBe("");
     } finally {
-      saveConfig("showExpansionHint", "true");
+      saveConfig("showExpansionHint", String(originalHint));
     }
   });
 });
@@ -197,6 +198,7 @@ describe("tool call blink rendering", () => {
   });
 
   it("renders configured indicator style symbols", () => {
+    const originalStyle = getConfig().indicatorStyle;
     try {
       saveConfig("indicatorStyle", "dot");
       expect(getStatusSymbol(true, false)).toBe("•");
@@ -208,7 +210,7 @@ describe("tool call blink rendering", () => {
       expect(getStatusSymbol(false, true)).toBe("◆");
       expect(getStatusSymbol(false, false)).toBe("◇");
     } finally {
-      saveConfig("indicatorStyle", "circle");
+      saveConfig("indicatorStyle", originalStyle);
     }
   });
 });

@@ -26,6 +26,7 @@ type CodemodeNestedCall = CodemodeToolDetails["calls"][number];
 const originalPath = process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH;
 let directory: string;
 beforeEach(() => {
+  initTheme("dark", false);
   directory = mkdtempSync(join(tmpdir(), "pi-ui-codemode-output-"));
   process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH = join(directory, "settings.json");
   loadConfig();

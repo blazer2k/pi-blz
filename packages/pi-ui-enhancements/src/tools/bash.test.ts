@@ -1,11 +1,11 @@
-import { afterEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import {
   initTheme,
   createBashToolDefinition,
   type ExtensionToolContext,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
-import { saveConfig } from "../config/store";
+import { getConfig, saveConfig } from "../config/store";
 import { patchBashTool } from "./bash";
 import { clearBlinkTimers, getBlinkIndicator } from "./rendering/state";
 import { stripAnsi } from "./rendering/text";
@@ -16,6 +16,8 @@ import { PI_0_84_3_OUTPUT } from "./test-fixtures/pi-0.84.3";
 function setupBashTool() {
   return setupTool(patchBashTool);
 }
+
+afterEach(() => clearBlinkTimers());
 
 describe("bash renderCall", () => {
   it("collapses whitespace and renders timeout as dim", () => {
@@ -416,8 +418,13 @@ describe("bash renderResult", () => {
     }
   });
 
-  afterEach(() => {
+  let originalDisplay: "preview" | "summary";
+  beforeEach(() => {
+    originalDisplay = getConfig().collapsedOutputDisplay;
     saveConfig("collapsedOutputDisplay", "preview");
+  });
+  afterEach(() => {
+    saveConfig("collapsedOutputDisplay", originalDisplay);
   });
 
   it("preview mode shows one head and one tail line around an omission row", () => {
@@ -593,6 +600,7 @@ describe("bash renderResult", () => {
       "to collapse",
     );
 
+    const originalHint = getConfig().showExpansionHint;
     saveConfig("showExpansionHint", "false");
     try {
       const collapsed = renderResult(
@@ -619,7 +627,7 @@ describe("bash renderResult", () => {
         "to collapse",
       );
     } finally {
-      saveConfig("showExpansionHint", "true");
+      saveConfig("showExpansionHint", String(originalHint));
     }
   });
 

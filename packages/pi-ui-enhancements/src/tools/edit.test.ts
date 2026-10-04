@@ -1,44 +1,16 @@
-import { describe, expect, it, beforeAll, afterAll } from "bun:test";
-import type { Theme } from "@earendil-works/pi-coding-agent";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { initTheme, type Theme } from "@earendil-works/pi-coding-agent";
 import { patchEditTool, parseDiffStats } from "./edit";
+import { clearBlinkTimers } from "./rendering/state";
+import { stripAnsi } from "./rendering/text";
 import { mkTheme, mkToolCtx, setupTool } from "../testing/helpers";
 
 function setupEditTool() {
   return setupTool(patchEditTool);
 }
 
-// Initialize a minimal theme so renderDiff works in expanded mode
-const testTheme: Theme = {
-  fg: (_color: string, text: string) => text,
-  bg: (_color: string, text: string) => text,
-  bold: (text: string) => text,
-  italic: (text: string) => text,
-  underline: (text: string) => text,
-  inverse: (text: string) => text,
-  strikethrough: (text: string) => text,
-  getFgAnsi: () => "",
-  getBgAnsi: () => "",
-  getColorMode: () => "truecolor",
-  getThinkingBorderColor: () => (s: string) => s,
-  getBashModeBorderColor: () => (s: string) => s,
-} as unknown as Theme;
-
-let savedTheme: Theme | undefined;
-
-beforeAll(async () => {
-  const themeMod =
-    await import("../../../../node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/theme/theme.js");
-  savedTheme = (themeMod as any).theme;
-  themeMod.setThemeInstance(testTheme);
-});
-
-afterAll(async () => {
-  const themeMod =
-    await import("../../../../node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/theme/theme.js");
-  if (savedTheme) {
-    themeMod.setThemeInstance(savedTheme);
-  }
-});
+beforeEach(() => initTheme("dark", false));
+afterEach(() => clearBlinkTimers());
 
 describe("parseDiffStats", () => {
   it("ignores file headers", () => {
@@ -149,8 +121,8 @@ describe("edit renderResult", () => {
     expect(output).toContain("│  ");
     expect(output).toContain("╰─ ");
     expect(output).toContain("╰─ +1 -1");
-    expect(output).toContain("+new");
-    expect(output).toContain("-old");
+    expect(stripAnsi(output)).toContain("+new");
+    expect(stripAnsi(output)).toContain("-old");
   });
 
   it("handles missing diff", () => {
