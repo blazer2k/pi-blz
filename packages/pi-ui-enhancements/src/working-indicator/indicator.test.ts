@@ -7,9 +7,18 @@ import {
   type ExtensionContext,
   type ExtensionUIContext,
 } from "@earendil-works/pi-coding-agent";
+import {
+  indexedColor,
+  oklchColor,
+  rgbColor,
+  type Color as ThemeColor,
+} from "@earendil-works/pi-tui";
 import { assembleRunDuration, registerWorkingIndicator } from "./indicator";
 
-function mkIndicatorHarness() {
+function mkIndicatorHarness(colors?: {
+  muted: ThemeColor;
+  accent: ThemeColor;
+}) {
   const handlers: Record<string, Array<(...args: any[]) => void>> = {};
   const pi = {
     on: (event: string, handler: (...args: any[]) => void) => {
@@ -20,19 +29,25 @@ function mkIndicatorHarness() {
 
   let notifyCount = 0;
   let lastFrames: string[] | null = null;
+  let lastIntervalMs: number | undefined;
   const ctx = {
     ui: {
-      setWorkingIndicator: (options?: { frames: string[] }) => {
+      setWorkingIndicator: (options?: {
+        frames: string[];
+        intervalMs?: number;
+      }) => {
         lastFrames = options?.frames ?? null;
+        lastIntervalMs = options?.intervalMs;
       },
       setWorkingMessage: () => {},
       notify: () => {
         notifyCount++;
       },
       theme: {
+        colors,
         fg: (_color: string, text: string) => text,
         getFgAnsi: () => "",
-        getColorMode: () => "ansi",
+        getColorMode: () => (colors ? "truecolor" : "ansi"),
       },
     },
   } as unknown as ExtensionContext;
@@ -43,6 +58,7 @@ function mkIndicatorHarness() {
     handlers,
     getNotifyCount: () => notifyCount,
     getLastFrames: () => lastFrames,
+    getLastIntervalMs: () => lastIntervalMs,
   };
 }
 
@@ -60,6 +76,121 @@ function installFakeClock(initialTime = 10_000) {
     },
   };
 }
+
+describe("working indicator colors", () => {
+  for (const [name, ansi] of [
+    ["terminal-default", "\x1b[39m"],
+    ["faint", "\x1b[38;2;40;50;60m\x1b[2m"],
+  ] as const) {
+    it(`uses resolved ${name} colors instead of ANSI escapes`, () => {
+      const { pi, ctx, handlers, getLastFrames } = mkIndicatorHarness({
+        muted: rgbColor(10, 20, 30),
+        accent: rgbColor(100, 150, 200),
+      });
+      ctx.ui.theme.getFgAnsi = () => ansi;
+      const clock = installFakeClock(11_000);
+      const handle = registerWorkingIndicator(pi, ctx);
+      try {
+        handlers.agent_start![0]!();
+        expect(getLastFrames()![0]).toStartWith("\x1b[38;2;27;44;62mW\x1b[39m");
+      } finally {
+        handle.dispose();
+        clock.restore();
+      }
+    });
+  }
+
+  it("mixes indexed and OKLCH theme colors in RGB", () => {
+    const { pi, ctx, handlers, getLastFrames } = mkIndicatorHarness({
+      muted: indexedColor(196),
+      accent: oklchColor(1, 0, 0),
+    });
+    const clock = installFakeClock(11_000);
+    const handle = registerWorkingIndicator(pi, ctx);
+    try {
+      handlers.agent_start![0]!();
+      expect(getLastFrames()![0]).toStartWith("\x1b[38;2;255;47;47mW\x1b[39m");
+      expect(getLastFrames()![0]).toContain("\x1b[38;2;255;224;224mk\x1b[39m");
+    } finally {
+      handle.dispose();
+      clock.restore();
+    }
+  });
+
+  it("uses dim text without resolving colors outside truecolor mode", () => {
+    const { pi, ctx, handlers, getLastFrames } = mkIndicatorHarness();
+    ctx.ui.theme.getColorMode = () => "256color";
+    ctx.ui.theme.fg = (color, text) => `[${color}]${text}`;
+    Object.defineProperty(ctx.ui.theme, "colors", {
+      get() {
+        throw new Error("Non-truecolor rendering must not resolve colors");
+      },
+    });
+    const handle = registerWorkingIndicator(pi, ctx);
+    try {
+      handlers.agent_start![0]!();
+      expect(getLastFrames()![0]).toStartWith("[dim]Working");
+      expect(getLastFrames()![0]).not.toContain("\x1b[38;2;");
+    } finally {
+      handle.dispose();
+    }
+  });
+
+  it("reads current theme colors on each frame", () => {
+    const colors = {
+      muted: rgbColor(10, 20, 30),
+      accent: rgbColor(100, 150, 200),
+    };
+    const { pi, ctx, handlers, getLastFrames } = mkIndicatorHarness(colors);
+    const clock = installFakeClock();
+    const handle = registerWorkingIndicator(pi, ctx);
+    try {
+      handlers.agent_start![0]!();
+      expect(getLastFrames()![0]).toStartWith("\x1b[38;2;10;20;30mW");
+      colors.muted = rgbColor(40, 50, 60);
+      colors.accent = rgbColor(200, 150, 100);
+      clock.advance(1_000);
+      handlers.agent_start![0]!();
+      expect(getLastFrames()![0]).toStartWith("\x1b[38;2;70;69;67mW");
+    } finally {
+      handle.dispose();
+      clock.restore();
+    }
+  });
+
+  it("preserves the two-second sweep, frame interval, and per-character resets", () => {
+    const { pi, ctx, handlers, getLastFrames, getLastIntervalMs } =
+      mkIndicatorHarness({
+        muted: rgbColor(10, 20, 30),
+        accent: rgbColor(100, 150, 200),
+      });
+    const clock = installFakeClock();
+    const handle = registerWorkingIndicator(pi, ctx);
+    try {
+      handlers.agent_start![0]!();
+      const first = getLastFrames()![0]!;
+      const base = [..."Working"]
+        .map((ch) => `\x1b[38;2;10;20;30m${ch}\x1b[39m`)
+        .join("");
+      expect(first).toStartWith(base);
+      expect(getLastIntervalMs()).toBe(100);
+      clock.advance(1_000);
+      handlers.agent_start![0]!();
+      expect(getLastFrames()![0]).toStartWith(
+        "\x1b[38;2;27;44;62mW\x1b[39m\x1b[38;2;51;79;107mo\x1b[39m" +
+          "\x1b[38;2;74;113;151mr\x1b[39m\x1b[38;2;89;134;179mk\x1b[39m" +
+          "\x1b[38;2;89;134;179mi\x1b[39m\x1b[38;2;74;113;151mn\x1b[39m" +
+          "\x1b[38;2;51;79;107mg\x1b[39m",
+      );
+      clock.advance(1_000);
+      handlers.agent_start![0]!();
+      expect(getLastFrames()![0]).toBe(first);
+    } finally {
+      handle.dispose();
+      clock.restore();
+    }
+  });
+});
 
 describe("assembleRunDuration", () => {
   it("formats seconds only", () => {

@@ -3,9 +3,9 @@ import type {
   ExtensionContext,
   Theme,
 } from "@earendil-works/pi-coding-agent";
+import { mixColors, styleText } from "@earendil-works/pi-tui";
 import { getConfig } from "../config/store";
 import type { Handle } from "../shared/handle";
-import { RESET_FG, type Color, rgbFg, blend, resolveTheme } from "./colors";
 
 const LABEL = "Working";
 const INTERRUPT_MSG = "esc to interrupt";
@@ -68,12 +68,10 @@ function getRuntime(pi: ExtensionAPI): WorkingIndicatorRuntime {
   return runtime;
 }
 
-function shimmerText(
-  text: string,
-  baseRgb: Color | undefined,
-  highlightRgb: Color | undefined,
-  theme: Theme,
-): string {
+function shimmerText(text: string, theme: Theme): string {
+  if (theme.getColorMode() !== "truecolor") return theme.fg("dim", text);
+
+  const { muted, accent } = theme.colors;
   const t = Date.now() / 1000;
   const chars = [...text];
   const pad = 10;
@@ -83,18 +81,17 @@ function shimmerText(
   const half = 5.0;
   let out = "";
 
-  if (baseRgb && highlightRgb) {
-    for (let i = 0; i < chars.length; i++) {
-      const ch = chars[i]!;
-      const dist = Math.abs(i + pad - pos);
-      const intensity =
-        dist <= half ? 0.5 * (1 + Math.cos((Math.PI * dist) / half)) : 0;
+  for (let i = 0; i < chars.length; i++) {
+    const ch = chars[i]!;
+    const dist = Math.abs(i + pad - pos);
+    const intensity =
+      dist <= half ? 0.5 * (1 + Math.cos((Math.PI * dist) / half)) : 0;
 
-      const blended = blend(baseRgb, highlightRgb, intensity * 0.9);
-      out += `${rgbFg(blended)}${ch}${RESET_FG}`;
-    }
-  } else {
-    out = theme.fg("dim", text);
+    out += styleText(
+      ch,
+      { fg: mixColors(muted, accent, intensity * 0.9, "srgb") },
+      "truecolor",
+    );
   }
   return out;
 }
@@ -137,13 +134,7 @@ export function registerWorkingIndicator(
 
   function renderFrame(): void {
     const cfg = getConfig();
-    const theme = resolveTheme(ctx);
-    const shimmered = shimmerText(
-      LABEL,
-      theme.baseRgb,
-      theme.highlightRgb,
-      ctx.ui.theme,
-    );
+    const shimmered = shimmerText(LABEL, ctx.ui.theme);
     const suffixParts: string[] = [];
 
     if (runStartTime > 0 && cfg.workingIndicatorShowDuration) {
