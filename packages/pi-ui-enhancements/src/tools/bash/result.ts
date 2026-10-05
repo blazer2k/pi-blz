@@ -2,14 +2,19 @@ import type {
   Theme,
   ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
-import { getCollapsedOutputDisplay } from "../rendering/state";
-import { renderCommandError, renderUnknownError } from "./error-result";
+import {
+  buildToolExpansionHint,
+  getCollapsedOutputDisplay,
+} from "../rendering/state";
+import { formatCollapsedOutput, formatOutputLines } from "../rendering/output";
+import type { ToolTextResult } from "../rendering/types";
+import { renderUnknownError } from "./error-result";
+import { buildBashMetadataParts, joinMetadata } from "./metadata";
 import { buildBashResultView } from "./model";
-import { renderBashSuccess } from "./success-result";
-import type { BashRenderState, BashResult } from "./types";
+import type { BashRenderState } from "./types";
 
 export function formatBashResult(
-  result: BashResult,
+  result: ToolTextResult,
   state: BashRenderState,
   options: ToolRenderResultOptions,
   theme: Theme,
@@ -21,12 +26,62 @@ export function formatBashResult(
     errorWidth: Math.max(1, width - 3),
   });
 
-  switch (view.kind) {
-    case "success":
-      return renderBashSuccess(view, theme, state, width);
-    case "command-error":
-      return renderCommandError(view, theme, state, width);
-    case "unknown-error":
-      return renderUnknownError(view, theme, state, width);
+  if (view.kind === "unknown-error") {
+    return renderUnknownError(view, theme, state, width);
   }
+
+  const collapsedOutput = formatCollapsedOutput(
+    view.output,
+    theme,
+    "toolOutput",
+    width,
+  );
+  const expandable =
+    view.callExpandable ||
+    view.output.hiddenLines > 0 ||
+    collapsedOutput.truncated ||
+    view.toolTruncated;
+  state.resultExpandable = expandable;
+  const expanded = view.expanded && expandable;
+  const output = expanded
+    ? formatOutputLines(view.output.fullText, theme, "toolOutput")
+    : collapsedOutput;
+  const metadataParts = buildBashMetadataParts(
+    {
+      durationSummary: view.durationSummary,
+      totalLines: view.output.totalLines,
+      includeLineCount:
+        !expanded &&
+        view.collapsedDisplay === "summary" &&
+        view.output.totalLines > 0,
+      toolTruncated: view.toolTruncated,
+    },
+    theme,
+  );
+  if (view.kind === "success" && view.output.totalLines === 0) {
+    metadataParts.push(theme.fg("muted", "(no output)"));
+  }
+
+  let metadata = joinMetadata(metadataParts, theme);
+  const hint = buildToolExpansionHint(
+    theme,
+    state,
+    { expanded },
+    expandable,
+    metadata ? "suffix" : "standalone",
+  );
+  if (view.kind === "success" && !metadata && !hint) {
+    metadata = theme.fg("muted", "output");
+  }
+  const footer = metadata + hint;
+
+  return [
+    output.text,
+    view.kind === "command-error"
+      ? theme.fg("dim", footer ? "├─ " : "╰─ ") + theme.fg("error", view.status)
+      : undefined,
+    footer ? theme.fg("dim", "╰─ ") + footer : undefined,
+  ]
+    .filter((line): line is string => Boolean(line))
+    .join("\n");
 }

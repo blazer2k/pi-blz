@@ -1,10 +1,5 @@
-import {
-  type BashToolDetails,
-  type BashToolInput as NativeBashToolInput,
-} from "@earendil-works/pi-coding-agent";
+import type { BashToolDetails } from "@earendil-works/pi-coding-agent";
 import type { BaseRenderState } from "../rendering/types";
-
-export type BashToolInput = NativeBashToolInput;
 
 export type BashRenderState = BaseRenderState & {
   callHighlightCache?: {
@@ -21,9 +16,4 @@ export type BashRenderState = BaseRenderState & {
 
 export type BashDetailsWithTiming = BashToolDetails & {
   durationMs?: number;
-};
-
-export type BashResult = {
-  content: Array<{ type: string; text?: string }>;
-  details?: unknown;
 };

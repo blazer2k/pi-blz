@@ -1,4 +1,8 @@
-import { highlightCode, type Theme } from "@earendil-works/pi-coding-agent";
+import {
+  highlightCode,
+  type BashToolInput,
+  type Theme,
+} from "@earendil-works/pi-coding-agent";
 import {
   truncateToWidth,
   visibleWidth,
@@ -10,7 +14,7 @@ import {
   safeTruncateToWidth,
 } from "../rendering/text";
 import { getCallText, getCallPrefix } from "../rendering/tree";
-import type { BashRenderState, BashToolInput } from "./types";
+import type { BashRenderState } from "./types";
 import { formatToolLabel } from "../rendering/labels";
 
 type BashCallContext = {

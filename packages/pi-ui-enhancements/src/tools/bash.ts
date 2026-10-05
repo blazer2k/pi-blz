@@ -1,11 +1,10 @@
-import type { ToolRenderers } from "@earendil-works/pi-coding-agent";
+import type {
+  BashToolInput,
+  ToolRenderers,
+} from "@earendil-works/pi-coding-agent";
 import { renderBashCall } from "./bash/call";
 import { formatBashResult } from "./bash/result";
-import type {
-  BashDetailsWithTiming,
-  BashRenderState,
-  BashToolInput,
-} from "./bash/types";
+import type { BashDetailsWithTiming, BashRenderState } from "./bash/types";
 import {
   invalidateIfChanged,
   registerToolTimer,

@@ -22,7 +22,7 @@ import {
   getCallRenderParts,
   formatExpandableCallText,
 } from "./rendering/tree";
-import type { BaseRenderState } from "./rendering/types";
+import type { BaseRenderState, ToolTextResult } from "./rendering/types";
 
 export function parseDiffStats(diff: string): {
   added: number;
@@ -41,10 +41,7 @@ export function parseDiffStats(diff: string): {
 }
 
 function formatEditResult(
-  result: {
-    content: Array<{ type: string; text?: string }>;
-    details?: unknown;
-  },
+  result: ToolTextResult,
   state: BaseRenderState,
   options: ToolRenderResultOptions,
   theme: Theme,

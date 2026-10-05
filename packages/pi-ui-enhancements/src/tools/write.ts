@@ -21,7 +21,7 @@ import {
   getResultText,
   formatExpandableCallText,
 } from "./rendering/tree";
-import type { BaseRenderState } from "./rendering/types";
+import type { BaseRenderState, ToolTextResult } from "./rendering/types";
 import { formatToolLabel } from "./rendering/labels";
 
 type WriteHighlightCache = {
@@ -143,7 +143,7 @@ function getHighlightedWriteLines(
 }
 
 function formatWriteResult(
-  result: { content: Array<{ type: string; text?: string }> },
+  result: ToolTextResult,
   state: WriteRenderState,
   options: ToolRenderResultOptions,
   theme: Theme,

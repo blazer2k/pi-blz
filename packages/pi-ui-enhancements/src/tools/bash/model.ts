@@ -4,11 +4,8 @@ import { extractTextContent } from "../rendering/text";
 import { selectOutputWindow, type OutputWindow } from "../rendering/output";
 import { getDurationSummary } from "./metadata";
 import { parseBashErrorText, stripBashTruncationNotice } from "./native-output";
-import type {
-  BashDetailsWithTiming,
-  BashRenderState,
-  BashResult,
-} from "./types";
+import type { ToolTextResult } from "../rendering/types";
+import type { BashDetailsWithTiming, BashRenderState } from "./types";
 
 type BaseBashResultView = {
   expanded: boolean;
@@ -91,7 +88,7 @@ function buildErrorView(
 }
 
 export function buildBashResultView(
-  result: BashResult,
+  result: ToolTextResult,
   state: BashRenderState,
   options: ToolRenderResultOptions,
   policy: BashResultPolicy,

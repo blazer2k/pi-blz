@@ -1,8 +1,4 @@
-import type {
-  Theme,
-  ToolRenderers,
-  ToolRenderResultOptions,
-} from "@earendil-works/pi-coding-agent";
+import type { ToolRenderers } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
 import { formatToolLabel } from "../rendering/labels";
 import {
@@ -10,8 +6,7 @@ import {
   invalidateIfChanged,
   updateResultState,
 } from "../rendering/state";
-import { formatSimpleErrorResult } from "../rendering/results";
-import { extractTextContent, safeTruncateToWidth } from "../rendering/text";
+import { safeTruncateToWidth } from "../rendering/text";
 import { getCallRenderParts, getResultText } from "../rendering/tree";
 import type { BaseRenderState } from "../rendering/types";
 import {
@@ -60,28 +55,6 @@ function renderComponentLines(
 ): string[] {
   const lines = component.render(width).map((line) => line.trimEnd());
   return preserveBlankLines ? lines : lines.filter((line) => line.length > 0);
-}
-
-function formatEmptyResult(
-  result: { content: Array<{ type: string; text?: string }> },
-  state: CustomRenderState,
-  options: ToolRenderResultOptions,
-  theme: Theme,
-  width: number,
-): string {
-  if (state.isError) {
-    return formatSimpleErrorResult(
-      extractTextContent(result),
-      state,
-      options,
-      theme,
-      width,
-    );
-  }
-
-  const metadata = buildResultStatusParts(state, theme);
-  metadata.push(theme.fg("muted", "(no output)"));
-  return theme.fg("dim", "╰─ ") + metadata.join(theme.fg("muted", " • "));
 }
 
 function createCallRenderer(
@@ -218,7 +191,13 @@ function createResultRenderer(
           Math.max(1, width - 3),
         );
         if (innerLines.length === 0) {
-          return formatEmptyResult(result, state, options, theme, width);
+          return buildGenericResult(
+            state.isError ? result : { content: [] },
+            state,
+            options,
+            theme,
+            width,
+          );
         }
 
         const renderedLines = innerLines.map((line, index) => {

@@ -269,19 +269,49 @@ describe("custom renderer adapters", () => {
     });
   }
 
-  it("uses native empty-result formatting for blank custom output", () => {
+  it("keeps blank successful native displays empty, including image results", () => {
     const definition = tool();
     definition.renderResult = () => new Text("   ", 0, 0);
-    expect(
-      plain(
-        wrap(definition).renderResult!(
-          { content: [], details: undefined },
-          resultOptions,
+    const wrapped = wrap(definition);
+    for (const expanded of [false, true]) {
+      const output = plain(
+        wrapped.renderResult!(
+          {
+            content: [
+              { type: "text", text: "native renderer chose to hide this" },
+              { type: "image", mimeType: "image/png", data: "AA==" },
+            ],
+            details: { truncation: { truncated: true } },
+          },
+          { ...resultOptions, expanded },
           mkTheme(),
-          mkToolCtx(),
+          mkToolCtx({ expanded }),
         ),
-      ),
-    ).toContain("(no output)");
+      );
+      expect(output.trim()).toBe("╰─ truncated • (no output)");
+    }
+  });
+
+  it("retains actual error content when the native result display is blank", () => {
+    const definition = tool();
+    definition.renderResult = () => new Text("   ", 0, 0);
+    const wrapped = wrap(definition);
+    for (const expanded of [false, true]) {
+      const output = plain(
+        wrapped.renderResult!(
+          {
+            content: [{ type: "text", text: "actual failure" }],
+            details: { truncation: { truncated: true } },
+          },
+          { ...resultOptions, expanded },
+          mkTheme(),
+          mkToolCtx({ expanded, isError: true }),
+        ),
+      );
+      expect(output).toContain("actual failure");
+      expect(output).toContain("truncated");
+      expect(output).not.toContain("(no output)");
+    }
   });
 
   for (const active of [false, true]) {
