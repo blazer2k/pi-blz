@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import {
   createAgentSession,
   createCodemodeExtension,
@@ -12,12 +12,25 @@ import {
   ModelRuntime,
   SessionManager,
   SettingsManager,
+  ToolExecutionComponent,
   type AgentSession,
+  type ExtensionAPI,
+  type ExtensionFactory,
   type ExtensionToolContext,
+  type ToolRenderers,
 } from "@earendil-works/pi-coding-agent";
 import type { ToolResultMessage } from "@earendil-works/pi-ai";
+import {
+  getCapabilities,
+  Image,
+  setCapabilities,
+  Text,
+  type TUI,
+} from "@earendil-works/pi-tui";
+import { Type } from "typebox";
 import extension from "../index";
-import { loadConfig } from "../config/store";
+import { getConfig, loadConfig, saveConfig } from "../config/store";
+import { stripAnsi } from "./rendering/text";
 import { mkTheme, mkToolCtx } from "../testing/helpers";
 
 const originalPath = process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH;
@@ -28,6 +41,7 @@ beforeEach(() => {
   directory = mkdtempSync(join(tmpdir(), "pi-ui-renderer-ownership-"));
   process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH = join(directory, "ui.json");
   loadConfig();
+  initTheme("dark", false);
 });
 afterEach(async () => {
   for (const session of sessions.splice(0)) {
@@ -48,7 +62,11 @@ async function createSession(
   enhanced: boolean,
   tools?: string[],
   sessionManager?: SessionManager,
+  extensionFactories: ExtensionFactory[] = enhanced ? [extension] : [],
 ) {
+  const createTransport = mock(() => {
+    throw new Error("Offline rendering tests must not connect to MCP");
+  });
   const settingsManager = SettingsManager.inMemory({ defaultTools: ["read"] });
   const resourceLoader = new DefaultResourceLoader({
     cwd: directory,
@@ -71,9 +89,10 @@ async function createSession(
         replaceable: true,
         factory: createMcpExtension({
           loadConfig: () => ({ servers: [], errors: [] }),
+          createTransport,
         }),
       },
-      ...(enhanced ? [extension] : []),
+      ...extensionFactories,
     ],
   });
   await resourceLoader.reload();
@@ -97,7 +116,7 @@ async function createSession(
   });
   sessions.push(session);
   await session.bindExtensions({ mode: "json" });
-  return { session, resourceLoader };
+  return { session, resourceLoader, createTransport };
 }
 
 function resolve(session: AgentSession, name: string) {
@@ -106,7 +125,368 @@ function resolve(session: AgentSession, name: string) {
   );
 }
 
+function toolComponent(
+  session: AgentSession,
+  name: string,
+  args: Record<string, unknown>,
+  id = name,
+) {
+  return new ToolExecutionComponent(
+    name,
+    id,
+    args,
+    { showImages: true },
+    resolve(session, name),
+    { requestRender() {} } as TUI,
+    directory,
+  );
+}
+
+async function exportData(session: AgentSession) {
+  const html = readFileSync(
+    await session.exportToHtml(join(directory, "export.html")),
+    "utf8",
+  );
+  const encoded =
+    /<script id="session-data" type="application\/json">([^<]*)<\/script>/.exec(
+      html,
+    )?.[1];
+  expect(encoded).toBeDefined();
+  return JSON.parse(Buffer.from(encoded!, "base64").toString("utf8")) as {
+    renderedTools: Record<
+      string,
+      {
+        callHtml?: string;
+        resultHtmlCollapsed?: string;
+        resultHtmlExpanded?: string;
+      }
+    >;
+  };
+}
+
 describe("public renderer integration", () => {
+  it("composes real extension resolvers around the enhancement without taking over self-owned shells", async () => {
+    const trace: string[] = [];
+    let beforeResult: ToolRenderers | undefined;
+    let afterResult: ToolRenderers | undefined;
+    const downstream: ToolRenderers = {
+      renderCall: () => new Text("Downstream wording", 0, 0),
+    };
+    const before: ExtensionFactory = (pi) => {
+      pi.registerToolRenderer((_name, next) => {
+        trace.push("before:enter");
+        beforeResult = next();
+        trace.push("before:exit");
+        return beforeResult;
+      });
+    };
+    const after: ExtensionFactory = (pi) => {
+      for (const name of ["composed", "self_owned"]) {
+        pi.registerTool({
+          name,
+          label: name,
+          description: name,
+          parameters: Type.Object({}),
+          execute: async () => ({ content: [], details: undefined }),
+          renderShell: name === "self_owned" ? "self" : "default",
+          renderCall: () => new Text("Registered wording", 0, 0),
+        });
+      }
+      pi.registerToolRenderer((name, next) => {
+        trace.push("after:enter");
+        const base = next();
+        afterResult = name === "composed" ? downstream : base;
+        trace.push("after:exit");
+        return afterResult;
+      });
+    };
+    const { session } = await createSession(true, undefined, undefined, [
+      before,
+      extension,
+      after,
+    ]);
+    for (const name of ["composed", "self_owned", "missing"]) {
+      trace.length = 0;
+      const base = session.getToolDefinition(name) ?? downstream;
+      const resolved = session.extensionRunner.resolveToolRenderers(
+        name,
+        () => {
+          trace.push("base");
+          return base;
+        },
+      );
+      expect(trace).toEqual([
+        "before:enter",
+        "after:enter",
+        "base",
+        "after:exit",
+        "before:exit",
+      ]);
+      expect(resolved).toBe(beforeResult);
+      if (name === "composed") {
+        expect(afterResult).toBe(downstream);
+        expect(resolved!.renderShell).toBe("self");
+        expect(resolved!.renderCall).not.toBe(downstream.renderCall);
+        expect(
+          resolved!.renderCall!({}, mkTheme(), mkToolCtx())
+            .render(80)
+            .join("\n"),
+        ).toContain("Downstream wording");
+      } else {
+        expect(afterResult).toBe(base);
+        expect(resolved).toBe(base);
+      }
+    }
+  });
+
+  it("renders disconnected MCP history and exports like native Pi, then uses a later local registration", async () => {
+    const name = "mcp__offline__query";
+    const id = "disconnected-history";
+    const args = { query: "history only" };
+    const result = {
+      content: [
+        {
+          type: "text" as const,
+          text: "offline first\nmiddle one\nmiddle two\nmiddle three\nmiddle four\noffline last",
+        },
+      ],
+      details: { server: "offline", tool: "query" },
+      isError: false,
+    };
+    let baseline:
+      | {
+          terminal: string[][];
+          html: Awaited<ReturnType<typeof exportData>>["renderedTools"][string];
+        }
+      | undefined;
+    const originalWrapping = getConfig().patchCustomTools;
+    try {
+      for (const mode of ["native", "unwrapped", "wrapped"]) {
+        const enhanced = mode !== "native";
+        saveConfig("patchCustomTools", String(mode === "wrapped"));
+        let pi!: ExtensionAPI;
+        const fixture = await createSession(enhanced, undefined, undefined, [
+          ...(enhanced ? [extension] : []),
+          (api) => {
+            pi = api;
+          },
+        ]);
+        const { session } = fixture;
+        const inventory = session.getAllTools();
+        const active = session.getActiveToolNames();
+        expect(session.getToolDefinition(name)).toBeUndefined();
+        expect(pi.getMcpServers()).toEqual([]);
+        session.sessionManager.appendMessage({
+          role: "user",
+          content: "offline history",
+          timestamp: 1,
+        });
+        session.sessionManager.appendMessage({
+          role: "assistant",
+          content: [{ type: "toolCall", id, name, arguments: args }],
+          api: "anthropic-messages",
+          provider: "anthropic",
+          model: "offline",
+          usage: {
+            input: 0,
+            output: 0,
+            cacheRead: 0,
+            cacheWrite: 0,
+            totalTokens: 0,
+            cost: {
+              input: 0,
+              output: 0,
+              cacheRead: 0,
+              cacheWrite: 0,
+              total: 0,
+            },
+          },
+          stopReason: "toolUse",
+          timestamp: 1,
+        });
+        session.sessionManager.appendMessage({
+          role: "toolResult",
+          toolCallId: id,
+          toolName: name,
+          ...result,
+          timestamp: 2,
+        });
+        const history = structuredClone(
+          session.sessionManager.buildSessionContext().messages,
+        );
+        const component = toolComponent(session, name, args, id);
+        component.setArgsComplete();
+        component.updateResult(result);
+        const terminal: string[][] = [];
+        for (const expanded of [false, true]) {
+          component.setExpanded(expanded);
+          const lines = component.render(80);
+          const visible = lines.map(stripAnsi).join("\n");
+          expect(visible).toContain("offline/query");
+          expect(visible).toContain("history only");
+          expect(visible).toContain("offline first");
+          expect(visible.includes("offline last")).toBe(expanded);
+          terminal.push(lines);
+        }
+        const html = (await exportData(session)).renderedTools[id]!;
+        expect(html.callHtml).toContain("offline/query");
+        expect(html.resultHtmlCollapsed).toContain("offline first");
+        expect(html.resultHtmlExpanded).toContain("offline last");
+        if (!baseline) baseline = { terminal, html };
+        else expect({ terminal, html }).toEqual(baseline);
+        expect(session.getAllTools()).toEqual(inventory);
+        expect(session.getActiveToolNames()).toEqual(active);
+        expect(session.getToolDefinition(name)).toBeUndefined();
+        expect(session.sessionManager.buildSessionContext().messages).toEqual(
+          history,
+        );
+        expect(fixture.createTransport).not.toHaveBeenCalled();
+
+        const local = {
+          name,
+          label: "Local query",
+          description: "Offline synthetic definition",
+          parameters: Type.Object({ query: Type.String() }),
+          exposure: "deferred" as const,
+          execute: async () => ({ content: [], details: undefined }),
+          renderCall: () => new Text("Local renderer", 0, 0),
+        };
+        pi.registerTool(local);
+        expect(session.getToolDefinition(name)).toBe(local);
+        expect(session.getActiveToolNames()).toEqual(active);
+        const later = toolComponent(session, name, args, id)
+          .render(80)
+          .map(stripAnsi)
+          .join("\n");
+        expect(later).toContain("Local renderer");
+        expect(later).not.toContain("offline/query");
+        expect(resolve(session, name)!.renderShell === "self").toBe(
+          mode === "wrapped",
+        );
+        expect(fixture.createTransport).not.toHaveBeenCalled();
+      }
+    } finally {
+      saveConfig("patchCustomTools", String(originalWrapping));
+    }
+  });
+
+  it("preserves one native PNG and reuses native components through partial/final updates and expansion", async () => {
+    const capabilities = getCapabilities();
+    const originalWrapping = getConfig().patchCustomTools;
+    const png = {
+      type: "image" as const,
+      mimeType: "image/png",
+      data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII=",
+    };
+    const partial = {
+      content: [{ type: "text" as const, text: "partial image" }, png],
+      details: undefined,
+      isError: false,
+    };
+    const final = {
+      content: [{ type: "text" as const, text: "final image" }, png],
+      details: undefined,
+      isError: false,
+    };
+    const snapshots = structuredClone([partial, final]);
+    setCapabilities({ ...capabilities, images: "kitty" });
+    try {
+      for (const mode of ["native", "unwrapped", "wrapped"]) {
+        const enhanced = mode !== "native";
+        saveConfig("patchCustomTools", String(mode === "wrapped"));
+        let call: Text | undefined;
+        let output: Text | undefined;
+        const previousCalls: unknown[] = [];
+        const previousResults: unknown[] = [];
+        const nativeResults: Array<{
+          content: unknown;
+          image: unknown;
+          isPartial: boolean;
+        }> = [];
+        const { session } = await createSession(
+          enhanced,
+          undefined,
+          undefined,
+          [
+            ...(enhanced ? [extension] : []),
+            (pi) => {
+              pi.registerTool({
+                name: "image_fixture",
+                label: "Image fixture",
+                description: "Offline PNG fixture",
+                parameters: Type.Object({}),
+                execute: async () => final,
+                renderCall(_args, _theme, context) {
+                  previousCalls.push(context.lastComponent);
+                  call ??= new Text("Image fixture", 0, 0);
+                  return call;
+                },
+                renderResult(result, options, _theme, context) {
+                  previousResults.push(context.lastComponent);
+                  nativeResults.push({
+                    content: result.content,
+                    image: result.content[1],
+                    isPartial: options.isPartial,
+                  });
+                  output ??= new Text("", 0, 0);
+                  output.setText(
+                    options.isPartial ? "partial image" : "final image",
+                  );
+                  return output;
+                },
+              });
+            },
+          ],
+        );
+        const component = toolComponent(session, "image_fixture", {});
+        component.setArgsComplete();
+        component.markExecutionStarted();
+        component.updateResult(partial, true);
+        const view = component as unknown as { imageComponents: Image[] };
+        const image = view.imageComponents[0]!;
+        expect(image).toBeInstanceOf(Image);
+        for (const isPartial of [true, false]) {
+          component.updateResult(isPartial ? partial : final, isPartial);
+          for (const expanded of [false, true, false]) {
+            component.setExpanded(expanded);
+            component.invalidate();
+            const lines = component.render(80);
+            expect(view.imageComponents).toHaveLength(1);
+            expect(view.imageComponents[0]).toBe(image);
+            expect(
+              component.children.filter((child) => child === image),
+            ).toHaveLength(1);
+            const imageLines = image.render(80);
+            expect(imageLines.length).toBeGreaterThan(0);
+            expect(lines.slice(-imageLines.length)).toEqual(imageLines);
+            expect(lines.map(stripAnsi).join("\n")).toContain(
+              isPartial ? "partial image" : "final image",
+            );
+          }
+        }
+        // Pi catches renderer errors, so assert recorded calls here.
+        expect(previousCalls[0]).toBeUndefined();
+        expect(previousCalls.length).toBeGreaterThan(1);
+        for (const previous of previousCalls.slice(1))
+          expect(previous).toBe(call);
+        expect(previousResults[0]).toBeUndefined();
+        expect(previousResults.length).toBeGreaterThan(1);
+        for (const previous of previousResults.slice(1))
+          expect(previous).toBe(output);
+        for (const result of nativeResults) {
+          expect(result.content).toBe(
+            result.isPartial ? partial.content : final.content,
+          );
+          expect(result.image).toBe(png);
+        }
+        expect([partial, final]).toEqual(snapshots);
+      }
+    } finally {
+      setCapabilities(capabilities);
+      saveConfig("patchCustomTools", String(originalWrapping));
+    }
+  });
+
   it("does not mutate Pi's registry method or re-register any tools", async () => {
     const original = ExtensionRunner.prototype.getAllRegisteredTools;
     const { session, resourceLoader } = await createSession(true);
@@ -334,18 +714,9 @@ describe("public renderer integration", () => {
       timestamp: 2,
     });
     initTheme("dark", false);
-    const html = readFileSync(
-      await session.exportToHtml(join(directory, "export.html")),
-      "utf8",
-    );
-    const encoded =
-      /<script id="session-data" type="application\/json">([^<]*)<\/script>/.exec(
-        html,
-      )?.[1];
-    expect(encoded).toBeDefined();
-    const data = JSON.parse(Buffer.from(encoded!, "base64").toString("utf8"));
-    expect(data.renderedTools["find-history"].callHtml).toContain("Find");
-    expect(data.renderedTools["find-history"].resultHtmlCollapsed).toContain(
+    const data = await exportData(session);
+    expect(data.renderedTools["find-history"]?.callHtml).toContain("Find");
+    expect(data.renderedTools["find-history"]?.resultHtmlCollapsed).toContain(
       "1 file",
     );
     const renderer = resolve(session, "read")!;
