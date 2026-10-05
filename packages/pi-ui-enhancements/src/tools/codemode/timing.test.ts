@@ -2,14 +2,19 @@ import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadConfig, saveConfig } from "../../config/store";
+import { loadConfig } from "../../config/store";
 import {
   createCodemodeExtension,
   type ExtensionAPI,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import type { Handle } from "../../shared/handle";
-import { mkTheme, mkToolCtx, setupCustomTool } from "../../testing/helpers";
+import {
+  mkTheme,
+  mkToolCtx,
+  setupCustomTool,
+  setTestConfig,
+} from "../../testing/helpers";
 import { clearBlinkTimers, registerToolTimer } from "../rendering/state";
 import type { CodemodeRenderState } from "./types";
 
@@ -221,13 +226,13 @@ describe("Codemode timing", () => {
     const { handle, state, progress } = setup();
     progress();
     const timer = state.durationTimer;
-    saveConfig("patchCustomTools", "false");
+    setTestConfig({ patchCustomTools: false });
     handle.clearCustomTimers();
     expect(state.durationTimer).toBeUndefined();
     expect(state.blinkTimer).toBeUndefined();
     progress();
     expect(intervals.size).toBe(0);
-    saveConfig("patchCustomTools", "true");
+    setTestConfig({ patchCustomTools: true });
     progress();
     expect(state.durationTimer).toBeDefined();
     expect(state.durationTimer).not.toBe(timer);

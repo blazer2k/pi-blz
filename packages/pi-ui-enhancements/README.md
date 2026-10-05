@@ -35,36 +35,51 @@ pi -e ./packages/pi-ui-enhancements/src/index.ts
 
 ## Settings
 
-Run `/ui-settings` in pi. Type in the menu to filter the settings list.
+Edit `~/.pi/agent/ui-settings.json`, then run `/reload` in pi. Changes are loaded at startup or on reload, not when the file is edited. This extension does not add a settings command.
 
-| Setting               | Description                                                           |
-| --------------------- | --------------------------------------------------------------------- |
-| Enable ASCII header   | Show ASCII art at session start                                       |
-| Header font           | Choose from 19 figlet fonts and 2 bundled fonts (default: Greek)      |
-| Header color          | Header text color (text, accent, dim)                                 |
-| Header alignment      | Place the header on the left, in the center, or on the right          |
-| Show version          | Show the pi version below the ASCII header                            |
-| Show interrupt hint   | Show "esc to interrupt" next to the working indicator                 |
-| Show run duration     | Show elapsed time while working and a brief message on completion     |
-| Patch custom tools    | Use compact output for extension tools, including Codemode            |
-| Capitalize tool names | Capitalize headers drawn by this extension (default: true)            |
-| Indicator style       | Tool status symbol (dot, circle, diamond)                             |
-| Indicator color       | Color of filled and completed symbols (success, text, toolTitle)      |
-| Max expanded entries  | Limit entries in expanded lists and custom results (-1 for unlimited) |
-| Collapsed output      | Bash and Codemode output style: preview or summary (default: preview) |
-| Editor frame color    | Color of editor borders and their status text (thinking, dim, muted)  |
-| Show thinking level   | Show the thinking level at the bottom of the editor                   |
-| Show cache tokens     | Show cache read/write token counts                                    |
-| Show cost             | Show the total session cost at the bottom of the editor               |
-| Show git branch       | Show the current git branch at the top of the editor                  |
+The file is created with defaults when the extension loads. Missing keys are filled in, and invalid values fall back to their defaults. Use JSON booleans and numbers, not quoted strings. Use `PI_UI_ENHANCEMENTS_CONFIG_PATH` to choose a different settings file.
 
-Settings are saved to `~/.pi/agent/ui-settings.json` and loaded at the start of each session. Use `PI_UI_ENHANCEMENTS_CONFIG_PATH` to choose a different settings file.
+For example:
+
+```json
+{
+  "asciiHeaderEnabled": false,
+  "collapsedOutputDisplay": "summary",
+  "maxExpandedEntries": 50
+}
+```
+
+| JSON key                           | Default     | Allowed values / purpose                                      |
+| ---------------------------------- | ----------- | ------------------------------------------------------------- |
+| `asciiHeaderEnabled`               | `true`      | Boolean: show the ASCII header                                |
+| `asciiHeaderFont`                  | `"Greek"`   | Font name from the list below                                 |
+| `asciiHeaderColor`                 | `"text"`    | `"text"`, `"accent"`, `"dim"`                                 |
+| `asciiHeaderAlign`                 | `"center"`  | `"left"`, `"center"`, `"right"`                               |
+| `asciiHeaderShowVersion`           | `true`      | Boolean: show the pi version below the header                 |
+| `workingIndicatorShowInterruptMsg` | `true`      | Boolean: show "esc to interrupt"                              |
+| `workingIndicatorShowDuration`     | `true`      | Boolean: show elapsed time and completion duration            |
+| `patchCustomTools`                 | `true`      | Boolean: compact eligible extension tools, including Codemode |
+| `capitalizeToolNames`              | `true`      | Boolean: capitalize headers drawn by this extension           |
+| `indicatorStyle`                   | `"circle"`  | `"dot"`, `"circle"`, `"diamond"`                              |
+| `indicatorColor`                   | `"success"` | `"success"`, `"text"`, `"toolTitle"`                          |
+| `maxExpandedEntries`               | `20`        | `-1`, `10`, `20`, `50`, `100`; `-1` means unlimited           |
+| `collapsedOutputDisplay`           | `"preview"` | `"preview"`, `"summary"`                                      |
+| `showExpansionHint`                | `true`      | Boolean: show expand/collapse keybinding hints                |
+| `roundedEditorColor`               | `"dim"`     | `"thinking"`, `"dim"`, `"muted"`                              |
+| `roundedEditorShowThinkingLevel`   | `true`      | Boolean: show the thinking level                              |
+| `roundedEditorShowCacheTokens`     | `false`     | Boolean: show cache read/write token counts                   |
+| `roundedEditorShowCost`            | `false`     | Boolean: show total session cost                              |
+| `roundedEditorShowBranch`          | `true`      | Boolean: show the git branch                                  |
+
+Bundled fonts: `Greek`, `Greek Large`.
+
+Figlet fonts: `3D-ASCII`, `Alligator`, `ANSI Compact`, `Classy`, `Coder Mini`, `Crazy`, `Delta Corps Priest 1`, `Future`, `Future Smooth`, `Georgia11`, `Italic`, `Jazmine`, `Larry 3D`, `Poison`, `Rebel`, `Slant`, `Tmplr`, `Trek`, `Univers`.
 
 ## Built-in tool display
 
 The extension changes how read, write, edit, bash, ls, find, and grep look. Pi still runs the original tools and controls their arguments, source information, and availability. Your `defaultTools` setting and CLI options decide which tools are active; this extension does not enable them.
 
-Tool calls and output fit the available terminal width and adjust when you resize it. Drawing settings, such as capitalization and indicator colors, update existing tool displays immediately.
+Tool calls and output fit the available terminal width and adjust when you resize it.
 
 Expanded Bash and Write show their full content. Expanded list tools show the beginning and end of a list, with an omission marker between them. `maxExpandedEntries` controls that limit and also applies to generic custom-tool results.
 
@@ -97,7 +112,7 @@ A tool-call block is the part of the conversation showing one tool's header, arg
 
 `patchCustomTools` controls compact display for eligible extension tools, including Codemode. Turning it off uses their normal display. This setting does not affect the seven built-in tool displays.
 
-Pi checks this setting when it creates or rebuilds a tool-call block. Changing it affects those blocks; blocks already on screen keep their existing layout and drawing functions. Other drawing settings can update existing blocks without rebuilding them.
+Pi checks this setting when it creates or rebuilds a tool-call block. Existing component instances keep their layout and drawing functions. After editing the configuration, run `/reload` so new or rebuilt blocks use the updated settings.
 
 If a custom tool has a working `renderCall()` function, the extension keeps its header wording. If that function is missing or fails, the extension builds a simple header using the tool identifier, such as `web_search`. A separate display label such as "Web Search" is not available through Pi's public renderer API.
 
@@ -127,7 +142,7 @@ Pi allows one custom editor and one custom footer at a time. Extensions cannot a
 
 This extension installs a `CustomEditor` subclass for each terminal session. Its footer shows extension-provided status messages that are not already in the editor border.
 
-On shutdown, it restores the previous editor only if its rounded editor is still active. An editor installed later by another extension is left alone. Changing UI settings reinstalls the rounded editor, so extension load order and later settings changes decide which editor is active.
+On shutdown, it restores the previous editor only if its rounded editor is still active. An editor installed later by another extension is left alone. Editor selection follows extension load order, including after `/reload`.
 
 If another extension replaces the footer, Pi disposes this extension's footer. During shutdown, this extension clears the footer only if it still owns it.
 

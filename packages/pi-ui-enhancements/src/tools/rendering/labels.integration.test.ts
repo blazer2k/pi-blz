@@ -7,28 +7,19 @@ import {
   ExtensionRunner,
   getPackageDir,
   initTheme,
-  ToolExecutionComponent,
   type ExtensionAPI,
   type ToolDefinition,
   type ToolRenderers,
 } from "@earendil-works/pi-coding-agent";
-import {
-  getKeybindings,
-  KeybindingsManager,
-  setKeybindings,
-  Text,
-  TUI_KEYBINDINGS,
-  visibleWidth,
-  type TUI,
-} from "@earendil-works/pi-tui";
-import { registerConfigCommand } from "../../config/command";
-import { getSettingItems } from "../../config/settings";
-import { getConfig, loadConfig, saveConfig } from "../../config/store";
+import { Text, visibleWidth } from "@earendil-works/pi-tui";
+
+import { loadConfig } from "../../config/store";
 import {
   mkTheme,
   mkToolCtx,
   setupTool,
   setupCustomTool,
+  setTestConfig,
 } from "../../testing/helpers";
 import { patchBashTool } from "../bash";
 import { createCodemodeRenderers } from "../codemode";
@@ -46,6 +37,7 @@ import type { BaseRenderState } from "./types";
 const originalPath = process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH;
 let directory: string;
 beforeEach(() => {
+  initTheme("dark", false);
   directory = mkdtempSync(join(tmpdir(), "pi-ui-tool-labels-"));
   process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH = join(directory, "settings.json");
   loadConfig();
@@ -119,7 +111,7 @@ describe("tool-call capitalization", () => {
       const definition = setupTool(testCase.patch);
       const originalArgs = structuredClone(testCase.args);
       for (const enabled of [true, false]) {
-        saveConfig("capitalizeToolNames", String(enabled));
+        setTestConfig({ capitalizeToolNames: enabled });
         for (const expanded of [false, true]) {
           const context = mkToolCtx({
             expanded,
@@ -161,7 +153,7 @@ describe("tool-call capitalization", () => {
       const blink = state.blinkTimer;
       expect(blink).toBeDefined();
       for (const enabled of [false, true]) {
-        saveConfig("capitalizeToolNames", String(enabled));
+        setTestConfig({ capitalizeToolNames: enabled });
         component.invalidate();
         expect(text(component)).toContain(` ${label(testCase.name, enabled)} `);
         expect(state.blinkTimer).toBe(blink);
@@ -170,10 +162,10 @@ describe("tool-call capitalization", () => {
   }
 
   it("capitalizes core headers even when custom-tool wrapping is disabled", () => {
-    saveConfig("patchCustomTools", "false");
+    setTestConfig({ patchCustomTools: false });
     const registryMethod = ExtensionRunner.prototype.getAllRegisteredTools;
     for (const enabled of [false, true]) {
-      saveConfig("capitalizeToolNames", String(enabled));
+      setTestConfig({ capitalizeToolNames: enabled });
       for (const testCase of coreCases) {
         const component = setupTool(testCase.patch).renderCall!(
           testCase.args,
@@ -191,7 +183,7 @@ describe("tool-call capitalization", () => {
   it("covers compact Read headers without renaming resource tags or paths", () => {
     const definition = setupTool(patchReadTool);
     for (const enabled of [true, false]) {
-      saveConfig("capitalizeToolNames", String(enabled));
+      setTestConfig({ capitalizeToolNames: enabled });
       for (const [path, kind, filename] of [
         [
           join(getPackageDir(), "docs", "extensions.md"),
@@ -240,13 +232,13 @@ describe("tool-call capitalization", () => {
     const blink = state.blinkTimer;
     expect(blink).toBeDefined();
     for (const enabled of [false, true]) {
-      saveConfig("capitalizeToolNames", String(enabled));
+      setTestConfig({ capitalizeToolNames: enabled });
       component.invalidate();
       expect(text(component)).toContain(` ${label("codemode", enabled)} `);
       expect(state.blinkTimer).toBe(blink);
     }
     for (const enabled of [false, true]) {
-      saveConfig("capitalizeToolNames", String(enabled));
+      setTestConfig({ capitalizeToolNames: enabled });
       const context = mkToolCtx({ executionStarted: false });
       expect(
         text(
@@ -322,7 +314,7 @@ describe("tool-call capitalization", () => {
           mkToolCtx({ expanded, executionStarted: false }),
         );
         for (const enabled of [true, false, true]) {
-          saveConfig("capitalizeToolNames", String(enabled));
+          setTestConfig({ capitalizeToolNames: enabled });
           component.invalidate();
           const output = text(component);
           expect(output).toContain(label("searchAPI", enabled));
@@ -339,7 +331,7 @@ describe("tool-call capitalization", () => {
       { renderCall: undefined },
       adapterOptions,
     );
-    saveConfig("capitalizeToolNames", "false");
+    setTestConfig({ capitalizeToolNames: false });
     expect(text(proper.renderCall!({}, mkTheme(), mkToolCtx()))).toContain(
       "searchAPI",
     );
@@ -356,7 +348,7 @@ describe("tool-call capitalization", () => {
     const fixture = setupCustomTool(native);
     try {
       for (const enabled of [true, false]) {
-        saveConfig("capitalizeToolNames", String(enabled));
+        setTestConfig({ capitalizeToolNames: enabled });
         const registered = fixture.renderers;
         expect(registered).toBe(native);
         expect(
@@ -403,7 +395,7 @@ describe("tool-call capitalization", () => {
           mkToolCtx({ expanded, executionStarted: false }),
         );
         for (const enabled of [true, false]) {
-          saveConfig("capitalizeToolNames", String(enabled));
+          setTestConfig({ capitalizeToolNames: enabled });
           component.invalidate();
           for (const width of [1, 2, 3, 5, 10, 20, 40, 80, 120, 200, 40]) {
             expect(
@@ -414,100 +406,6 @@ describe("tool-call capitalization", () => {
           }
         }
       }
-    }
-  });
-
-  it("redraws existing Pi tool components when the settings menu toggles capitalization", async () => {
-    initTheme("dark", false);
-    saveConfig("showExpansionHint", "false");
-    const previousKeys = getKeybindings();
-    setKeybindings(new KeybindingsManager(TUI_KEYBINDINGS));
-    try {
-      const notifications: string[] = [];
-      const native = nativeCodemode();
-      const definitions = [
-        {
-          definition: setupTool(patchReadTool),
-          args: { path: "CaseFile.txt" },
-          name: "read",
-        },
-        {
-          definition: createCodemodeRenderers(native, adapterOptions),
-          args: { code: 'text("case Sensitive");' },
-          name: "codemode",
-        },
-        {
-          definition: createWrappedRenderers(
-            "searchAPI",
-            {
-              renderCall: () => new Text("searchAPI case Sensitive", 0, 0),
-            },
-            adapterOptions,
-          ),
-          args: {},
-          name: "searchAPI",
-        },
-      ];
-      const ui = { requestRender() {} } as unknown as TUI;
-      const components = definitions.map(
-        ({ definition, args, name }) =>
-          new ToolExecutionComponent(
-            name,
-            "label-toggle",
-            args,
-            { showImages: false },
-            definition,
-            ui,
-            directory,
-          ),
-      );
-      let command!: Parameters<ExtensionAPI["registerCommand"]>[1];
-      registerConfigCommand(
-        {
-          registerCommand(_name, definition) {
-            command = definition;
-          },
-        } as ExtensionAPI,
-        () => {},
-        () => {},
-      );
-      const index = getSettingItems(getConfig()).findIndex(
-        (item) => item.id === "capitalizeToolNames",
-      );
-      for (const enabled of [false, true]) {
-        await command.handler("", {
-          mode: "tui",
-          ui: {
-            notify(message: string) {
-              notifications.push(message);
-            },
-            custom: async (factory: Function) => {
-              const settings = factory(
-                {
-                  invalidate: () =>
-                    components.forEach((component) => component.invalidate()),
-                  requestRender() {},
-                  terminal: { rows: 24 },
-                },
-                mkTheme(),
-                previousKeys,
-                () => {},
-              );
-              for (let row = 0; row < index; row++)
-                settings.handleInput("\x1b[B");
-              settings.handleInput("\r");
-            },
-          },
-        } as never);
-        expect(notifications).toEqual([]);
-        expect(getConfig().capitalizeToolNames).toBe(enabled);
-        for (let i = 0; i < components.length; i++)
-          expect(text(components[i]!)).toContain(
-            label(definitions[i]!.name, enabled),
-          );
-      }
-    } finally {
-      setKeybindings(previousKeys);
     }
   });
 });

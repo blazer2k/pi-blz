@@ -1,3 +1,4 @@
+import { writeFileSync } from "node:fs";
 import {
   type Theme,
   type ToolDefinition,
@@ -5,8 +6,27 @@ import {
   type ToolRenderers,
   type SourceInfo,
 } from "@earendil-works/pi-coding-agent";
+import type { Config } from "../config/definition";
+import { getConfig, loadConfig } from "../config/store";
 import { createToolRendering } from "../tools/tool-registration";
 import type { CustomToolRenderingReporter } from "../tools/custom-tools/types";
+
+export function setTestConfig(updates: Partial<Config>): void {
+  const config = { ...getConfig(), ...updates };
+  loadConfig(undefined, {
+    prepare() {},
+    exists: () => true,
+    read: () => JSON.stringify(config),
+    write() {},
+  });
+}
+
+export function writeTestConfig(updates: Partial<Config>): void {
+  const path = process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH;
+  if (!path) throw new Error("A temporary config path is required");
+  writeFileSync(path, JSON.stringify({ ...getConfig(), ...updates }));
+  loadConfig();
+}
 
 export function mkTheme(): Theme {
   return {

@@ -1,6 +1,5 @@
 import {
   VERSION,
-  type ExtensionAPI,
   type ExtensionContext,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
@@ -156,19 +155,12 @@ export function buildAsciiHeader(
   return lines;
 }
 
-export function registerAsciiHeader(
-  _pi: ExtensionAPI,
-  ctx: ExtensionContext,
-  onReregister: (fn: () => void) => void,
-): Handle {
-  function applyHeader() {
-    const config = loadAsciiHeaderConfig();
+export function registerAsciiHeader(ctx: ExtensionContext): Handle {
+  const config = loadAsciiHeaderConfig();
 
-    if (!config.enabled) {
-      ctx.ui.setHeader(undefined);
-      return;
-    }
-
+  if (!config.enabled) {
+    ctx.ui.setHeader(undefined);
+  } else {
     const data = buildAsciiHeaderData(config);
 
     ctx.ui.setHeader((_tui, theme) => ({
@@ -178,8 +170,6 @@ export function registerAsciiHeader(
       invalidate() {},
     }));
   }
-  applyHeader();
-  onReregister(applyHeader);
 
   return {
     dispose() {

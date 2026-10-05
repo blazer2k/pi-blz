@@ -13,8 +13,8 @@ import {
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import extension from "../index";
-import { loadConfig, saveConfig } from "../config/store";
-import { mkTheme, mkToolCtx } from "../testing/helpers";
+import { loadConfig } from "../config/store";
+import { mkTheme, mkToolCtx, writeTestConfig } from "../testing/helpers";
 import { createCodemodeRenderers } from "./codemode";
 import { shouldWrapRenderers } from "./custom-tools/definition-adapter";
 
@@ -136,7 +136,7 @@ describe("Codemode wrapper integration", () => {
         active: false,
       },
     ]) {
-      saveConfig("patchCustomTools", "false");
+      writeTestConfig({ patchCustomTools: false });
       await loader.reload();
       settings.applyOverrides({ defaultTools });
       const { session } = await createAgentSession({
@@ -172,7 +172,7 @@ describe("Codemode wrapper integration", () => {
             .getAllRegisteredTools()
             .find((tool) => tool.definition.name === "codemode")!;
         for (const enabled of [true, false, true]) {
-          saveConfig("patchCustomTools", String(enabled));
+          writeTestConfig({ patchCustomTools: enabled });
           const registered = getRegistered();
           expect(registered.sourceInfo.path).toBe("builtin:codemode");
           expect(registered.definition).toBe(native);

@@ -11,8 +11,8 @@ import {
 } from "./state";
 import { formatTreeLine, getCallRenderParts } from "./tree";
 import type { BaseRenderState } from "./types";
-import { getConfig, saveConfig } from "../../config/store";
-import { mkTheme } from "../../testing/helpers";
+import { getConfig } from "../../config/store";
+import { mkTheme, setTestConfig } from "../../testing/helpers";
 
 describe("updateResultState", () => {
   it("returns true only when state changes", () => {
@@ -89,13 +89,13 @@ describe("buildExpansionHint", () => {
 
   it("returns empty hints when showExpansionHint is disabled", () => {
     const originalHint = getConfig().showExpansionHint;
-    saveConfig("showExpansionHint", "false");
+    setTestConfig({ showExpansionHint: false });
     try {
       const theme = mkTheme();
       expect(buildExpansionHint(theme, "expand")).toBe("");
       expect(buildExpansionHint(theme, "collapse")).toBe("");
     } finally {
-      saveConfig("showExpansionHint", String(originalHint));
+      setTestConfig({ showExpansionHint: originalHint });
     }
   });
 });
@@ -126,6 +126,7 @@ describe("tool call blink rendering", () => {
   });
 
   it("invalidates active blinkers from one shared aligned timer", () => {
+    clearBlinkTimers();
     const originalNow = Date.now;
     const originalSetTimeout = globalThis.setTimeout;
     const originalClearTimeout = globalThis.clearTimeout;
@@ -185,31 +186,31 @@ describe("tool call blink rendering", () => {
 
     try {
       for (const color of ["success", "text", "toolTitle"] as const) {
-        saveConfig("indicatorColor", color);
+        setTestConfig({ indicatorColor: color });
         expect(getStatusColor(false, true)).toBe(color);
         expect(getStatusColor(false, false)).toBe("dim");
         expect(getStatusColor(true, true)).toBe(color);
         expect(getStatusColor(true, false)).toBe(color);
       }
     } finally {
-      saveConfig("indicatorColor", originalColor);
+      setTestConfig({ indicatorColor: originalColor });
     }
   });
 
   it("renders configured indicator style symbols", () => {
     const originalStyle = getConfig().indicatorStyle;
     try {
-      saveConfig("indicatorStyle", "dot");
+      setTestConfig({ indicatorStyle: "dot" });
       expect(getStatusSymbol(true, false)).toBe("•");
       expect(getStatusSymbol(false, true)).toBe("•");
       expect(getStatusSymbol(false, false)).toBe("◦");
 
-      saveConfig("indicatorStyle", "diamond");
+      setTestConfig({ indicatorStyle: "diamond" });
       expect(getStatusSymbol(true, false)).toBe("◆");
       expect(getStatusSymbol(false, true)).toBe("◆");
       expect(getStatusSymbol(false, false)).toBe("◇");
     } finally {
-      saveConfig("indicatorStyle", originalStyle);
+      setTestConfig({ indicatorStyle: originalStyle });
     }
   });
 });

@@ -23,7 +23,6 @@ describe("registerRoundedEditor", () => {
     let footerCleared = false;
     let footerClearCount = 0;
     let renderRequests = 0;
-    let reregister: (() => void) | undefined;
     const ctx = {
       cwd: "/repo",
       model: undefined,
@@ -47,9 +46,7 @@ describe("registerRoundedEditor", () => {
       },
     } as unknown as ExtensionContext;
 
-    const handle = registerRoundedEditor(pi, ctx, (register) => {
-      reregister = register;
-    });
+    const handle = registerRoundedEditor(pi, ctx);
     expect(editorFactory).not.toBe(previousEditor);
 
     const tui = {
@@ -75,15 +72,24 @@ describe("registerRoundedEditor", () => {
     await handlers.agent_end!();
     expect(renderRequests).toBeGreaterThan(0);
 
-    editorFactory = previousEditor;
-    reregister!();
-    expect(editorFactory).not.toBe(previousEditor);
-
     handle.dispose();
     handle.dispose();
-    reregister!();
     expect(editorFactory).toBe(previousEditor);
     expect(footerCleared).toBe(true);
+    expect(footerClearCount).toBe(1);
+
+    const next = registerRoundedEditor(pi, ctx);
+    const replacement = () => ({ render: () => [] });
+    editorFactory = replacement;
+    const nextFooter = footerFactory!(tui, footerTheme, {
+      getGitBranch: () => "main",
+      getExtensionStatuses: () => new Map(),
+      onBranchChange: () => () => {},
+    });
+    nextFooter.dispose();
+    next.dispose();
+    next.dispose();
+    expect(editorFactory).toBe(replacement);
     expect(footerClearCount).toBe(1);
   });
 });

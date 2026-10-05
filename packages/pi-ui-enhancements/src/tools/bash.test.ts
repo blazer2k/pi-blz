@@ -5,11 +5,16 @@ import {
   type ExtensionToolContext,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
-import { getConfig, saveConfig } from "../config/store";
+import { getConfig } from "../config/store";
 import { patchBashTool } from "./bash";
 import { clearBlinkTimers, getBlinkIndicator } from "./rendering/state";
 import { stripAnsi } from "./rendering/text";
-import { mkTheme, mkToolCtx, setupTool } from "../testing/helpers";
+import {
+  mkTheme,
+  mkToolCtx,
+  setupTool,
+  setTestConfig,
+} from "../testing/helpers";
 import type { BashRenderState } from "./bash/types";
 import { PI_0_84_3_OUTPUT } from "./test-fixtures/pi-0.84.3";
 
@@ -421,10 +426,10 @@ describe("bash renderResult", () => {
   let originalDisplay: "preview" | "summary";
   beforeEach(() => {
     originalDisplay = getConfig().collapsedOutputDisplay;
-    saveConfig("collapsedOutputDisplay", "preview");
+    setTestConfig({ collapsedOutputDisplay: "preview" });
   });
   afterEach(() => {
-    saveConfig("collapsedOutputDisplay", originalDisplay);
+    setTestConfig({ collapsedOutputDisplay: originalDisplay });
   });
 
   it("preview mode shows one head and one tail line around an omission row", () => {
@@ -497,7 +502,7 @@ describe("bash renderResult", () => {
   });
 
   it("summary mode hides output and includes its line count", () => {
-    saveConfig("collapsedOutputDisplay", "summary");
+    setTestConfig({ collapsedOutputDisplay: "summary" });
     const def = setupBashTool();
     const output = def.renderResult!(
       {
@@ -517,7 +522,7 @@ describe("bash renderResult", () => {
   });
 
   it("puts normalized errors before the metadata footer", () => {
-    saveConfig("collapsedOutputDisplay", "summary");
+    setTestConfig({ collapsedOutputDisplay: "summary" });
     const def = setupBashTool();
     const output = def.renderResult!(
       {
@@ -609,7 +614,7 @@ describe("bash renderResult", () => {
     );
 
     const originalHint = getConfig().showExpansionHint;
-    saveConfig("showExpansionHint", "false");
+    setTestConfig({ showExpansionHint: false });
     try {
       const collapsed = renderResult(
         {
@@ -635,7 +640,7 @@ describe("bash renderResult", () => {
         "to collapse",
       );
     } finally {
-      saveConfig("showExpansionHint", String(originalHint));
+      setTestConfig({ showExpansionHint: originalHint });
     }
   });
 

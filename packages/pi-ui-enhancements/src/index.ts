@@ -1,12 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-import { registerConfigCommand } from "./config/command";
-import {
-  clearOnConfigChange,
-  getConfig,
-  loadConfig,
-  setOnConfigChange,
-} from "./config/store";
+import { getConfig, loadConfig } from "./config/store";
 import { registerRoundedEditor } from "./editor/registration";
 import { registerAsciiHeader } from "./header/header";
 import type { Handle } from "./shared/handle";
@@ -66,30 +60,6 @@ export default function (pi: ExtensionAPI) {
   });
   pi.registerToolRenderer(toolRendering.resolve);
 
-  let headerReregister: (() => void) | null = null;
-  let editorReregister: (() => void) | null = null;
-  let settingsUiActive = false;
-
-  function handleConfigChange() {
-    if (!getConfig().patchCustomTools) toolRendering.clearCustomTimers();
-    headerReregister?.();
-    if (!settingsUiActive) {
-      editorReregister?.();
-    }
-  }
-
-  setOnConfigChange(handleConfigChange);
-
-  registerConfigCommand(
-    pi,
-    () => {
-      settingsUiActive = true;
-    },
-    () => {
-      settingsUiActive = false;
-    },
-  );
-
   pi.on("session_start", async (_event, ctx) => {
     renderingEnabled = true;
     bashTimings.clear();
@@ -107,8 +77,6 @@ export default function (pi: ExtensionAPI) {
       )
         bashTimings.set(data.toolCallId, { durationMs: data.durationMs });
     }
-    // Reset in case settings UI was force-closed last session
-    settingsUiActive = false;
     loadConfig((err) => {
       ctx.ui.notify(
         `Config load failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -116,20 +84,13 @@ export default function (pi: ExtensionAPI) {
       );
     });
 
-    // Reinstall after the previous session_shutdown cleared the global callback.
-    setOnConfigChange(handleConfigChange);
-
     if (!getConfig().patchCustomTools) toolRendering.clearCustomTimers();
 
     if (ctx.mode === "tui") {
       uiHandles.push(registerTuiCapture(ctx));
       uiHandles.push(
-        registerAsciiHeader(pi, ctx, (fn) => {
-          headerReregister = fn;
-        }),
-        registerRoundedEditor(pi, ctx, (fn) => {
-          editorReregister = fn;
-        }),
+        registerAsciiHeader(ctx),
+        registerRoundedEditor(pi, ctx),
         registerWorkingIndicator(pi, ctx),
       );
       ctx.ui.setHiddenThinkingLabel("(think)");
@@ -150,8 +111,5 @@ export default function (pi: ExtensionAPI) {
 
     disposeHandles(uiHandles, "UI enhancement");
     uiHandles = [];
-    headerReregister = null;
-    editorReregister = null;
-    clearOnConfigChange();
   });
 }

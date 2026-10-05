@@ -14,8 +14,8 @@ import type {
   ListResultConfig,
   ResultStatusState,
 } from "./types";
-import { getConfig, saveConfig } from "../../config/store";
-import { mkTheme } from "../../testing/helpers";
+import { getConfig } from "../../config/store";
+import { mkTheme, setTestConfig } from "../../testing/helpers";
 
 const opts: ToolRenderResultOptions = { expanded: false, isPartial: false };
 const optsExpanded: ToolRenderResultOptions = {
@@ -132,13 +132,13 @@ function resultStatusState(
 }
 
 describe("formatListResult", () => {
-  let originalMaxEntries: number;
+  let originalMaxEntries: ReturnType<typeof getConfig>["maxExpandedEntries"];
   beforeEach(() => {
     originalMaxEntries = getConfig().maxExpandedEntries;
-    saveConfig("maxExpandedEntries", "20");
+    setTestConfig({ maxExpandedEntries: 20 });
   });
   afterEach(() => {
-    saveConfig("maxExpandedEntries", String(originalMaxEntries));
+    setTestConfig({ maxExpandedEntries: originalMaxEntries });
   });
 
   it("renders empty message", () => {
@@ -204,7 +204,7 @@ describe("formatListResult", () => {
   });
 
   it("renders every item when maxExpandedEntries is unlimited", () => {
-    saveConfig("maxExpandedEntries", "-1");
+    setTestConfig({ maxExpandedEntries: -1 });
     const items = Array.from({ length: 25 }, (_, i) => `file${i}.txt`);
     const output = formatListResult(
       { content: [{ type: "text", text: items.join("\n") }] },

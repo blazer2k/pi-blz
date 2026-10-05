@@ -6,13 +6,8 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import type { EditorTheme, TUI } from "@earendil-works/pi-tui";
 import type { Config } from "../config/definition";
-import {
-  getConfig,
-  loadConfig,
-  saveConfig,
-  type ConfigStorage,
-} from "../config/store";
-import { mkTheme } from "../testing/helpers";
+import { getConfig, loadConfig, type ConfigStorage } from "../config/store";
+import { mkTheme, setTestConfig } from "../testing/helpers";
 import { RoundedEditor } from "./component";
 
 const memoryStorage: ConfigStorage = {
@@ -116,7 +111,7 @@ describe("RoundedEditor", () => {
   });
 
   it("uses the thinking frame color when configured", () => {
-    saveConfig("roundedEditorColor", "thinking", memoryStorage);
+    setTestConfig({ roundedEditorColor: "thinking" });
     const { editor, getThinkingBorderCalls } = createEditor();
 
     editor.render(80);

@@ -14,8 +14,8 @@ import {
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import type { AgentToolResult } from "@earendil-works/pi-agent-core";
-import { loadConfig, saveConfig } from "../../config/store";
-import { mkTheme, mkToolCtx } from "../../testing/helpers";
+import { loadConfig } from "../../config/store";
+import { mkTheme, mkToolCtx, setTestConfig } from "../../testing/helpers";
 import { createCodemodeRenderers } from "../codemode";
 import { clearBlinkTimers } from "../rendering/state";
 import { stripAnsi } from "../rendering/text";
@@ -147,7 +147,7 @@ describe("Codemode output", () => {
   });
 
   it("summary hides ordinary output and reports its line count", () => {
-    saveConfig("collapsedOutputDisplay", "summary");
+    setTestConfig({ collapsedOutputDisplay: "summary" });
     const { text } = render(result("one\ntwo"));
     expect(text).not.toContain("one");
     expect(text).not.toContain("two");
@@ -157,7 +157,7 @@ describe("Codemode output", () => {
 
   it("shows separate script diagnostics rather than prior printed output", () => {
     for (const display of ["preview", "summary"] as const) {
-      saveConfig("collapsedOutputDisplay", display);
+      setTestConfig({ collapsedOutputDisplay: display });
       const input = result("first\nsecond\nthird\nfourth");
       input.content.push({
         type: "text",
@@ -171,7 +171,7 @@ describe("Codemode output", () => {
   });
 
   it("keeps headerless errors and avoids hints when the diagnostic is all output", () => {
-    saveConfig("collapsedOutputDisplay", "summary");
+    setTestConfig({ collapsedOutputDisplay: "summary" });
     const { component, text } = render(
       {
         content: [{ type: "text", text: "Invalid options" }],
@@ -216,8 +216,8 @@ describe("Codemode output", () => {
   });
 
   it("keeps full expanded arguments, errors, blank lines and long output despite the list cap", () => {
-    saveConfig("maxExpandedEntries", "10");
-    saveConfig("collapsedOutputDisplay", "summary");
+    setTestConfig({ maxExpandedEntries: 10 });
+    setTestConfig({ collapsedOutputDisplay: "summary" });
     const calls = Array.from({ length: 12 }, (_, i) => ({
       ...call("error", String(i)),
       error: `failure ${i}\nmore detail`,
@@ -304,7 +304,7 @@ describe("Codemode output", () => {
     Object.freeze(input.content);
     input.content.forEach(Object.freeze);
     for (const display of ["preview", "summary"] as const) {
-      saveConfig("collapsedOutputDisplay", display);
+      setTestConfig({ collapsedOutputDisplay: display });
       for (const showImages of [false, true]) {
         const component = definition.renderResult!(
           input,
@@ -345,7 +345,7 @@ describe("Codemode output", () => {
       details: { calls: [], fullOutputPath: path },
     };
     for (const display of ["preview", "summary"] as const) {
-      saveConfig("collapsedOutputDisplay", display);
+      setTestConfig({ collapsedOutputDisplay: display });
       const { text } = render(input);
       expect(text).toContain(`Full output: ${path}`);
       expect(text).toContain("truncated");
@@ -359,7 +359,7 @@ describe("Codemode output", () => {
     const failed = result(
       "Warning: truncated output (original token count: 100)\nTotal output lines: 30\n\nhead…tail\n\n[Could not save the full output: permission denied]",
     );
-    saveConfig("collapsedOutputDisplay", "summary");
+    setTestConfig({ collapsedOutputDisplay: "summary" });
     expect(render(failed).text).toContain(
       "Could not save the full output: permission denied",
     );
@@ -374,7 +374,7 @@ describe("Codemode output", () => {
 
   it("respects the hint preference and reuses components while updating metadata", () => {
     const { definition, context, component } = render(result("a\nb\nc\nd"));
-    saveConfig("showExpansionHint", "false");
+    setTestConfig({ showExpansionHint: false });
     const next = definition.renderResult!(
       result("next", [call("ok")]),
       { expanded: false, isPartial: false },
@@ -432,7 +432,7 @@ describe("Codemode output", () => {
       },
     };
     for (const display of ["preview", "summary"] as const) {
-      saveConfig("collapsedOutputDisplay", display);
+      setTestConfig({ collapsedOutputDisplay: display });
       for (const expanded of [false, true]) {
         const { component } = render(input, expanded, true);
         for (const width of [1, 2, 3, 4, 5, 10, 20, 40, 80, 120, 200, 40]) {
@@ -575,7 +575,7 @@ describe("Codemode output", () => {
       expect(view.truncated).toBe(true);
       expect(view.fullOutputPath).toBeString();
       expect(view.output).not.toContain("Full output:");
-      saveConfig("collapsedOutputDisplay", "summary");
+      setTestConfig({ collapsedOutputDisplay: "summary" });
       const component = definition.renderResult!(
         input,
         { expanded: false, isPartial: false },
@@ -742,7 +742,7 @@ describe("Codemode call", () => {
   });
 
   it("changes expansion state on resize and honors capitalization", () => {
-    saveConfig("capitalizeToolNames", "false");
+    setTestConfig({ capitalizeToolNames: false });
     const definition = setup();
     const state: CodemodeRenderState = {};
     const component = definition.renderCall!(

@@ -2,13 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import {
-  applyConfigUpdate,
-  getDefaultConfig,
-  validateConfig,
-  type Config,
-  type ConfigKey,
-} from "./definition";
+import { getDefaultConfig, validateConfig, type Config } from "./definition";
 
 export interface ConfigStorage {
   prepare(configPath: string): void;
@@ -49,16 +43,7 @@ function reportConfigError(
   else console.error(message, error);
 }
 
-let onConfigChange: (() => void) | null = null;
 let config = getDefaultConfig();
-
-export function setOnConfigChange(callback: (() => void) | null): void {
-  onConfigChange = callback;
-}
-
-export function clearOnConfigChange(): void {
-  onConfigChange = null;
-}
 
 export function loadConfig(
   onError?: (error: unknown) => void,
@@ -115,19 +100,6 @@ export function loadConfig(
       error,
     );
   }
-}
-
-export function saveConfig(
-  key: ConfigKey,
-  value: string,
-  storage: ConfigStorage = nodeConfigStorage,
-): void {
-  const updated = applyConfigUpdate(config, key, value);
-  const configPath = getConfigPath();
-  storage.prepare(configPath);
-  storage.write(configPath, JSON.stringify(updated, null, 2));
-  config = updated;
-  onConfigChange?.();
 }
 
 export function getConfig(): Config {

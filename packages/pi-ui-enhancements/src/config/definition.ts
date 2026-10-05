@@ -136,30 +136,3 @@ export function validateConfig(raw: unknown): Config {
 
   return validated;
 }
-
-function parseConfigValue(
-  key: ConfigKey,
-  value: string,
-): string | number | boolean {
-  if (typeof DEFAULT_CONFIG[key] === "boolean") return value === "true";
-  if (typeof DEFAULT_CONFIG[key] === "number") return Number(value);
-  return value;
-}
-
-export function applyConfigUpdate(
-  current: Config,
-  key: ConfigKey,
-  value: string,
-): Config {
-  const parsed = parseConfigValue(key, value);
-  const updated = { ...current, [key]: parsed };
-
-  if (!validator.Check(updated)) {
-    throw new Error(`Invalid config update: ${key}=${value}`);
-  }
-  if (key === "asciiHeaderFont" && !ALLOWED_FONTS.includes(String(parsed))) {
-    throw new Error(`Invalid config update: ${key}=${value}`);
-  }
-
-  return validateConfig(updated);
-}

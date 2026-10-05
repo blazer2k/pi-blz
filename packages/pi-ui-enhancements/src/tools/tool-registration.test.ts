@@ -8,8 +8,8 @@ import type {
   ToolRenderers,
 } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import { loadConfig, saveConfig } from "../config/store";
-import { mkTheme, mkToolCtx } from "../testing/helpers";
+import { loadConfig } from "../config/store";
+import { mkTheme, mkToolCtx, setTestConfig } from "../testing/helpers";
 import { createWrappedRenderers } from "./custom-tools/definition-adapter";
 import { clearBlinkTimers } from "./rendering/state";
 import { createToolRendering } from "./tool-registration";
@@ -91,7 +91,7 @@ describe("public tool renderer resolver", () => {
     expect(layer.resolve("edit", () => edit)!.renderCall).not.toBe(
       edit.renderCall,
     );
-    saveConfig("patchCustomTools", "false");
+    setTestConfig({ patchCustomTools: false });
     expect(layer.resolve("read", () => native)!.renderCall).not.toBe(
       native.renderCall,
     );
@@ -142,13 +142,13 @@ describe("public tool renderer resolver", () => {
       { getAllTools: () => [info("tool", source("tool", "inline"))] },
       { isEnabled: () => enabled, isToolCallActive: () => false },
     );
-    saveConfig("patchCustomTools", "false");
+    setTestConfig({ patchCustomTools: false });
     expect(layer.resolve("tool", () => native)).toBe(native);
-    saveConfig("patchCustomTools", "true");
+    setTestConfig({ patchCustomTools: true });
     const enhanced = layer.resolve("tool", () => native)!;
     expect(enhanced.renderCall).not.toBe(native.renderCall);
     expect(enhanced.renderShell).toBe("self");
-    saveConfig("patchCustomTools", "false");
+    setTestConfig({ patchCustomTools: false });
     expect(layer.resolve("tool", () => native)).toBe(native);
     expect(enhanced.renderShell).toBe("self");
     enabled = false;
@@ -156,7 +156,7 @@ describe("public tool renderer resolver", () => {
     layer.reset();
     expect(layer.resolve("tool", () => native)).toBe(native);
     enabled = true;
-    saveConfig("patchCustomTools", "true");
+    setTestConfig({ patchCustomTools: true });
     expect(layer.resolve("tool", () => native)!.renderCall).not.toBe(
       native.renderCall,
     );

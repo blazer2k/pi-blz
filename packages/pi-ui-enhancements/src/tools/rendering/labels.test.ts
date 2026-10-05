@@ -3,8 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { getDefaultConfig } from "../../config/definition";
-import { loadConfig, saveConfig } from "../../config/store";
+import { loadConfig } from "../../config/store";
 import { formatToolLabel } from "./labels";
+import { setTestConfig } from "../../testing/helpers";
 
 const originalPath = process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH;
 let directory: string;
@@ -51,7 +52,7 @@ describe("formatToolLabel", () => {
   });
 
   it("preserves exact spelling and escape sequences when disabled", () => {
-    saveConfig("capitalizeToolNames", "false");
+    setTestConfig({ capitalizeToolNames: false });
     for (const source of [
       "read",
       "searchAPI",
@@ -66,9 +67,9 @@ describe("formatToolLabel", () => {
 
   it("observes setting changes without rebuilding the helper", () => {
     expect(formatToolLabel("bash")).toBe("Bash");
-    saveConfig("capitalizeToolNames", "false");
+    setTestConfig({ capitalizeToolNames: false });
     expect(formatToolLabel("bash")).toBe("bash");
-    saveConfig("capitalizeToolNames", "true");
+    setTestConfig({ capitalizeToolNames: true });
     expect(formatToolLabel("bash")).toBe("Bash");
   });
 });

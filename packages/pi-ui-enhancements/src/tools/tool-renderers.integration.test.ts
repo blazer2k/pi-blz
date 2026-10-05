@@ -1,4 +1,10 @@
-import { mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import {
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
@@ -29,9 +35,9 @@ import {
 } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import extension from "../index";
-import { getConfig, loadConfig, saveConfig } from "../config/store";
+import { getConfig, loadConfig } from "../config/store";
 import { stripAnsi } from "./rendering/text";
-import { mkTheme, mkToolCtx } from "../testing/helpers";
+import { mkTheme, mkToolCtx, writeTestConfig } from "../testing/helpers";
 
 const originalPath = process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH;
 let directory: string;
@@ -165,6 +171,57 @@ async function exportData(session: AgentSession) {
 }
 
 describe("public renderer integration", () => {
+  it("loads externally edited settings only after Pi reloads and registers no settings command", async () => {
+    const { session, resourceLoader } = await createSession(true);
+    const commands = () =>
+      resourceLoader
+        .getExtensions()
+        .extensions.flatMap((entry) => [...entry.commands.keys()]);
+    expect(commands()).not.toContain("ui-settings");
+    const initial = getConfig();
+    const inventory = session.getAllTools().map((tool) => tool.name);
+    const active = session.getActiveToolNames();
+    const args = { command: "echo config" };
+    const result = {
+      content: [{ type: "text" as const, text: "first\nsecond\nthird\nlast" }],
+      details: { durationMs: 1 },
+      isError: false,
+    };
+    const component = toolComponent(session, "bash", args);
+    component.setArgsComplete();
+    component.updateResult(result);
+    const before = component.render(80);
+    expect(before.map(stripAnsi).join("\n")).toContain("Bash $ echo config");
+    expect(before.map(stripAnsi).join("\n")).toContain("│  first");
+    const updates = {
+      capitalizeToolNames: false,
+      collapsedOutputDisplay: "summary",
+      indicatorStyle: "diamond",
+      asciiHeaderEnabled: false,
+      roundedEditorColor: "muted",
+    } as const;
+    writeFileSync(
+      process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH!,
+      JSON.stringify({ ...initial, ...updates }),
+    );
+    expect(getConfig()).toEqual(initial);
+    component.invalidate();
+    expect(component.render(80)).toEqual(before);
+
+    await session.reload();
+    expect(getConfig()).toEqual({ ...initial, ...updates });
+    expect(commands()).not.toContain("ui-settings");
+    const rebuilt = toolComponent(session, "bash", args);
+    rebuilt.setArgsComplete();
+    rebuilt.updateResult(result);
+    const after = rebuilt.render(80).map(stripAnsi).join("\n");
+    expect(after).toContain("◆ bash $ echo config");
+    expect(after).toContain("4 lines");
+    expect(after).not.toContain("│  first");
+    expect(session.getAllTools().map((tool) => tool.name)).toEqual(inventory);
+    expect(session.getActiveToolNames()).toEqual(active);
+  });
+
   it("composes real extension resolvers around the enhancement without taking over self-owned shells", async () => {
     const trace: string[] = [];
     let beforeResult: ToolRenderers | undefined;
@@ -263,7 +320,7 @@ describe("public renderer integration", () => {
     try {
       for (const mode of ["native", "unwrapped", "wrapped"]) {
         const enhanced = mode !== "native";
-        saveConfig("patchCustomTools", String(mode === "wrapped"));
+        writeTestConfig({ patchCustomTools: mode === "wrapped" });
         let pi!: ExtensionAPI;
         const fixture = await createSession(enhanced, undefined, undefined, [
           ...(enhanced ? [extension] : []),
@@ -366,7 +423,7 @@ describe("public renderer integration", () => {
         expect(fixture.createTransport).not.toHaveBeenCalled();
       }
     } finally {
-      saveConfig("patchCustomTools", String(originalWrapping));
+      writeTestConfig({ patchCustomTools: originalWrapping });
     }
   });
 
@@ -393,7 +450,7 @@ describe("public renderer integration", () => {
     try {
       for (const mode of ["native", "unwrapped", "wrapped"]) {
         const enhanced = mode !== "native";
-        saveConfig("patchCustomTools", String(mode === "wrapped"));
+        writeTestConfig({ patchCustomTools: mode === "wrapped" });
         let call: Text | undefined;
         let output: Text | undefined;
         const previousCalls: unknown[] = [];
@@ -483,7 +540,7 @@ describe("public renderer integration", () => {
       }
     } finally {
       setCapabilities(capabilities);
-      saveConfig("patchCustomTools", String(originalWrapping));
+      writeTestConfig({ patchCustomTools: originalWrapping });
     }
   });
 

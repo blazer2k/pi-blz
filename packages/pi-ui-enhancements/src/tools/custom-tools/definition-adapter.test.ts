@@ -4,8 +4,13 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Text, visibleWidth } from "@earendil-works/pi-tui";
-import { loadConfig, saveConfig } from "../../config/store";
-import { mkTheme, mkToolCtx, setupCustomTool } from "../../testing/helpers";
+import { loadConfig } from "../../config/store";
+import {
+  mkTheme,
+  mkToolCtx,
+  setupCustomTool,
+  setTestConfig,
+} from "../../testing/helpers";
 import { clearBlinkTimers } from "../rendering/state";
 import { stripAnsi } from "../rendering/text";
 import type { BaseRenderState } from "../rendering/types";
@@ -17,7 +22,7 @@ beforeEach(() => {
   directory = mkdtempSync(join(tmpdir(), "pi-ui-custom-renderers-"));
   process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH = join(directory, "settings.json");
   loadConfig();
-  saveConfig("capitalizeToolNames", "false");
+  setTestConfig({ capitalizeToolNames: false });
 });
 afterEach(() => {
   clearBlinkTimers();
@@ -72,7 +77,7 @@ describe("custom renderer adapters", () => {
         issues.push(issue);
       });
       for (const enabled of [false, true]) {
-        saveConfig("capitalizeToolNames", String(enabled));
+        setTestConfig({ capitalizeToolNames: enabled });
         for (let repeat = 0; repeat < 2; repeat++) {
           const component = fixture.renderers.renderCall!(
             { query: "mixed Case", count: 5 },
@@ -394,7 +399,7 @@ describe("custom renderer adapters", () => {
 
   for (const enabled of [false, true]) {
     it(`preserves native header wording and safe ANSI with capitalization=${enabled}`, () => {
-      saveConfig("capitalizeToolNames", String(enabled));
+      setTestConfig({ capitalizeToolNames: enabled });
       for (const title of [
         "search",
         "\x1b[35msearch\x1b[39m",

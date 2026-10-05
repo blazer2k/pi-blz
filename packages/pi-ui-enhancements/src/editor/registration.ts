@@ -29,7 +29,6 @@ function getRuntime(pi: ExtensionAPI): RoundedEditorRuntime {
 export function registerRoundedEditor(
   pi: ExtensionAPI,
   ctx: ExtensionContext,
-  onReregister: (register: () => void) => void,
 ): Handle {
   const runtime = getRuntime(pi);
   let getGitBranch: () => string | null = () => null;
@@ -81,11 +80,7 @@ export function registerRoundedEditor(
     );
   };
 
-  const applyEditor = () => {
-    if (!disposed) ctx.ui.setEditorComponent(roundedEditorFactory);
-  };
-  applyEditor();
-  onReregister(applyEditor);
+  ctx.ui.setEditorComponent(roundedEditorFactory);
 
   return {
     dispose() {

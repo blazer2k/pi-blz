@@ -3,14 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import { getDefaultConfig } from "./definition";
-import {
-  clearOnConfigChange,
-  getConfig,
-  loadConfig,
-  saveConfig,
-  setOnConfigChange,
-  type ConfigStorage,
-} from "./store";
+import { setTestConfig } from "../testing/helpers";
+import { getConfig, loadConfig, type ConfigStorage } from "./store";
 
 let configDir: string;
 let previousConfigPath: string | undefined;
@@ -33,7 +27,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  clearOnConfigChange();
   if (previousConfigPath === undefined) {
     delete process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH;
   } else {
@@ -110,62 +103,64 @@ describe("config validation", () => {
     }
   });
 
-  it("rejects unsupported fonts without changing the current config", () => {
-    const original = getConfig();
-    expect(() => saveConfig("asciiHeaderFont", "not-a-font")).toThrow(
-      "Invalid config update",
+  it("loads boolean and enum settings as JSON values", () => {
+    writeFileSync(
+      process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH!,
+      JSON.stringify({
+        asciiHeaderEnabled: false,
+        roundedEditorShowCost: true,
+        asciiHeaderAlign: "right",
+      }),
     );
-    expect(getConfig()).toEqual(original);
-  });
-});
-
-describe("config value parsing", () => {
-  it("saves boolean settings", () => {
-    saveConfig("asciiHeaderEnabled", "false");
-    saveConfig("roundedEditorShowCost", "true");
-
-    expect(getConfig().asciiHeaderEnabled).toBe(false);
-    expect(getConfig().roundedEditorShowCost).toBe(true);
+    loadConfig();
+    expect(getConfig()).toEqual({
+      ...getDefaultConfig(),
+      asciiHeaderEnabled: false,
+      roundedEditorShowCost: true,
+      asciiHeaderAlign: "right",
+    });
   });
 
-  it("saves enum settings and rejects unsupported values", () => {
-    saveConfig("asciiHeaderAlign", "right");
-    expect(getConfig().asciiHeaderAlign).toBe("right");
-
-    expect(() => saveConfig("asciiHeaderAlign", "justify")).toThrow(
-      "Invalid config update",
+  it("recovers invalid primitive and enum values", () => {
+    loadConfig(
+      undefined,
+      createStorage({
+        read: () =>
+          JSON.stringify({
+            asciiHeaderEnabled: "false",
+            roundedEditorShowCost: 1,
+            asciiHeaderAlign: "justify",
+            indicatorStyle: null,
+          }),
+      }),
     );
+    expect(getConfig()).toEqual(getDefaultConfig());
   });
 });
 
 describe("config numeric values", () => {
-  it("rejects fractional numeric updates", () => {
-    expect(() => saveConfig("maxExpandedEntries", "20.5")).toThrow(
-      "Invalid config update",
-    );
-  });
-
   it("accepts only configured maxExpandedEntries values", () => {
     for (const value of [-1, 10, 20, 50, 100] as const) {
-      saveConfig("maxExpandedEntries", String(value));
+      loadConfig(
+        undefined,
+        createStorage({
+          read: () => JSON.stringify({ maxExpandedEntries: value }),
+        }),
+      );
       expect(getConfig().maxExpandedEntries).toBe(value);
     }
 
-    for (const value of [
-      "0",
-      "25",
-      "99",
-      "NaN",
-      "Infinity",
-      "-Infinity",
-      "nope",
-    ]) {
-      expect(() => saveConfig("maxExpandedEntries", value)).toThrow(
-        "Invalid config update",
+    for (const value of [0, 25, 99, 20.5, null, "20", "NaN", "Infinity"]) {
+      loadConfig(
+        undefined,
+        createStorage({
+          read: () => JSON.stringify({ maxExpandedEntries: value }),
+        }),
+      );
+      expect(getConfig().maxExpandedEntries).toBe(
+        getDefaultConfig().maxExpandedEntries,
       );
     }
-
-    saveConfig("maxExpandedEntries", "20");
   });
 
   it("falls back to defaults for fractional numeric values loaded from disk", () => {
@@ -173,23 +168,19 @@ describe("config numeric values", () => {
       process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH!,
       JSON.stringify({ maxCallWidth: 120.5, maxExpandedEntries: 10.5 }),
     );
-
     loadConfig();
-
     expect(getConfig()).not.toHaveProperty("maxCallWidth");
     expect(getConfig().maxExpandedEntries).toBe(20);
   });
 
   it("validates collapsedOutputDisplay against allowed values", () => {
     expect(getConfig().collapsedOutputDisplay).toBe("preview");
-
-    saveConfig("collapsedOutputDisplay", "summary");
-    expect(getConfig().collapsedOutputDisplay).toBe("summary");
+    writeFileSync(
+      process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH!,
+      JSON.stringify({ collapsedOutputDisplay: "summary" }),
+    );
     loadConfig();
     expect(getConfig().collapsedOutputDisplay).toBe("summary");
-    expect(() => saveConfig("collapsedOutputDisplay", "tail")).toThrow(
-      "Invalid config update",
-    );
 
     writeFileSync(
       process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH!,
@@ -202,10 +193,9 @@ describe("config numeric values", () => {
 
 describe("config storage failures", () => {
   it("falls back to defaults when the config directory cannot be prepared", () => {
-    saveConfig("asciiHeaderAlign", "right");
+    setTestConfig({ asciiHeaderAlign: "right" });
     const failure = new Error("prepare failed");
     const errors: unknown[] = [];
-
     loadConfig(
       (error) => errors.push(error),
       createStorage({
@@ -214,7 +204,6 @@ describe("config storage failures", () => {
         },
       }),
     );
-
     expect(getConfig().asciiHeaderAlign).toBe(
       getDefaultConfig().asciiHeaderAlign,
     );
@@ -224,7 +213,6 @@ describe("config storage failures", () => {
   it("reports a failure to create a missing config file", () => {
     const failure = new Error("create failed");
     const errors: unknown[] = [];
-
     loadConfig(
       (error) => errors.push(error),
       createStorage({
@@ -234,7 +222,6 @@ describe("config storage failures", () => {
         },
       }),
     );
-
     expect(getConfig().asciiHeaderAlign).toBe(
       getDefaultConfig().asciiHeaderAlign,
     );
@@ -242,10 +229,9 @@ describe("config storage failures", () => {
   });
 
   it("falls back to defaults when the config cannot be read", () => {
-    saveConfig("asciiHeaderAlign", "right");
+    setTestConfig({ asciiHeaderAlign: "right" });
     const failure = new Error("read failed");
     const errors: unknown[] = [];
-
     loadConfig(
       (error) => errors.push(error),
       createStorage({
@@ -254,7 +240,6 @@ describe("config storage failures", () => {
         },
       }),
     );
-
     expect(getConfig().asciiHeaderAlign).toBe(
       getDefaultConfig().asciiHeaderAlign,
     );
@@ -263,12 +248,10 @@ describe("config storage failures", () => {
 
   it("falls back to defaults when the config contains malformed JSON", () => {
     const errors: unknown[] = [];
-
     loadConfig(
       (error) => errors.push(error),
       createStorage({ read: () => "{" }),
     );
-
     expect(getConfig().asciiHeaderAlign).toBe(
       getDefaultConfig().asciiHeaderAlign,
     );
@@ -279,7 +262,6 @@ describe("config storage failures", () => {
   it("keeps validated config when normalization cannot be persisted", () => {
     const failure = new Error("normalize failed");
     const errors: unknown[] = [];
-
     loadConfig(
       (error) => errors.push(error),
       createStorage({
@@ -289,30 +271,7 @@ describe("config storage failures", () => {
         },
       }),
     );
-
     expect(getConfig().asciiHeaderAlign).toBe("right");
     expect(errors).toEqual([failure]);
-  });
-
-  it("does not mutate config or notify listeners when a save fails", () => {
-    saveConfig("asciiHeaderAlign", "right");
-    const failure = new Error("save failed");
-    let notificationCount = 0;
-    setOnConfigChange(() => notificationCount++);
-
-    expect(() =>
-      saveConfig(
-        "asciiHeaderAlign",
-        "center",
-        createStorage({
-          write() {
-            throw failure;
-          },
-        }),
-      ),
-    ).toThrow(failure);
-
-    expect(getConfig().asciiHeaderAlign).toBe("right");
-    expect(notificationCount).toBe(0);
   });
 });
