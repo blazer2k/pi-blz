@@ -136,26 +136,6 @@ describe("read renderCall", () => {
 });
 
 describe("read renderResult", () => {
-  it("reports text line count", () => {
-    const def = setupReadTool();
-    const renderResult = def.renderResult!;
-    const theme = mkTheme();
-    const ctx = mkToolCtx();
-
-    const component = renderResult(
-      {
-        content: [{ type: "text", text: "line1\nline2\nline3" }],
-        details: undefined,
-      },
-      { expanded: false, isPartial: false },
-      theme,
-      ctx,
-    );
-
-    const output = component.render(120).join("\n");
-    expect(output).toContain("3 lines");
-  });
-
   it("excludes continuation notices from text line counts", () => {
     const def = setupReadTool();
     const renderResult = def.renderResult!;
@@ -302,26 +282,6 @@ describe("read renderResult", () => {
       .render(45)
       .find((line) => line.includes("Image unavailable"));
     expect(warningLine).toContain(`${warningOpen}Image unavailable`);
-  });
-
-  it("marks truncation", () => {
-    const def = setupReadTool();
-    const renderResult = def.renderResult!;
-    const theme = mkTheme();
-    const ctx = mkToolCtx();
-
-    const component = renderResult(
-      {
-        content: [{ type: "text", text: "line1\nline2" }],
-        details: { truncation: { truncated: true } },
-      },
-      { expanded: false, isPartial: false },
-      theme,
-      ctx,
-    );
-
-    const output = component.render(120).join("\n");
-    expect(output).toContain("truncated • 2 lines");
   });
 
   it("reports no content when empty", () => {

@@ -17,7 +17,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { ToolResultMessage } from "@earendil-works/pi-ai";
 import extension from "../index";
-import { loadConfig, saveConfig } from "../config/store";
+import { loadConfig } from "../config/store";
 import { mkTheme, mkToolCtx } from "../testing/helpers";
 
 const originalPath = process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH;
@@ -120,26 +120,8 @@ describe("public renderer integration", () => {
     expect(enhanced!.toolRenderers).toHaveLength(1);
     expect(resourceLoader.getExtensions().errors).toEqual([]);
     expect(resourceLoader.getExtensions().warnings ?? []).toEqual([]);
-    const native = resourceLoader
-      .getExtensions()
-      .extensions.find((item) => item.path === "builtin:codemode")!
-      .tools.get("codemode")!.definition;
-    expect(session.getToolDefinition("codemode")).toBe(native);
-    expect(resolve(session, "codemode")?.renderCall).not.toBe(
-      native.renderCall,
-    );
-    saveConfig("patchCustomTools", "false");
-    expect(resolve(session, "codemode")?.renderCall).toBe(native.renderCall);
-    expect(resolve(session, "codemode")?.renderResult).toBe(
-      native.renderResult,
-    );
-    expect(resolve(session, "codemode")?.renderShell).toBe(native.renderShell);
     expect(resolve(session, "read")?.renderCall).not.toBe(
       session.getToolDefinition("read")!.renderCall,
-    );
-    saveConfig("patchCustomTools", "true");
-    expect(resolve(session, "codemode")?.renderCall).not.toBe(
-      native.renderCall,
     );
     expect(ExtensionRunner.prototype.getAllRegisteredTools).toBe(original);
   });

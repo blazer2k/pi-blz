@@ -171,16 +171,10 @@ describe("Codemode wrapper integration", () => {
           session.extensionRunner
             .getAllRegisteredTools()
             .find((tool) => tool.definition.name === "codemode")!;
-        expect(getRegistered().definition).toBe(native);
         for (const enabled of [true, false, true]) {
           saveConfig("patchCustomTools", String(enabled));
           const registered = getRegistered();
           expect(registered.sourceInfo.path).toBe("builtin:codemode");
-          expect(registered.definition.execute).toBe(native.execute);
-          expect(registered.definition.parameters).toBe(native.parameters);
-          expect(registered.definition.prepareLoadout).toBe(
-            native.prepareLoadout,
-          );
           expect(registered.definition).toBe(native);
           const resolved = session.extensionRunner.resolveToolRenderers(
             "codemode",
@@ -202,7 +196,7 @@ describe("Codemode wrapper integration", () => {
                 .render(120)
                 .join("\n"),
             ).toContain("+2 lines");
-          } else expect(resolved!.renderCall).toBe(native.renderCall);
+          } else expect(resolved).toBe(native);
           expect(session.getActiveToolNames().includes("codemode")).toBe(
             active,
           );

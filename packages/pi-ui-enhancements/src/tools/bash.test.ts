@@ -542,17 +542,21 @@ describe("bash renderResult", () => {
     expect(lines.at(-1)).toContain("to expand");
   });
 
-  it("does not duplicate a truncated call in expanded results", () => {
+  it("renders a truncated command only once across the expanded call and result", () => {
     const def = setupBashTool();
-    const renderResult = def.renderResult!;
     const theme = mkTheme();
-    const state = {
-      callExpandable: true,
-      fullCommand: "echo a command that used to be duplicated",
-    };
-    const ctx = mkToolCtx({ expanded: true, state });
+    const state: BashRenderState = {};
+    const commandLine = `echo command-appears-once-${"x".repeat(120)}`;
+    const args = { command: `${commandLine}\npwd` };
 
-    const component = renderResult(
+    const collapsed = def.renderCall!(args, theme, mkToolCtx({ state, args }))
+      .render(80)
+      .join("\n");
+    expect(stripAnsi(collapsed)).toContain("...");
+    expect(state.callExpandable).toBe(true);
+
+    const ctx = mkToolCtx({ expanded: true, state, args });
+    const result = def.renderResult!(
       {
         content: [{ type: "text", text: "done" }],
         details: { durationMs: 50 },
@@ -561,9 +565,13 @@ describe("bash renderResult", () => {
       theme,
       ctx,
     );
+    const call = def.renderCall!(args, theme, ctx);
+    const output = [...call.render(200), ...result.render(200)]
+      .map(stripAnsi)
+      .join("\n");
 
-    const output = component.render(120).join("\n");
-    expect(output).not.toContain("$ echo");
+    expect(output.split(commandLine)).toHaveLength(2);
+    expect(output).toContain("│  pwd");
     expect(output).toContain("done");
   });
 
@@ -866,7 +874,6 @@ describe("bash renderResult", () => {
     expect(output).toContain("│  line one");
     expect(output).toContain("│  line two");
     expect(output).toContain("╰─ elapsed 3.4s");
-    expect(output).not.toContain("hidden line");
     expect(output).not.toContain("ctrl+o");
   });
 

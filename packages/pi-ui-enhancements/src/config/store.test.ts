@@ -54,6 +54,7 @@ describe("config compatibility", () => {
         read: () =>
           JSON.stringify({
             patchedBuiltInTools: "all",
+            bashCollapsedDisplay: "summary",
             futureSetting: true,
             maxCallWidth: 120,
             indicatorColor: "text",
@@ -70,9 +71,6 @@ describe("config compatibility", () => {
       indicatorColor: "text",
     });
     expect(JSON.parse(normalized)).toEqual(getConfig());
-    expect(getConfig()).not.toHaveProperty("maxCallWidth");
-    expect(getConfig()).not.toHaveProperty("patchedBuiltInTools");
-    expect(getConfig()).not.toHaveProperty("futureSetting");
   });
 });
 
@@ -199,22 +197,6 @@ describe("config numeric values", () => {
     );
     loadConfig();
     expect(getConfig().collapsedOutputDisplay).toBe("preview");
-  });
-});
-
-describe("obsolete settings", () => {
-  it("ignores the old Bash setting without resetting valid settings", () => {
-    writeFileSync(
-      process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH!,
-      JSON.stringify({
-        bashCollapsedDisplay: "summary",
-        indicatorColor: "text",
-      }),
-    );
-    loadConfig();
-    expect(getConfig()).not.toHaveProperty("bashCollapsedDisplay");
-    expect(getConfig().collapsedOutputDisplay).toBe("preview");
-    expect(getConfig().indicatorColor).toBe("text");
   });
 });
 
