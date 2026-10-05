@@ -1,77 +1,232 @@
-import { describe, expect, it } from "bun:test";
-import type { Theme } from "@earendil-works/pi-coding-agent";
-import { visibleWidth } from "@earendil-works/pi-tui";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import {
-  type AsciiHeaderConfig,
-  type AsciiHeaderData,
-  buildAsciiHeader,
-  buildAsciiHeaderData,
-} from "./header";
+  VERSION,
+  type ExtensionContext,
+  type Theme,
+} from "@earendil-works/pi-coding-agent";
+import {
+  foregroundAnsi,
+  rgbColor,
+  visibleWidth,
+  type Component,
+  type TerminalColorMode,
+  type TUI,
+} from "@earendil-works/pi-tui";
+import type { Config } from "../config/definition";
+import { getConfig } from "../config/store";
+import { mkTheme, setTestConfig } from "../testing/helpers";
+import { stripAnsi } from "../tools/rendering/text";
+import { buildHeader, registerHeader } from "./header";
 
-const theme = {
-  fg: (_color: string, text: string) => text,
-} as unknown as Theme;
+let previous: Config;
+beforeEach(() => {
+  previous = getConfig();
+});
+afterEach(() => {
+  setTestConfig(previous);
+});
 
-const baseConfig: AsciiHeaderConfig = {
-  enabled: true,
-  text: "pi",
-  font: "Greek",
-  color: "text",
-  align: "left",
-  showVersion: false,
-};
+const compact = ["▀▀█ ", "█▀ █"];
+const large = ["██████  ", "██  ██  ", "████  ██", "██    ██"];
 
-const singleLineData: AsciiHeaderData = {
-  rawLines: ["pi"],
-  rawLineWidths: [2],
-  versionWidth: 0,
-};
+type HeaderComponent = Component & { dispose?(): void };
+type HeaderFactory = NonNullable<
+  Parameters<ExtensionContext["ui"]["setHeader"]>[0]
+>;
 
-describe("buildAsciiHeader", () => {
-  it("renders all supported alignments", () => {
-    const render = (align: AsciiHeaderConfig["align"]) =>
-      buildAsciiHeader(theme, 10, { ...baseConfig, align }, singleLineData);
+function headerContext() {
+  let current: HeaderComponent | undefined;
+  const calls: Array<HeaderFactory | undefined> = [];
+  const ctx = {
+    ui: {
+      setHeader(factory: HeaderFactory | undefined) {
+        calls.push(factory);
+        current?.dispose?.();
+        current = factory?.({} as TUI, mkTheme());
+      },
+    },
+  } as unknown as ExtensionContext;
+  return { ctx, calls, current: () => current };
+}
 
-    expect(render("left")).toEqual(["", " pi", "", ""]);
-    expect(render("center")).toEqual(["", "    pi", "", ""]);
-    expect(render("right")).toEqual(["", "       pi", "", ""]);
-  });
-
-  it("renders the bundled Greek font deterministically", () => {
-    const data = buildAsciiHeaderData(baseConfig);
-
-    expect(data.rawLines).toEqual([
-      "▄▄▄▄▄▄▄▄▄▄▄▄▄",
-      " ███     ███  ",
-      " ███     ███  ",
-      " ███     ███  ",
-      " ███     ███  ",
-      "▀▀▀▀▀   ▀▀▀▀▀",
-    ]);
-    expect(data.rawLineWidths).toEqual([14, 14, 14, 14, 14, 14]);
-  });
-
-  it("falls back to plain text when figlet rejects a font", () => {
-    const data = buildAsciiHeaderData({
-      ...baseConfig,
-      text: "fallback",
-      font: "not-a-font",
+describe("buildHeader", () => {
+  for (const [headerMode, logo] of [
+    ["compact", compact],
+    ["large", large],
+  ] as const) {
+    it(`renders the ${headerMode} logo and version with left and center alignment`, () => {
+      const left = buildHeader(
+        mkTheme(),
+        20,
+        { headerMode, headerAlign: "left" },
+        false,
+      ).map(stripAnsi);
+      expect(left).toEqual([
+        "",
+        ...logo.map((line) => " " + line),
+        "",
+        ` v${VERSION}`,
+        "",
+      ]);
+      const center = buildHeader(
+        mkTheme(),
+        20,
+        { headerMode, headerAlign: "center" },
+        false,
+      ).map(stripAnsi);
+      const padding = " ".repeat(Math.floor((20 - logo[0]!.length) / 2));
+      expect(center).toEqual([
+        "",
+        ...logo.map((line) => padding + line),
+        "",
+        " ".repeat(Math.floor((20 - visibleWidth(`v${VERSION}`)) / 2)) +
+          `v${VERSION}`,
+        "",
+      ]);
+      expect(logo.map(visibleWidth)).toEqual(
+        logo.map(() => (headerMode === "compact" ? 4 : 8)),
+      );
     });
 
-    expect(data.rawLines).toEqual(["fallback"]);
-    expect(data.rawLineWidths).toEqual([8]);
-  });
+    it(`uses the colored wordmark fallback for ${headerMode} on Apple Terminal`, () => {
+      const output = buildHeader(
+        mkTheme(),
+        20,
+        { headerMode, headerAlign: "center" },
+        true,
+      );
+      expect(output.map(stripAnsi)).toEqual([
+        "",
+        "         Pi",
+        "",
+        " ".repeat(Math.floor((20 - visibleWidth(`v${VERSION}`)) / 2)) +
+          `v${VERSION}`,
+        "",
+      ]);
+      expect(output[1]).toContain(
+        foregroundAnsi(rgbColor(228, 138, 122), "truecolor") + "P\x1b[0m",
+      );
+      expect(output[1]).toContain(
+        foregroundAnsi(rgbColor(234, 182, 93), "truecolor") + "i\x1b[0m",
+      );
+    });
+  }
 
-  it("keeps every alignment and the version within widths zero through 200", () => {
-    for (const align of ["left", "center", "right"] as const) {
-      const config = { ...baseConfig, align, showVersion: true };
-      const data = buildAsciiHeaderData(config);
-
-      for (let width = 0; width <= 200; width++) {
-        for (const line of buildAsciiHeader(theme, width, config, data)) {
-          expect(visibleWidth(line)).toBeLessThanOrEqual(width);
+  it("uses the current terminal color mode on every render and keeps the version dim", () => {
+    let mode: TerminalColorMode = "truecolor";
+    const colors: Array<[string, string]> = [];
+    const theme = {
+      ...mkTheme(),
+      getColorMode: () => mode,
+      fg: (color: string, text: string) => {
+        colors.push([color, text]);
+        return text;
+      },
+    } as Theme;
+    for (const next of ["truecolor", "256color", "truecolor"] as const) {
+      mode = next;
+      for (const headerMode of ["compact", "large"] as const) {
+        for (const appleTerminal of [false, true]) {
+          const output = buildHeader(
+            theme,
+            20,
+            { headerMode, headerAlign: "left" },
+            appleTerminal,
+          ).join("\n");
+          expect(output).toContain(
+            foregroundAnsi(rgbColor(228, 138, 122), mode),
+          );
+          expect(output).toContain(
+            foregroundAnsi(rgbColor(234, 182, 93), mode),
+          );
+          if (!appleTerminal)
+            expect(output).toContain(
+              foregroundAnsi(rgbColor(79, 142, 179), mode),
+            );
+          expect(output.includes("\x1b[38;2;")).toBe(mode === "truecolor");
+          expect(colors.at(-1)).toEqual(["dim", `v${VERSION}`]);
+          expect(output).toContain("\x1b[0m");
         }
       }
     }
+  });
+
+  it("fits both custom modes and fallback at widths zero through 200", () => {
+    for (const headerMode of ["compact", "large"] as const) {
+      for (const headerAlign of ["left", "center"] as const) {
+        for (const appleTerminal of [false, true]) {
+          for (let width = 0; width <= 200; width++) {
+            for (const line of buildHeader(
+              mkTheme(),
+              width,
+              { headerMode, headerAlign },
+              appleTerminal,
+            )) {
+              expect(visibleWidth(line)).toBeLessThanOrEqual(width);
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it("returns no custom content for native and off", () => {
+    for (const headerMode of ["native", "off"] as const) {
+      expect(
+        buildHeader(
+          {} as Theme,
+          80,
+          { headerMode, headerAlign: "center" },
+          false,
+        ),
+      ).toEqual([]);
+    }
+  });
+});
+
+describe("registerHeader", () => {
+  it("makes no header calls in native mode, including cleanup", () => {
+    for (const headerAlign of ["left", "center"] as const) {
+      setTestConfig({ headerMode: "native", headerAlign });
+      const fixture = headerContext();
+      const handle = registerHeader(fixture.ctx);
+      handle.dispose();
+      handle.dispose();
+      expect(fixture.calls).toEqual([]);
+    }
+  });
+
+  it("installs an empty component for off and restores native once on cleanup", () => {
+    setTestConfig({ headerMode: "off" });
+    const fixture = headerContext();
+    const handle = registerHeader(fixture.ctx);
+    expect(fixture.calls[0]).toBeFunction();
+    expect(fixture.current()!.render(80)).toEqual([]);
+    handle.dispose();
+    handle.dispose();
+    expect(fixture.calls).toHaveLength(2);
+    expect(fixture.calls[1]).toBeUndefined();
+  });
+
+  it("retains loaded settings until reinstall and leaves replacement headers alone", () => {
+    setTestConfig({ headerMode: "compact", headerAlign: "center" });
+    const fixture = headerContext();
+    const old = registerHeader(fixture.ctx);
+    const before = fixture.current()!.render(80);
+    setTestConfig({ headerMode: "large", headerAlign: "left" });
+    fixture.current()!.invalidate();
+    expect(fixture.current()!.render(80)).toEqual(before);
+    const next = registerHeader(fixture.ctx);
+    old.dispose();
+    expect(fixture.calls).toHaveLength(2);
+    expect(fixture.current()!.render(80).map(stripAnsi).join("\n")).toContain(
+      ` v${VERSION}`,
+    );
+    const replacement = { render: () => ["other extension"], invalidate() {} };
+    fixture.ctx.ui.setHeader(() => replacement);
+    next.dispose();
+    next.dispose();
+    expect(fixture.current()).toBe(replacement);
+    expect(fixture.calls).toHaveLength(3);
   });
 });

@@ -23,14 +23,17 @@ import {
   type ExtensionAPI,
   type ExtensionFactory,
   type ExtensionToolContext,
+  type ExtensionUIContext,
   type ToolRenderers,
 } from "@earendil-works/pi-coding-agent";
 import type { ToolResultMessage } from "@earendil-works/pi-ai";
 import {
   getCapabilities,
+  isAppleTerminalSession,
   Image,
   setCapabilities,
   Text,
+  type Component,
   type TUI,
 } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
@@ -69,6 +72,7 @@ async function createSession(
   tools?: string[],
   sessionManager?: SessionManager,
   extensionFactories: ExtensionFactory[] = enhanced ? [extension] : [],
+  bindings: Parameters<AgentSession["bindExtensions"]>[0] = { mode: "json" },
 ) {
   const createTransport = mock(() => {
     throw new Error("Offline rendering tests must not connect to MCP");
@@ -121,7 +125,7 @@ async function createSession(
     tools,
   });
   sessions.push(session);
-  await session.bindExtensions({ mode: "json" });
+  await session.bindExtensions(bindings);
   return { session, resourceLoader, createTransport };
 }
 
@@ -172,7 +176,36 @@ async function exportData(session: AgentSession) {
 
 describe("public renderer integration", () => {
   it("loads externally edited settings only after Pi reloads and registers no settings command", async () => {
-    const { session, resourceLoader } = await createSession(true);
+    let header: (Component & { dispose?(): void }) | undefined;
+    const errors: unknown[] = [];
+    const uiContext = {
+      setHeader(factory: Parameters<ExtensionUIContext["setHeader"]>[0]) {
+        header?.dispose?.();
+        header = factory?.({} as TUI, mkTheme());
+      },
+      setWidget() {},
+      setEditorComponent() {},
+      getEditorComponent: () => undefined,
+      setFooter() {},
+      setStatus() {},
+      setWorkingIndicator() {},
+      setWorkingMessage() {},
+      setWorkingVisible() {},
+      setHiddenThinkingLabel() {},
+      notify: (message: string) => errors.push(message),
+    } as unknown as ExtensionUIContext;
+    const { session, resourceLoader, createTransport } = await createSession(
+      true,
+      undefined,
+      undefined,
+      [extension],
+      {
+        mode: "tui",
+        uiContext,
+        onError: (error) => errors.push(error),
+      },
+    );
+    const initialHeader = header!.render(80);
     const commands = () =>
       resourceLoader
         .getExtensions()
@@ -197,7 +230,8 @@ describe("public renderer integration", () => {
       capitalizeToolNames: false,
       collapsedOutputDisplay: "summary",
       indicatorStyle: "diamond",
-      asciiHeaderEnabled: false,
+      headerMode: "large",
+      headerAlign: "center",
       roundedEditorColor: "muted",
     } as const;
     writeFileSync(
@@ -207,9 +241,17 @@ describe("public renderer integration", () => {
     expect(getConfig()).toEqual(initial);
     component.invalidate();
     expect(component.render(80)).toEqual(before);
+    header!.invalidate();
+    expect(header!.render(80)).toEqual(initialHeader);
 
     await session.reload();
     expect(getConfig()).toEqual({ ...initial, ...updates });
+    expect(header!.render(80)).not.toEqual(initialHeader);
+    expect(header!.render(80).map(stripAnsi)).toContain(
+      isAppleTerminalSession()
+        ? " ".repeat(39) + "Pi"
+        : " ".repeat(36) + "██████  ",
+    );
     expect(commands()).not.toContain("ui-settings");
     const rebuilt = toolComponent(session, "bash", args);
     rebuilt.setArgsComplete();
@@ -220,6 +262,24 @@ describe("public renderer integration", () => {
     expect(after).not.toContain("│  first");
     expect(session.getAllTools().map((tool) => tool.name)).toEqual(inventory);
     expect(session.getActiveToolNames()).toEqual(active);
+    for (const headerMode of ["native", "off", "compact"] as const) {
+      writeFileSync(
+        process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH!,
+        JSON.stringify({ ...getConfig(), headerMode }),
+      );
+      await session.reload();
+      expect(getConfig().headerMode).toBe(headerMode);
+      if (headerMode === "native") expect(header).toBeUndefined();
+      else if (headerMode === "off") expect(header!.render(80)).toEqual([]);
+      else
+        expect(header!.render(80).map(stripAnsi)).toContain(
+          isAppleTerminalSession()
+            ? " ".repeat(39) + "Pi"
+            : " ".repeat(38) + "▀▀█ ",
+        );
+    }
+    expect(errors).toEqual([]);
+    expect(createTransport).not.toHaveBeenCalled();
   });
 
   it("composes real extension resolvers around the enhancement without taking over self-owned shells", async () => {

@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { getDefaultConfig } from "./definition";
 import { setTestConfig } from "../testing/helpers";
 import { getConfig, loadConfig, type ConfigStorage } from "./store";
@@ -36,21 +36,26 @@ afterEach(() => {
   loadConfig();
 });
 
-describe("config compatibility", () => {
-  it("ignores removed and additional fields without resetting valid settings", () => {
-    const errors: unknown[] = [];
-    let normalized = "";
+describe("config validation", () => {
+  it("defaults to the compact left-aligned header", () => {
+    expect(getDefaultConfig()).toMatchObject({
+      headerMode: "compact",
+      headerAlign: "left",
+    });
+    expect(getConfig()).toEqual(getDefaultConfig());
+  });
 
+  it("recovers invalid settings individually and normalizes the file", () => {
+    let normalized = "";
     loadConfig(
-      (error) => errors.push(error),
+      undefined,
       createStorage({
         read: () =>
           JSON.stringify({
-            patchedBuiltInTools: "all",
-            bashCollapsedDisplay: "summary",
-            futureSetting: true,
-            maxCallWidth: 120,
-            indicatorColor: "text",
+            headerMode: "unsupported",
+            headerAlign: "center",
+            maxExpandedEntries: 25,
+            roundedEditorShowCost: true,
           }),
         write(_path, contents) {
           normalized = contents;
@@ -58,67 +63,48 @@ describe("config compatibility", () => {
       }),
     );
 
-    expect(errors).toEqual([]);
     expect(getConfig()).toEqual({
       ...getDefaultConfig(),
-      indicatorColor: "text",
+      headerAlign: "center",
+      roundedEditorShowCost: true,
     });
     expect(JSON.parse(normalized)).toEqual(getConfig());
-  });
-});
-
-describe("config validation", () => {
-  it("recovers invalid settings individually and normalizes the file", () => {
-    const report = spyOn(console, "error").mockImplementation(() => {});
-    let normalized = "";
-    try {
-      loadConfig(
-        undefined,
-        createStorage({
-          read: () =>
-            JSON.stringify({
-              asciiHeaderEnabled: "false",
-              asciiHeaderFont: "not-a-font",
-              asciiHeaderAlign: "right",
-              maxExpandedEntries: 25,
-              roundedEditorShowCost: true,
-            }),
-          write(_path, contents) {
-            normalized = contents;
-          },
-        }),
-      );
-
-      expect(getConfig()).toEqual({
-        ...getDefaultConfig(),
-        asciiHeaderAlign: "right",
-        roundedEditorShowCost: true,
-      });
-      expect(JSON.parse(normalized)).toEqual(getConfig());
-      expect(report).toHaveBeenCalledWith(
-        `Invalid font "not-a-font", falling back to "${getDefaultConfig().asciiHeaderFont}"`,
-      );
-    } finally {
-      report.mockRestore();
-    }
   });
 
   it("loads boolean and enum settings as JSON values", () => {
     writeFileSync(
       process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH!,
       JSON.stringify({
-        asciiHeaderEnabled: false,
+        roundedEditorShowBranch: false,
         roundedEditorShowCost: true,
-        asciiHeaderAlign: "right",
+        headerAlign: "center",
       }),
     );
     loadConfig();
     expect(getConfig()).toEqual({
       ...getDefaultConfig(),
-      asciiHeaderEnabled: false,
+      roundedEditorShowBranch: false,
       roundedEditorShowCost: true,
-      asciiHeaderAlign: "right",
+      headerAlign: "center",
     });
+  });
+
+  it("accepts all four header modes and both alignments", () => {
+    for (const headerMode of ["native", "compact", "large", "off"] as const) {
+      for (const headerAlign of ["left", "center"] as const) {
+        loadConfig(
+          undefined,
+          createStorage({
+            read: () => JSON.stringify({ headerMode, headerAlign }),
+          }),
+        );
+        expect(getConfig()).toEqual({
+          ...getDefaultConfig(),
+          headerMode,
+          headerAlign,
+        });
+      }
+    }
   });
 
   it("recovers invalid primitive and enum values", () => {
@@ -127,9 +113,10 @@ describe("config validation", () => {
       createStorage({
         read: () =>
           JSON.stringify({
-            asciiHeaderEnabled: "false",
+            roundedEditorShowBranch: "false",
             roundedEditorShowCost: 1,
-            asciiHeaderAlign: "justify",
+            headerMode: false,
+            headerAlign: "right",
             indicatorStyle: null,
           }),
       }),
@@ -166,10 +153,9 @@ describe("config numeric values", () => {
   it("falls back to defaults for fractional numeric values loaded from disk", () => {
     writeFileSync(
       process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH!,
-      JSON.stringify({ maxCallWidth: 120.5, maxExpandedEntries: 10.5 }),
+      JSON.stringify({ maxExpandedEntries: 10.5 }),
     );
     loadConfig();
-    expect(getConfig()).not.toHaveProperty("maxCallWidth");
     expect(getConfig().maxExpandedEntries).toBe(20);
   });
 
@@ -193,7 +179,7 @@ describe("config numeric values", () => {
 
 describe("config storage failures", () => {
   it("falls back to defaults when the config directory cannot be prepared", () => {
-    setTestConfig({ asciiHeaderAlign: "right" });
+    setTestConfig({ headerAlign: "center" });
     const failure = new Error("prepare failed");
     const errors: unknown[] = [];
     loadConfig(
@@ -204,9 +190,7 @@ describe("config storage failures", () => {
         },
       }),
     );
-    expect(getConfig().asciiHeaderAlign).toBe(
-      getDefaultConfig().asciiHeaderAlign,
-    );
+    expect(getConfig().headerAlign).toBe(getDefaultConfig().headerAlign);
     expect(errors).toEqual([failure]);
   });
 
@@ -222,14 +206,12 @@ describe("config storage failures", () => {
         },
       }),
     );
-    expect(getConfig().asciiHeaderAlign).toBe(
-      getDefaultConfig().asciiHeaderAlign,
-    );
+    expect(getConfig().headerAlign).toBe(getDefaultConfig().headerAlign);
     expect(errors).toEqual([failure]);
   });
 
   it("falls back to defaults when the config cannot be read", () => {
-    setTestConfig({ asciiHeaderAlign: "right" });
+    setTestConfig({ headerAlign: "center" });
     const failure = new Error("read failed");
     const errors: unknown[] = [];
     loadConfig(
@@ -240,9 +222,7 @@ describe("config storage failures", () => {
         },
       }),
     );
-    expect(getConfig().asciiHeaderAlign).toBe(
-      getDefaultConfig().asciiHeaderAlign,
-    );
+    expect(getConfig().headerAlign).toBe(getDefaultConfig().headerAlign);
     expect(errors).toEqual([failure]);
   });
 
@@ -252,9 +232,7 @@ describe("config storage failures", () => {
       (error) => errors.push(error),
       createStorage({ read: () => "{" }),
     );
-    expect(getConfig().asciiHeaderAlign).toBe(
-      getDefaultConfig().asciiHeaderAlign,
-    );
+    expect(getConfig().headerAlign).toBe(getDefaultConfig().headerAlign);
     expect(errors).toHaveLength(1);
     expect(errors[0]).toBeInstanceOf(SyntaxError);
   });
@@ -265,13 +243,13 @@ describe("config storage failures", () => {
     loadConfig(
       (error) => errors.push(error),
       createStorage({
-        read: () => JSON.stringify({ asciiHeaderAlign: "right" }),
+        read: () => JSON.stringify({ headerAlign: "center" }),
         write() {
           throw failure;
         },
       }),
     );
-    expect(getConfig().asciiHeaderAlign).toBe("right");
+    expect(getConfig().headerAlign).toBe("center");
     expect(errors).toEqual([failure]);
   });
 });

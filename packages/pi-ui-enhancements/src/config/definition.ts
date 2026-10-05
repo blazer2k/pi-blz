@@ -1,40 +1,13 @@
 import { Type, type Static } from "typebox";
 import { Compile } from "typebox/compile";
 
-export const ALLOWED_FONTS: string[] = [
-  "3D-ASCII",
-  "Alligator",
-  "ANSI Compact",
-  "Classy",
-  "Coder Mini",
-  "Crazy",
-  "Delta Corps Priest 1",
-  "Future",
-  "Future Smooth",
-  "Georgia11",
-  "Greek",
-  "Greek Large",
-  "Italic",
-  "Jazmine",
-  "Larry 3D",
-  "Poison",
-  "Rebel",
-  "Slant",
-  "Tmplr",
-  "Trek",
-  "Univers",
-];
-
 export type Config = Static<typeof ConfigSchema>;
 
 export type ConfigKey = keyof Config;
 
 const DEFAULT_CONFIG: Config = {
-  asciiHeaderEnabled: true,
-  asciiHeaderFont: "Greek",
-  asciiHeaderColor: "text",
-  asciiHeaderAlign: "center",
-  asciiHeaderShowVersion: true,
+  headerMode: "compact",
+  headerAlign: "left",
   workingIndicatorShowInterruptMsg: true,
   workingIndicatorShowDuration: true,
   patchCustomTools: true,
@@ -53,19 +26,13 @@ const DEFAULT_CONFIG: Config = {
 
 const ConfigSchema = Type.Object(
   {
-    asciiHeaderEnabled: Type.Boolean(),
-    asciiHeaderFont: Type.String({ minLength: 1 }),
-    asciiHeaderColor: Type.Union([
-      Type.Literal("text"),
-      Type.Literal("accent"),
-      Type.Literal("dim"),
+    headerMode: Type.Union([
+      Type.Literal("native"),
+      Type.Literal("compact"),
+      Type.Literal("large"),
+      Type.Literal("off"),
     ]),
-    asciiHeaderAlign: Type.Union([
-      Type.Literal("left"),
-      Type.Literal("center"),
-      Type.Literal("right"),
-    ]),
-    asciiHeaderShowVersion: Type.Boolean(),
+    headerAlign: Type.Union([Type.Literal("left"), Type.Literal("center")]),
     workingIndicatorShowInterruptMsg: Type.Boolean(),
     workingIndicatorShowDuration: Type.Boolean(),
     patchCustomTools: Type.Boolean(),
@@ -124,14 +91,6 @@ export function validateConfig(raw: unknown): Config {
     if (validator.Check(candidate)) {
       validated[key] = candidate[key] as never;
     }
-  }
-
-  if (!ALLOWED_FONTS.includes(validated.asciiHeaderFont)) {
-    console.error(
-      `Invalid font "${validated.asciiHeaderFont}", ` +
-        `falling back to "${DEFAULT_CONFIG.asciiHeaderFont}"`,
-    );
-    validated.asciiHeaderFont = DEFAULT_CONFIG.asciiHeaderFont;
   }
 
   return validated;

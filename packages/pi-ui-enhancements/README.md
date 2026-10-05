@@ -8,13 +8,13 @@ Compact tool output and a configurable terminal interface for [pi](https://pi.de
 
 This extension adds:
 
-- An ASCII art header at session start, using figlet or the bundled Greek pi fonts.
+- A compact or enlarged Pi logo at session start, with the version below it. You can also keep Pi's own header or hide the header content.
 - A rounded editor border showing the working directory, git branch, model, token usage, and context percentage.
 - A shimmer animation on the "Working" label, with elapsed time and an interrupt hint.
 - Compact tool output with tree-style lines and clickable paths when your terminal supports them. This also works with eligible third-party tools.
 - Optional capitalization of tool headers, enabled by default.
 
-![Example: compact tool output with ASCII header](images/example.webp)
+![Example: compact tool output](images/example.webp)
 
 ![Example: rounded editor border with working indicator](images/editor.webp)
 
@@ -43,7 +43,8 @@ For example:
 
 ```json
 {
-  "asciiHeaderEnabled": false,
+  "headerMode": "compact",
+  "headerAlign": "left",
   "collapsedOutputDisplay": "summary",
   "maxExpandedEntries": 50
 }
@@ -51,11 +52,8 @@ For example:
 
 | JSON key                           | Default     | Allowed values / purpose                                      |
 | ---------------------------------- | ----------- | ------------------------------------------------------------- |
-| `asciiHeaderEnabled`               | `true`      | Boolean: show the ASCII header                                |
-| `asciiHeaderFont`                  | `"Greek"`   | Font name from the list below                                 |
-| `asciiHeaderColor`                 | `"text"`    | `"text"`, `"accent"`, `"dim"`                                 |
-| `asciiHeaderAlign`                 | `"center"`  | `"left"`, `"center"`, `"right"`                               |
-| `asciiHeaderShowVersion`           | `true`      | Boolean: show the pi version below the header                 |
+| `headerMode`                       | `"compact"` | `"native"`, `"compact"`, `"large"`, `"off"`                   |
+| `headerAlign`                      | `"left"`    | `"left"`, `"center"`; applies to compact/large only           |
 | `workingIndicatorShowInterruptMsg` | `true`      | Boolean: show "esc to interrupt"                              |
 | `workingIndicatorShowDuration`     | `true`      | Boolean: show elapsed time and completion duration            |
 | `patchCustomTools`                 | `true`      | Boolean: compact eligible extension tools, including Codemode |
@@ -71,9 +69,18 @@ For example:
 | `roundedEditorShowCost`            | `false`     | Boolean: show total session cost                              |
 | `roundedEditorShowBranch`          | `true`      | Boolean: show the git branch                                  |
 
-Bundled fonts: `Greek`, `Greek Large`.
+## Header
 
-Figlet fonts: `3D-ASCII`, `Alligator`, `ANSI Compact`, `Classy`, `Coder Mini`, `Crazy`, `Delta Corps Priest 1`, `Future`, `Future Smooth`, `Georgia11`, `Italic`, `Jazmine`, `Larry 3D`, `Poison`, `Rebel`, `Slant`, `Tmplr`, `Trek`, `Univers`.
+| `headerMode` | Display                                                                                                 |
+| ------------ | ------------------------------------------------------------------------------------------------------- |
+| `native`     | Pi's own startup header and hints, as configured in Pi. This extension leaves it untouched.             |
+| `compact`    | Native-size logo, four columns wide and two lines tall, with the version below it and no startup hints. |
+| `large`      | Enlarged logo, eight columns wide and four lines tall, with the version below it and no startup hints.  |
+| `off`        | No header content. Pi's startup warnings and resource notices are unchanged.                            |
+
+`headerAlign` supports `left` and `center`. It applies to `compact` and `large`, including their Apple Terminal fallback. It has no effect in `native` or `off`.
+
+The logo uses Pi's coral, blue, and yellow colors in the terminal's color mode. In Apple Terminal, both custom modes show a colored `Pi` wordmark instead. The version remains below it.
 
 ## Built-in tool display
 
