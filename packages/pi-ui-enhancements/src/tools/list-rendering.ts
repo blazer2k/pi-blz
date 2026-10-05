@@ -10,7 +10,6 @@ type PatternPathCallOptions = {
   title: string;
   pattern: unknown;
   path?: string;
-  pathPrefix?: string;
   suffix?: string;
   cwd: string;
   theme: Theme;
@@ -28,13 +27,12 @@ export function buildPatternPathCall({
   title,
   pattern,
   path,
-  pathPrefix = " in ",
   suffix = "",
   cwd,
   theme,
   width,
 }: PatternPathCallOptions): PatternPathCall {
-  const visiblePathPrefix = path ? pathPrefix : "";
+  const visiblePathPrefix = path ? " in " : "";
   const overhead = visibleWidth(prefix + title + visiblePathPrefix + suffix);
   const remaining = Math.max(0, width - overhead);
 

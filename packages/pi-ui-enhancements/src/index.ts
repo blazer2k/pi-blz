@@ -18,10 +18,6 @@ import { registerWorkingIndicator } from "./working-indicator/indicator";
 
 const BASH_TIMING_ENTRY = "pi-ui-enhancements:bash-timing";
 
-function hasTui(ctx: { hasUI: boolean; mode?: string }): boolean {
-  return ctx.mode === "tui" || (ctx.mode === undefined && ctx.hasUI);
-}
-
 function disposeHandles(handles: readonly Handle[], description: string): void {
   for (const handle of handles) {
     try {
@@ -125,7 +121,7 @@ export default function (pi: ExtensionAPI) {
 
     if (!getConfig().patchCustomTools) toolRendering.clearCustomTimers();
 
-    if (hasTui(ctx)) {
+    if (ctx.mode === "tui") {
       uiHandles.push(registerTuiCapture(ctx));
       uiHandles.push(
         registerAsciiHeader(pi, ctx, (fn) => {

@@ -17,7 +17,6 @@ const DURATION_UPDATE_INTERVAL_MS = 250;
 
 export type BashTiming = {
   startedAt?: number;
-  endedAt?: number;
   durationMs?: number;
 };
 export type BashTimingLookup = (toolCallId: string) => BashTiming | undefined;
@@ -29,10 +28,6 @@ export function patchBashTool(
     const timing = getTiming(toolCallId);
     if (!timing) return;
     if (timing.startedAt !== undefined) state.startedAt = timing.startedAt;
-    if (timing.endedAt !== undefined && timing.startedAt !== undefined) {
-      state.endedAt = timing.endedAt;
-      state.durationMs = timing.endedAt - timing.startedAt;
-    }
     if (timing.durationMs !== undefined) state.durationMs = timing.durationMs;
   }
 

@@ -9,7 +9,6 @@ import {
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import type { Handle } from "../../shared/handle";
-import { clearCodemodeTimers } from "./timing";
 import { mkTheme, mkToolCtx, setupCustomTool } from "../../testing/helpers";
 import { clearBlinkTimers, registerToolTimer } from "../rendering/state";
 import type { CodemodeRenderState } from "./types";
@@ -47,7 +46,6 @@ beforeEach(() => {
 });
 afterEach(() => {
   for (const handle of handles.splice(0)) handle.dispose();
-  clearCodemodeTimers();
   clearBlinkTimers();
   clock.mockRestore();
   globalThis.setInterval = originalInterval;
@@ -238,14 +236,19 @@ describe("Codemode timing", () => {
     expect(intervals.size).toBe(0);
   });
 
-  it("does not clear unrelated Bash duration timers when custom rendering is disposed", () => {
+  it("does not clear another instance's Codemode or unrelated Bash timers", () => {
     const { handle, progress } = setup();
     progress();
+    const other = setup();
+    other.progress();
+    const otherTimer = other.state.durationTimer;
     const bashTimer = setInterval(() => {}, 250);
     registerToolTimer(bashTimer);
     handle.dispose();
     expect(intervals.has(bashTimer)).toBe(true);
-    expect(intervals.size).toBe(1);
+    expect(other.state.durationTimer).toBe(otherTimer);
+    expect(other.state.blinkTimer).toBeDefined();
+    expect(intervals.size).toBe(2);
   });
 
   it("clears duration timers on errors and idempotent disposal", () => {

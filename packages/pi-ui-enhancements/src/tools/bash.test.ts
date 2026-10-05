@@ -281,8 +281,8 @@ describe("bash renderResult", () => {
     }
 
     expect(errorText).toContain("Command aborted");
-    const endedAt = Date.now();
-    const def = patchBashTool(() => ({ startedAt, endedAt }));
+    const durationMs = Date.now() - startedAt;
+    const def = patchBashTool(() => ({ durationMs }));
 
     const component = def.renderResult!(
       { content: [{ type: "text", text: errorText }], details: undefined },
@@ -323,8 +323,8 @@ describe("bash renderResult", () => {
       (result.details as { durationMs?: number } | undefined)?.durationMs,
     ).toBeUndefined();
     const snapshot = structuredClone(result);
-    const endedAt = Date.now();
-    const def = patchBashTool(() => ({ startedAt, endedAt }));
+    const durationMs = Date.now() - startedAt;
+    const def = patchBashTool(() => ({ durationMs }));
 
     const component = def.renderResult!(
       result,

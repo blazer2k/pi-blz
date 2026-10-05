@@ -118,7 +118,6 @@ describe("tool call blink rendering", () => {
         invalidate: () => {},
       });
 
-      expect(state.blinkOn).toBe(true);
       expect(prefix).toBe("[success]● ");
     } finally {
       Date.now = originalNow;

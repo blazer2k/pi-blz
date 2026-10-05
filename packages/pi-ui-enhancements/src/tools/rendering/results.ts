@@ -193,9 +193,8 @@ export function formatListResult(
   const lines: string[] = [];
 
   const renderItem = (item: string) => {
-    const rendered = config.renderItem ? config.renderItem(item, theme) : item;
     lines.push(
-      formatTreeLine(rendered, {
+      formatTreeLine(item, {
         theme,
         prefix: "│  ",
         color: "toolOutput",

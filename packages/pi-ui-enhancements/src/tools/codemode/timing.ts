@@ -5,8 +5,6 @@ import {
 } from "../rendering/state";
 import type { CodemodeRenderState } from "./types";
 
-const activeStates = new Set<CodemodeRenderState>();
-
 function stopTiming(state: CodemodeRenderState): void {
   if (state.startedAt !== undefined) state.endedAt ??= Date.now();
   if (state.durationTimer) {
@@ -16,11 +14,10 @@ function stopTiming(state: CodemodeRenderState): void {
   }
   if (state.blinkTimer)
     updateBlinkTimer(state, false, state.blinkTimer.invalidate);
-  activeStates.delete(state);
 }
 
 export function clearCodemodeTimers(
-  states: Iterable<CodemodeRenderState> = activeStates,
+  states: Iterable<CodemodeRenderState>,
 ): void {
   for (const state of states) stopTiming(state);
 }
@@ -40,7 +37,6 @@ export function updateCodemodeTiming(
       if (!isActive()) stopTiming(state);
       invalidate();
     }, 250);
-    activeStates.add(state);
     registerToolTimer(state.durationTimer);
   }
 }

@@ -82,6 +82,7 @@ function mkPi() {
 function mkCtx(overrides?: Partial<ExtensionContext>) {
   return {
     cwd: process.cwd(),
+    mode: "tui",
     hasUI: true,
     ui: {
       setWidget: overrides?.ui?.setWidget ?? (() => {}),
@@ -136,7 +137,10 @@ describe("extension lifecycle", () => {
       expect(pi._registeredTools()).toEqual([]);
       expect(pi._registeredTools()).not.toContain("codemode");
       expect(pi._resolve("bash")?.renderShell).toBe("self");
-      pi._handlers.session_start![0]!({}, mkCtx({ hasUI: false }));
+      pi._handlers.session_start![0]!(
+        {},
+        mkCtx({ mode: "json", hasUI: false }),
+      );
       expect(ExtensionRunner.prototype.getAllRegisteredTools).toBe(
         registryMethod,
       );
@@ -162,13 +166,14 @@ describe("extension lifecycle", () => {
     expect((pi as any)._setActiveToolsArg()).toBeUndefined();
   });
 
-  it("session_start skips UI enhancements when hasUI is false", () => {
+  it("session_start skips UI enhancements outside TUI mode", () => {
     const pi = mkPi();
     ext(pi);
 
     let editorSet = false;
     let workingSet = false;
     const ctx = mkCtx({
+      mode: "json",
       hasUI: false,
       ui: {
         setEditorComponent: () => {
@@ -187,7 +192,7 @@ describe("extension lifecycle", () => {
     expect(workingSet).toBe(false);
   });
 
-  it("session_start registers UI enhancements when hasUI is true", () => {
+  it("session_start registers UI enhancements in TUI mode", () => {
     const pi = mkPi();
     ext(pi);
 
@@ -340,7 +345,7 @@ describe("extension lifecycle", () => {
     const pi = mkPi();
     const clock = spyOn(Date, "now").mockReturnValue(1000);
     ext(pi);
-    const ctx = mkCtx({ hasUI: false });
+    const ctx = mkCtx({ mode: "json", hasUI: false });
     ctx.sessionManager.getBranch = () =>
       pi._entries() as ReturnType<typeof ctx.sessionManager.getBranch>;
     const render = () =>

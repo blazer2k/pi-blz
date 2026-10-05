@@ -22,6 +22,7 @@ import { registerTuiCapture } from "./tui-runtime";
 import type { BaseRenderState } from "./types";
 
 const handles: Handle[] = [];
+const codemodeStates: CodemodeRenderState[] = [];
 let clock: ReturnType<typeof spyOn>;
 beforeEach(() => {
   initTheme("dark", false);
@@ -29,7 +30,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   for (const handle of handles.splice(0)) handle.dispose();
-  clearCodemodeTimers();
+  clearCodemodeTimers(codemodeStates.splice(0));
   clearBlinkTimers();
   clock.mockRestore();
 });
@@ -92,6 +93,7 @@ function renderer(testCase: (typeof cases)[number], executionStarted = true) {
   let active = executionStarted;
   const definition = testCase.create(() => active);
   const state: BaseRenderState = {};
+  if (testCase.name === "codemode") codemodeStates.push(state);
   const context = mkToolCtx({
     expanded: true,
     executionStarted,
@@ -134,12 +136,13 @@ describe("expanded tool indicators by TUI mode", () => {
         const on = render();
         const timer = state.blinkTimer;
         expect(timer).toBeDefined();
-        expect(state.blinkOn).toBe(true);
+        expect(stripAnsi(on[0]!).trimStart()).toStartWith(
+          `${getBlinkIndicator().filled} `,
+        );
         expect(color()).toBe(getConfig().indicatorColor);
         clock.mockReturnValue(1500);
         const off = render();
         expect(state.blinkTimer).toBe(timer);
-        expect(state.blinkOn).toBe(false);
         expect(color()).toBe("dim");
         expect(off.length).toBe(on.length);
         expect(stripAnsi(off.join("\n"))).toContain(
@@ -214,7 +217,7 @@ describe("expanded tool indicators by TUI mode", () => {
       tools.forEach((tool) => tool.render());
       expect(timeout).toHaveBeenCalledTimes(2);
     } finally {
-      clearCodemodeTimers();
+      clearCodemodeTimers(codemodeStates);
       clearBlinkTimers();
       timeout.mockRestore();
     }

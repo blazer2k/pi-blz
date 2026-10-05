@@ -10,8 +10,6 @@ export type BaseRenderState = {
   isError?: boolean;
   expanded?: boolean;
   callExpandable?: boolean;
-  /** Captured blink phase shared between renderCall and renderResult. */
-  blinkOn?: boolean;
 };
 
 export type ResultStatusState = BaseRenderState & {
@@ -24,7 +22,6 @@ export type ListResultConfig = {
   singularLabel: string;
   pluralLabel: string;
   preprocess: (text: string) => string[];
-  renderItem?: (item: string, theme: Theme) => string;
 };
 
 export type ToolTextResult = {

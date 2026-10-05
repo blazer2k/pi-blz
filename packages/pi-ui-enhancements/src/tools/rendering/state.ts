@@ -14,14 +14,10 @@ export function getBlinkIndicator(): BlinkIndicator {
   }
 }
 
-export const BLINK_INDICATOR = getBlinkIndicator;
-
 export function getMaxExpandedEntries(): number {
   const value = getConfig().maxExpandedEntries;
   return value === -1 ? Infinity : value;
 }
-
-export const MAX_EXPANDED_ENTRIES = getMaxExpandedEntries;
 
 export function getCollapsedOutputDisplay(): "preview" | "summary" {
   return getConfig().collapsedOutputDisplay;

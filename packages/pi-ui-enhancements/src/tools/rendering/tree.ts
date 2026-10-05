@@ -81,8 +81,8 @@ export function formatExpandableCallText(
     : safeTruncateToWidth(options.collapsedText, width, options.ellipsis);
 }
 
-export function getCallText(theme: Theme, paddingX = 1): TreeText {
-  return new TreeText(paddingX, theme.fg("dim", "│  "));
+export function getCallText(theme: Theme): TreeText {
+  return new TreeText(theme.fg("dim", "│  "));
 }
 
 export function getCallRenderParts(
@@ -94,13 +94,12 @@ export function getCallRenderParts(
     invalidate: () => void;
   },
   renderOptions?: {
-    paddingX?: number;
     animate?: boolean;
     staticActive?: boolean;
   },
 ): { text: TreeText; prefix: string; isDone: boolean } {
   return {
-    text: getCallText(theme, renderOptions?.paddingX),
+    text: getCallText(theme),
     ...getCallPrefix(state, theme, toolContext, renderOptions),
   };
 }
@@ -122,7 +121,6 @@ export function getCallPrefix(
     renderOptions?.staticActive === true && !isDone && !isFullscreenTui();
   const animate = (renderOptions?.animate ?? true) && !staticActive;
   const blinkOn = animate ? isBlinkOn() : false;
-  state.blinkOn = blinkOn;
 
   updateBlinkTimer(state, animate && !isDone, toolContext.invalidate);
 
@@ -195,11 +193,8 @@ class TreeText extends Text {
   private renderedSource?: TreeTextSource;
   private renderedWidth?: number;
 
-  constructor(
-    private readonly horizontalPadding: number,
-    private readonly callContinuationPrefix?: string,
-  ) {
-    super("", horizontalPadding, 0);
+  constructor(private readonly callContinuationPrefix?: string) {
+    super("", 1, 0);
   }
 
   override setText(text: TreeTextSource, sourceComponent?: Component): void {
@@ -222,7 +217,7 @@ class TreeText extends Text {
       this.renderedSource !== this.sourceText ||
       this.renderedWidth !== width
     ) {
-      const contentWidth = Math.max(1, width - this.horizontalPadding * 2);
+      const contentWidth = Math.max(1, width - 2);
       const source =
         typeof this.sourceText === "function"
           ? this.sourceText(contentWidth)
@@ -247,14 +242,12 @@ export function getResultText(
   state: BaseRenderState,
   options: ToolRenderResultOptions,
   lastComponent: unknown,
-  renderOptions?: { paddingX?: number },
 ): TreeText {
-  const paddingX = renderOptions?.paddingX ?? 1;
   const previousText =
     lastComponent instanceof TreeText ? lastComponent : undefined;
   const text =
     state.expanded !== options.expanded || !previousText
-      ? new TreeText(paddingX)
+      ? new TreeText()
       : previousText;
 
   state.expanded = options.expanded;
