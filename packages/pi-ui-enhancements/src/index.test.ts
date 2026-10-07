@@ -192,6 +192,56 @@ describe("extension lifecycle", () => {
     expect(workingSet).toBe(false);
   });
 
+  it("native editor style registers no editor, footer, or custom Working lifecycle", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "pi-ui-native-editor-"));
+    const originalPath = process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH;
+    process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH = join(
+      directory,
+      "settings.json",
+    );
+    writeFileSync(
+      process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH,
+      JSON.stringify({ editorStyle: "native" }),
+    );
+    const pi = mkPi();
+    const calls: string[] = [];
+    try {
+      ext(pi);
+      await pi._handlers.session_start![0]!(
+        {},
+        mkCtx({
+          ui: {
+            setEditorComponent: () => calls.push("editor"),
+            getEditorComponent: () => {
+              throw new Error("Native mode must not take ownership");
+            },
+            setFooter: () => calls.push("footer"),
+            setWorkingIndicator: () => calls.push("working"),
+            setWorkingMessage: () => calls.push("message"),
+            setHeader() {},
+            setWidget() {},
+            setHiddenThinkingLabel() {},
+            notify() {},
+          } as unknown as ExtensionContext["ui"],
+        }),
+      );
+      expect(calls).toEqual([]);
+      expect(pi._handlers.agent_start).toBeUndefined();
+      expect(pi._handlers.agent_settled).toBeUndefined();
+      expect(pi._handlers.agent_end).toBeUndefined();
+      expect(pi._resolverCount()).toBe(1);
+      expect(pi._resolve("bash")?.renderShell).toBe("self");
+      await pi._handlers.session_shutdown![0]!({});
+      expect(calls).toEqual([]);
+    } finally {
+      if (originalPath === undefined)
+        delete process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH;
+      else process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH = originalPath;
+      rmSync(directory, { recursive: true, force: true });
+      loadConfig();
+    }
+  });
+
   it("session_start registers UI enhancements in TUI mode", () => {
     const pi = mkPi();
     ext(pi);

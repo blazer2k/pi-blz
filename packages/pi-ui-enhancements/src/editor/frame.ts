@@ -37,12 +37,17 @@ export function getRightBorderGlyph(
   return "│";
 }
 
-function buildTopLine(width: number, cwd: string, border: BorderFn): string {
+function buildTopLine(
+  width: number,
+  cwd: string,
+  border: BorderFn,
+  rounded: boolean,
+): string {
   const cwdBudget = Math.max(1, width - 5);
   const cwdDisplay = truncateToWidth(cwd, cwdBudget, "...");
   const topRight = ` ${border(cwdDisplay)} `;
   const topGap = Math.max(1, width - 3 - visibleWidth(topRight));
-  return `${border("╭")}${border("─".repeat(topGap))}${topRight}${border("─╮")}`;
+  return `${border(rounded ? "╭" : "─")}${border("─".repeat(topGap))}${topRight}${border(rounded ? "─╮" : "──")}`;
 }
 
 function getUsageParts(data: EditorFrameData, border: BorderFn): string[] {
@@ -81,22 +86,34 @@ function colorContextUsage(
   return border(data.pct);
 }
 
-function buildBottomLine(
-  width: number,
+function getBottomParts(
   data: EditorFrameData,
   theme: FooterTheme,
   border: BorderFn,
-): string {
+): { left: string; right: string } {
   const modelParts = [border(data.modelId)];
   if (data.thinkingLevel) {
     modelParts.push(border(`(${data.thinkingLevel})`));
   }
 
-  let bottomLeft = ` ${modelParts.join(" ")} `;
   const usageParts = getUsageParts(data, border);
   usageParts.push(colorContextUsage(data, theme, border));
-  let bottomRight = ` ${usageParts.join(" ")} `;
+  return {
+    left: ` ${modelParts.join(" ")} `,
+    right: ` ${usageParts.join(" ")} `,
+  };
+}
 
+function buildBottomLine(
+  width: number,
+  data: EditorFrameData,
+  theme: FooterTheme,
+  border: BorderFn,
+  rounded: boolean,
+): string {
+  const parts = getBottomParts(data, theme, border);
+  let bottomLeft = parts.left;
+  let bottomRight = parts.right;
   let leftWidth = visibleWidth(bottomLeft);
   let rightWidth = visibleWidth(bottomRight);
   const available = Math.max(1, width - 5);
@@ -118,7 +135,78 @@ function buildBottomLine(
   }
 
   const gapWidth = Math.max(1, width - 4 - leftWidth - rightWidth);
-  return `${border("╰─")}${bottomLeft}${border("─".repeat(gapWidth))}${bottomRight}${border("─╯")}`;
+  return `${border(rounded ? "╰─" : "──")}${bottomLeft}${border("─".repeat(gapWidth))}${bottomRight}${border(rounded ? "─╯" : "──")}`;
+}
+
+function buildScrollLine(
+  width: number,
+  left: string,
+  right: string,
+  direction: "↑" | "↓",
+  count: number,
+  border: BorderFn,
+): string {
+  if (width <= 0) return "";
+  let notice = ` ${direction} ${count} more `;
+  if (visibleWidth(notice) + 2 > width) notice = ` ${direction} ${count} `;
+  if (visibleWidth(notice) > width) notice = direction;
+  const noticeWidth = visibleWidth(notice);
+  const start = Math.floor((width - noticeWidth) / 2);
+  const leftBlock = truncateToWidth(
+    left ? border("──") + left : "",
+    Math.max(0, start - 1),
+    border("..."),
+  );
+  const rightBlock = truncateToWidth(
+    right ? right + border("──") : "",
+    Math.max(0, width - start - noticeWidth - 1),
+    border("..."),
+  );
+  return (
+    leftBlock +
+    border("─".repeat(start - visibleWidth(leftBlock))) +
+    border(notice) +
+    border("─".repeat(width - start - noticeWidth - visibleWidth(rightBlock))) +
+    rightBlock
+  );
+}
+
+export function buildCompactTopLine(
+  width: number,
+  cwd: string,
+  border: BorderFn,
+  hiddenLineCount: number,
+): string {
+  const line =
+    hiddenLineCount > 0
+      ? buildScrollLine(
+          width,
+          "",
+          ` ${border(cwd)} `,
+          "↑",
+          hiddenLineCount,
+          border,
+        )
+      : buildTopLine(width, cwd, border, false);
+  return truncateToWidth(line, Math.max(0, width), "");
+}
+
+export function buildCompactBottomLine(
+  width: number,
+  data: EditorFrameData,
+  theme: FooterTheme,
+  border: BorderFn,
+  hiddenLineCount: number,
+): string {
+  if (hiddenLineCount > 0) {
+    const { left, right } = getBottomParts(data, theme, border);
+    return buildScrollLine(width, left, right, "↓", hiddenLineCount, border);
+  }
+  return truncateToWidth(
+    buildBottomLine(width, data, theme, border, false),
+    Math.max(0, width),
+    "",
+  );
 }
 
 function frameInterior(
@@ -157,8 +245,8 @@ export function frameEditorLines(
 
   const { lines, scroll } = nativeLayout;
   const innerWidth = Math.max(1, width - 2);
-  lines[0] = buildTopLine(width, data.cwd, border);
-  lines.push(buildBottomLine(width, data, theme, border));
+  lines[0] = buildTopLine(width, data.cwd, border, true);
+  lines.push(buildBottomLine(width, data, theme, border, true));
   frameInterior(lines, width, innerWidth, border, scroll);
 
   return lines.map((line) => truncateToWidth(line, Math.max(0, width), ""));

@@ -2,6 +2,8 @@ import { describe, expect, it } from "bun:test";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import {
   type EditorFrameData,
+  buildCompactTopLine,
+  buildCompactBottomLine,
   frameEditorLines,
   formatStatusLine,
   getRightBorderGlyph,
@@ -162,6 +164,96 @@ describe("frameEditorLines", () => {
     expect(
       frameEditorLines(nativeLines, 20, frameData, footerTheme, plainBorder),
     ).toEqual(nativeLines);
+  });
+});
+
+describe("compact editor rules", () => {
+  it("keeps metadata in the existing positions without corners or side borders", () => {
+    expect(buildCompactTopLine(20, "/repo", plainBorder, 0)).toBe(
+      "─────────── /repo ──",
+    );
+    expect(
+      buildCompactBottomLine(20, frameData, footerTheme, plainBorder, 0),
+    ).toBe("── m ──────── 42% ──");
+  });
+
+  it("centers scroll notices and keeps metadata on either side", () => {
+    const top = buildCompactTopLine(80, "/repo (main)", plainBorder, 14);
+    const bottom = buildCompactBottomLine(
+      80,
+      frameData,
+      footerTheme,
+      plainBorder,
+      3,
+    );
+    expect(top.indexOf(" ↑ 14 more ")).toBe(
+      Math.floor((80 - " ↑ 14 more ".length) / 2),
+    );
+    expect(top).toContain(" /repo (main) ──");
+    expect(bottom.indexOf(" ↓ 3 more ")).toBe(
+      Math.floor((80 - " ↓ 3 more ".length) / 2),
+    );
+    expect(bottom.startsWith("── m ")).toBe(true);
+    expect(bottom.endsWith(" 42% ──")).toBe(true);
+  });
+
+  it("prioritizes notices over overflowing metadata and fits widths zero through 200", () => {
+    const border = (text: string) => `\x1b[2m${text}\x1b[0m`;
+    for (let width = 0; width <= 200; width++) {
+      const top = buildCompactTopLine(
+        width,
+        "界 long directory".repeat(10),
+        border,
+        14,
+      );
+      const bottom = buildCompactBottomLine(
+        width,
+        { ...frameData, modelId: "界 model".repeat(10) },
+        footerTheme,
+        border,
+        3,
+      );
+      expect(visibleWidth(top)).toBeLessThanOrEqual(width);
+      expect(visibleWidth(bottom)).toBeLessThanOrEqual(width);
+      if (width >= 13) {
+        expect(top).toContain(" ↑ 14 more ");
+        expect(bottom).toContain(" ↓ 3 more ");
+      } else if (width > 0) {
+        expect(top).toContain("↑");
+        expect(bottom).toContain("↓");
+      }
+    }
+  });
+
+  it("keeps optional usage values and context warning colors in the compact lower rule", () => {
+    const colors: string[] = [];
+    const bottom = buildCompactBottomLine(
+      120,
+      {
+        ...frameData,
+        thinkingLevel: "high",
+        inputTokens: 1_500,
+        outputTokens: 500,
+        cacheReadTokens: 2_000,
+        cacheWriteTokens: 3_000,
+        totalCost: 0.25,
+        showCacheTokens: true,
+        showCost: true,
+        pct: "95%",
+        pctValue: 95,
+      },
+      {
+        fg: (color, text) => {
+          colors.push(color);
+          return text;
+        },
+      },
+      plainBorder,
+      0,
+    );
+    expect(bottom).toContain("m (high)");
+    expect(bottom).toContain("↑1.5k ↓500 R2.0k W3.0k $0.25 95%");
+    expect(colors).toEqual(["error"]);
   });
 });
 

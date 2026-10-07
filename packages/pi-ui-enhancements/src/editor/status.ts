@@ -5,10 +5,10 @@ import { formatTokens, type SessionUsage } from "./usage";
 
 type EditorStatusConfig = Pick<
   Config,
-  | "roundedEditorShowBranch"
-  | "roundedEditorShowCacheTokens"
-  | "roundedEditorShowCost"
-  | "roundedEditorShowThinkingLevel"
+  | "editorShowBranch"
+  | "editorShowCacheTokens"
+  | "editorShowCost"
+  | "editorShowThinkingLevel"
 >;
 
 export type EditorStatusInput = {
@@ -29,7 +29,7 @@ function getVisibleThinkingLevel(
 ): string | null {
   const level = input.activeThinkingLevel;
   if (
-    !config.roundedEditorShowThinkingLevel ||
+    !config.editorShowThinkingLevel ||
     !input.modelSupportsReasoning ||
     !level ||
     level === "off" ||
@@ -51,7 +51,7 @@ export function buildEditorFrameData(
     input.contextPercent === null
       ? `?%/${contextWindow}`
       : `${input.contextPercent.toFixed(1)}%/${contextWindow}`;
-  const branch = config.roundedEditorShowBranch ? input.gitBranch : null;
+  const branch = config.editorShowBranch ? input.gitBranch : null;
   const cwd = branch
     ? `${shortenPath(input.cwd)} (${branch})`
     : shortenPath(input.cwd);
@@ -63,7 +63,7 @@ export function buildEditorFrameData(
     pct,
     pctValue: input.contextPercent,
     ...input.usage,
-    showCacheTokens: config.roundedEditorShowCacheTokens,
-    showCost: config.roundedEditorShowCost,
+    showCacheTokens: config.editorShowCacheTokens,
+    showCost: config.editorShowCost,
   };
 }

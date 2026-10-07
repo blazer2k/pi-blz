@@ -4,14 +4,23 @@ import {
   type ExtensionContext,
   type KeybindingsManager,
 } from "@earendil-works/pi-coding-agent";
-import type { EditorTheme, TUI } from "@earendil-works/pi-tui";
+import {
+  truncateToWidth,
+  type EditorTheme,
+  type TUI,
+} from "@earendil-works/pi-tui";
 import type { Config } from "../config/definition";
 import { getConfig } from "../config/store";
-import { frameEditorLines, type BorderFn } from "./frame";
+import {
+  buildCompactTopLine,
+  buildCompactBottomLine,
+  frameEditorLines,
+  type BorderFn,
+} from "./frame";
 import { buildEditorFrameData } from "./status";
 import type { SessionUsage } from "./usage";
 
-export class RoundedEditor extends CustomEditor {
+export class EnhancedEditor extends CustomEditor {
   constructor(
     tui: TUI,
     theme: EditorTheme,
@@ -20,8 +29,12 @@ export class RoundedEditor extends CustomEditor {
     private readonly pi: ExtensionAPI,
     private readonly getGitBranch: () => string | null,
     private readonly getCurrentUsage: () => SessionUsage,
+    private readonly style: Exclude<Config["editorStyle"], "native">,
   ) {
-    super(tui, theme, kb, { paddingX: 0 });
+    super(tui, theme, kb, {
+      paddingX: style === "rounded" ? 0 : 1,
+      embedWorkingStatus: false,
+    });
   }
 
   private buildFrameData(config: Config) {
@@ -41,7 +54,7 @@ export class RoundedEditor extends CustomEditor {
           supportedLevels[thinkingLevel] !== null,
         ),
         contextPercent: this.ctx.getContextUsage()?.percent ?? null,
-        gitBranch: config.roundedEditorShowBranch ? this.getGitBranch() : null,
+        gitBranch: config.editorShowBranch ? this.getGitBranch() : null,
         usage: this.getCurrentUsage(),
       },
       config,
@@ -53,7 +66,7 @@ export class RoundedEditor extends CustomEditor {
       return this.ctx.ui.theme.getBashModeBorderColor();
     }
 
-    const color = config.roundedEditorColor;
+    const color = config.editorColor;
     if (color === "thinking") {
       return this.ctx.ui.theme.getThinkingBorderColor(
         this.pi.getThinkingLevel() ?? "off",
@@ -63,8 +76,44 @@ export class RoundedEditor extends CustomEditor {
     return (text: string) => this.ctx.ui.theme.fg(color, text);
   }
 
+  protected override renderTopBorder(
+    width: number,
+    hiddenLineCount: number,
+  ): string {
+    if (this.style !== "compact")
+      return super.renderTopBorder(width, hiddenLineCount);
+    const config = getConfig();
+    return buildCompactTopLine(
+      width,
+      this.buildFrameData(config).cwd,
+      this.getBorder(config),
+      hiddenLineCount,
+    );
+  }
+
+  protected override renderBottomBorder(
+    width: number,
+    hiddenLineCount: number,
+  ): string {
+    if (this.style !== "compact")
+      return super.renderBottomBorder(width, hiddenLineCount);
+    const config = getConfig();
+    return buildCompactBottomLine(
+      width,
+      this.buildFrameData(config),
+      this.ctx.ui.theme,
+      this.getBorder(config),
+      hiddenLineCount,
+    );
+  }
+
   override render(width: number): string[] {
     const config = getConfig();
+    if (this.style === "compact") {
+      return super
+        .render(Math.max(1, width))
+        .map((line) => truncateToWidth(line, Math.max(0, width), ""));
+    }
     const lines = super.render(Math.max(1, width - 2));
     if (lines.length < 2) return lines;
 

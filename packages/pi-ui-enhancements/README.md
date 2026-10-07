@@ -9,8 +9,8 @@ Compact tool output and a configurable terminal interface for [pi](https://pi.de
 This extension adds:
 
 - A compact or enlarged Pi logo at session start, with the version below it. You can also keep Pi's own header or hide the header content.
-- A rounded editor border showing the working directory, git branch, model, token usage, and context percentage.
-- A shimmer animation on the "Working" label, with elapsed time and an interrupt hint.
+- Native, compact, or rounded editor styles. The custom styles show the working directory, git branch, model, token usage, and context percentage in their borders.
+- A shimmer animation on the "Working" label in compact and rounded styles, with elapsed time and an interrupt hint.
 - Compact tool output with tree-style lines and clickable paths when your terminal supports them. This also works with eligible third-party tools.
 - Optional capitalization of tool headers, enabled by default.
 
@@ -45,6 +45,8 @@ For example:
 {
   "headerMode": "compact",
   "headerAlign": "left",
+  "editorStyle": "compact",
+  "editorColor": "dim",
   "collapsedOutputDisplay": "summary",
   "maxExpandedEntries": 50
 }
@@ -63,11 +65,12 @@ For example:
 | `maxExpandedEntries`               | `20`        | `-1`, `10`, `20`, `50`, `100`; `-1` means unlimited           |
 | `collapsedOutputDisplay`           | `"preview"` | `"preview"`, `"summary"`                                      |
 | `showExpansionHint`                | `true`      | Boolean: show expand/collapse keybinding hints                |
-| `roundedEditorColor`               | `"dim"`     | `"thinking"`, `"dim"`, `"muted"`                              |
-| `roundedEditorShowThinkingLevel`   | `true`      | Boolean: show the thinking level                              |
-| `roundedEditorShowCacheTokens`     | `false`     | Boolean: show cache read/write token counts                   |
-| `roundedEditorShowCost`            | `false`     | Boolean: show total session cost                              |
-| `roundedEditorShowBranch`          | `true`      | Boolean: show the git branch                                  |
+| `editorStyle`                      | `"rounded"` | `"native"`, `"compact"`, `"rounded"`                          |
+| `editorColor`                      | `"dim"`     | `"thinking"`, `"dim"`, `"muted"`; custom styles only          |
+| `editorShowThinkingLevel`          | `true`      | Boolean: show the thinking level in custom styles             |
+| `editorShowCacheTokens`            | `false`     | Boolean: show cache read/write tokens in custom styles        |
+| `editorShowCost`                   | `true`      | Boolean: show total session cost in custom styles             |
+| `editorShowBranch`                 | `true`      | Boolean: show the git branch in custom styles                 |
 
 ## Header
 
@@ -82,6 +85,20 @@ For example:
 
 The logo uses Pi's coral, blue, and yellow colors in the terminal's color mode. In Apple Terminal, both custom modes show a colored `Pi` wordmark instead. The version remains below it.
 
+## Editor
+
+| `editorStyle` | Display                                                                                                                  |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `native`      | Pi's untouched editor, native footer, and Working indicator embedded in the upper rule.                                  |
+| `compact`     | Two horizontal rules with our metadata, no corners or side borders, and centered `↑ N more` / `↓ N more` scroll notices. |
+| `rounded`     | Rounded borders with our metadata and scroll arrows on the right edge.                                                   |
+
+In compact and rounded styles, the working directory and optional branch sit in the upper rule. The lower rule shows the model and optional thinking level on the left, with token usage, optional cost, and context usage on the right. Compact keeps native input layout and places autocomplete below the lower rule.
+
+`editorColor` and the `editorShow*` settings apply only to compact and rounded. The default color is `dim`; `thinking` follows Pi's thinking-level colors. Shell input uses Pi's Bash-mode color. High context usage retains warning and error colors.
+
+Compact and rounded use the separate shimmer Working indicator and a footer for extension status messages. `workingIndicatorShowInterruptMsg` and `workingIndicatorShowDuration` apply to those styles only. Native leaves Working and footer status messages to Pi.
+
 ## Built-in tool display
 
 The extension changes how read, write, edit, bash, ls, find, and grep look. Pi still runs the original tools and controls their arguments, source information, and availability. Your `defaultTools` setting and CLI options decide which tools are active; this extension does not enable them.
@@ -90,7 +107,7 @@ Tool calls and output fit the available terminal width and adjust when you resiz
 
 Expanded Bash and Write show their full content. Expanded list tools show the beginning and end of a list, with an omission marker between them. `maxExpandedEntries` controls that limit and also applies to generic custom-tool results.
 
-Unfinished indicators in expanded Bash, Write, and wrapped Codemode blink in fullscreen mode. In regular mode they stay dim and still, avoiding repeated redraws of terminal scrollback. Completed indicators stay still in both modes. These mode rules apply only to expanded calls, and work even when the rounded editor is disabled.
+Unfinished indicators in expanded Bash, Write, and wrapped Codemode blink in fullscreen mode. In regular mode they stay dim and still, avoiding repeated redraws of terminal scrollback. Completed indicators stay still in both modes. These mode rules apply only to expanded calls and work with every editor style.
 
 Bash duration is measured from execution events. Small extension-only records in the session file keep those durations available when you reopen a session or Pi rebuilds the conversation display. These records are not sent to the model and do not change tool results. Saved results with `details.durationMs` also remain supported.
 
@@ -147,9 +164,9 @@ Each loaded copy of this extension tracks and cleans up its own custom-tool time
 
 Pi allows one custom editor and one custom footer at a time. Extensions cannot automatically combine their editors or footers.
 
-This extension installs a `CustomEditor` subclass for each terminal session. Its footer shows extension-provided status messages that are not already in the editor border.
+In compact and rounded styles, this extension installs a `CustomEditor` subclass. Its footer shows extension-provided status messages. Native does not replace the editor or footer.
 
-On shutdown, it restores the previous editor only if its rounded editor is still active. An editor installed later by another extension is left alone. Editor selection follows extension load order, including after `/reload`.
+On shutdown, it restores the previous editor only if its custom editor is still active. An editor installed later by another extension is left alone. Editor selection follows extension load order, including after `/reload`.
 
 If another extension replaces the footer, Pi disposes this extension's footer. During shutdown, this extension clears the footer only if it still owns it.
 

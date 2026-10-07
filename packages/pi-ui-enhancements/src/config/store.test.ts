@@ -37,10 +37,16 @@ afterEach(() => {
 });
 
 describe("config validation", () => {
-  it("defaults to the compact left-aligned header", () => {
+  it("defaults to the compact left-aligned header and rounded dim editor", () => {
     expect(getDefaultConfig()).toMatchObject({
       headerMode: "compact",
       headerAlign: "left",
+      editorStyle: "rounded",
+      editorColor: "dim",
+      editorShowThinkingLevel: true,
+      editorShowCacheTokens: false,
+      editorShowCost: true,
+      editorShowBranch: true,
     });
     expect(getConfig()).toEqual(getDefaultConfig());
   });
@@ -55,7 +61,7 @@ describe("config validation", () => {
             headerMode: "unsupported",
             headerAlign: "center",
             maxExpandedEntries: 25,
-            roundedEditorShowCost: true,
+            editorShowCost: false,
           }),
         write(_path, contents) {
           normalized = contents;
@@ -66,7 +72,7 @@ describe("config validation", () => {
     expect(getConfig()).toEqual({
       ...getDefaultConfig(),
       headerAlign: "center",
-      roundedEditorShowCost: true,
+      editorShowCost: false,
     });
     expect(JSON.parse(normalized)).toEqual(getConfig());
   });
@@ -75,16 +81,16 @@ describe("config validation", () => {
     writeFileSync(
       process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH!,
       JSON.stringify({
-        roundedEditorShowBranch: false,
-        roundedEditorShowCost: true,
+        editorShowBranch: false,
+        editorShowCost: false,
         headerAlign: "center",
       }),
     );
     loadConfig();
     expect(getConfig()).toEqual({
       ...getDefaultConfig(),
-      roundedEditorShowBranch: false,
-      roundedEditorShowCost: true,
+      editorShowBranch: false,
+      editorShowCost: false,
       headerAlign: "center",
     });
   });
@@ -107,14 +113,34 @@ describe("config validation", () => {
     }
   });
 
+  it("accepts all editor styles and colors", () => {
+    for (const editorStyle of ["native", "compact", "rounded"] as const) {
+      for (const editorColor of ["thinking", "dim", "muted"] as const) {
+        loadConfig(
+          undefined,
+          createStorage({
+            read: () => JSON.stringify({ editorStyle, editorColor }),
+          }),
+        );
+        expect(getConfig()).toEqual({
+          ...getDefaultConfig(),
+          editorStyle,
+          editorColor,
+        });
+      }
+    }
+  });
+
   it("recovers invalid primitive and enum values", () => {
     loadConfig(
       undefined,
       createStorage({
         read: () =>
           JSON.stringify({
-            roundedEditorShowBranch: "false",
-            roundedEditorShowCost: 1,
+            editorShowBranch: "false",
+            editorShowCost: 1,
+            editorStyle: "unsupported",
+            editorColor: "unsupported",
             headerMode: false,
             headerAlign: "right",
             indicatorStyle: null,

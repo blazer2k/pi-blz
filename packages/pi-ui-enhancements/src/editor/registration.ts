@@ -3,21 +3,22 @@ import type {
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import type { Handle } from "../shared/handle";
-import { RoundedEditor } from "./component";
+import { getConfig } from "../config/store";
+import { EnhancedEditor } from "./component";
 import { formatStatusLine } from "./frame";
 import { getTotalUsage } from "./usage";
 
-type RoundedEditorRuntime = {
+type EditorRuntime = {
   invalidateUsage: (() => void) | null;
 };
 
-const runtimes = new WeakMap<ExtensionAPI, RoundedEditorRuntime>();
+const runtimes = new WeakMap<ExtensionAPI, EditorRuntime>();
 
-function getRuntime(pi: ExtensionAPI): RoundedEditorRuntime {
+function getRuntime(pi: ExtensionAPI): EditorRuntime {
   const existing = runtimes.get(pi);
   if (existing) return existing;
 
-  const runtime: RoundedEditorRuntime = { invalidateUsage: null };
+  const runtime: EditorRuntime = { invalidateUsage: null };
   const invalidateUsage = async () => runtime.invalidateUsage?.();
   pi.on("agent_end", invalidateUsage);
   pi.on("session_compact", invalidateUsage);
@@ -26,10 +27,13 @@ function getRuntime(pi: ExtensionAPI): RoundedEditorRuntime {
   return runtime;
 }
 
-export function registerRoundedEditor(
+export function registerEditor(
   pi: ExtensionAPI,
   ctx: ExtensionContext,
 ): Handle {
+  const style = getConfig().editorStyle;
+  if (style === "native") return { dispose() {} };
+
   const runtime = getRuntime(pi);
   let getGitBranch: () => string | null = () => null;
   let requestRender: (() => void) | null = null;
@@ -65,11 +69,11 @@ export function registerRoundedEditor(
   });
 
   const previousEditorFactory = ctx.ui.getEditorComponent();
-  const roundedEditorFactory: NonNullable<
+  const editorFactory: NonNullable<
     ReturnType<ExtensionContext["ui"]["getEditorComponent"]>
   > = (tui, theme, keybindings) => {
     requestRender = () => tui.requestRender();
-    return new RoundedEditor(
+    return new EnhancedEditor(
       tui,
       theme,
       keybindings,
@@ -77,10 +81,11 @@ export function registerRoundedEditor(
       pi,
       () => getGitBranch(),
       () => cachedUsage,
+      style,
     );
   };
 
-  ctx.ui.setEditorComponent(roundedEditorFactory);
+  ctx.ui.setEditorComponent(editorFactory);
 
   return {
     dispose() {
@@ -90,7 +95,7 @@ export function registerRoundedEditor(
         runtime.invalidateUsage = null;
       }
       requestRender = null;
-      if (ctx.ui.getEditorComponent() === roundedEditorFactory) {
+      if (ctx.ui.getEditorComponent() === editorFactory) {
         ctx.ui.setEditorComponent(previousEditorFactory);
       }
       if (footerOwned) {

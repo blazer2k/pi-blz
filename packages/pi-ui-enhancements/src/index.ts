@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 import { getConfig, loadConfig } from "./config/store";
-import { registerRoundedEditor } from "./editor/registration";
+import { registerEditor } from "./editor/registration";
 import { registerHeader } from "./header/header";
 import type { Handle } from "./shared/handle";
 import type { BashTiming } from "./tools/bash";
@@ -88,11 +88,13 @@ export default function (pi: ExtensionAPI) {
 
     if (ctx.mode === "tui") {
       uiHandles.push(registerTuiCapture(ctx));
-      uiHandles.push(
-        registerHeader(ctx),
-        registerRoundedEditor(pi, ctx),
-        registerWorkingIndicator(pi, ctx),
-      );
+      uiHandles.push(registerHeader(ctx));
+      if (getConfig().editorStyle !== "native") {
+        uiHandles.push(
+          registerEditor(pi, ctx),
+          registerWorkingIndicator(pi, ctx),
+        );
+      }
       ctx.ui.setHiddenThinkingLabel("(think)");
       uiHandles.push({
         dispose() {

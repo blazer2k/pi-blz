@@ -34,14 +34,14 @@ describe("buildEditorFrameData", () => {
       cacheWriteTokens: 100,
       totalCost: 0.25,
       showCacheTokens: false,
-      showCost: false,
+      showCost: true,
     });
   });
 
   it("hides unsupported thinking and optional branch data", () => {
     const config = {
       ...getDefaultConfig(),
-      roundedEditorShowBranch: false,
+      editorShowBranch: false,
     };
     const data = buildEditorFrameData(
       {

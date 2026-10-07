@@ -10,6 +10,9 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import {
   createAgentSession,
+  CustomEditor,
+  FooterComponent,
+  InteractiveMode,
   createCodemodeExtension,
   createMcpExtension,
   initTheme,
@@ -24,6 +27,7 @@ import {
   type ExtensionFactory,
   type ExtensionToolContext,
   type ExtensionUIContext,
+  type KeybindingsManager,
   type ToolRenderers,
 } from "@earendil-works/pi-coding-agent";
 import type { ToolResultMessage } from "@earendil-works/pi-ai";
@@ -31,6 +35,7 @@ import {
   getCapabilities,
   isAppleTerminalSession,
   Image,
+  Container,
   setCapabilities,
   Text,
   type Component,
@@ -232,7 +237,7 @@ describe("public renderer integration", () => {
       indicatorStyle: "diamond",
       headerMode: "large",
       headerAlign: "center",
-      roundedEditorColor: "muted",
+      editorColor: "muted",
     } as const;
     writeFileSync(
       process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH!,
@@ -280,6 +285,199 @@ describe("public renderer integration", () => {
     }
     expect(errors).toEqual([]);
     expect(createTransport).not.toHaveBeenCalled();
+  });
+
+  it("reloads all editor styles with real Pi editor/footer setters and native embedded Working", async () => {
+    const { session, createTransport } = await createSession(true);
+    const errors: unknown[] = [];
+    const statuses = new Map([["offline", "offline status"]]);
+    let branchSubscriptions = 0;
+    const footerData = {
+      getGitBranch: () => "main",
+      getExtensionStatuses: () => statuses,
+      getAvailableProviderCount: () => 1,
+      onBranchChange() {
+        branchSubscriptions++;
+        return () => {
+          branchSubscriptions--;
+        };
+      },
+    } as ConstructorParameters<typeof FooterComponent>[1];
+    const tui = {
+      terminal: { rows: 24 },
+      requestRender() {},
+      setFocus() {},
+      getClearOnShrink: () => false,
+    } as unknown as TUI;
+    const editorTheme = {
+      borderColor: (text: string) => text,
+      selectList: {},
+    } as ConstructorParameters<typeof CustomEditor>[1];
+    const keybindings = {
+      matches: () => false,
+    } as unknown as KeybindingsManager;
+    const native = new CustomEditor(tui, editorTheme, keybindings, {
+      paddingX: 2,
+      autocompleteMaxVisible: 7,
+      embedWorkingStatus: true,
+    });
+    native.setText("draft 界 input");
+    const nativeFooter = new FooterComponent(session, footerData);
+    const host = Object.assign(Object.create(InteractiveMode.prototype), {
+      ui: tui,
+      runtimeHost: { session },
+      defaultEditor: native,
+      editor: native,
+      editorContainer: new Container(),
+      footerContainer: new Container(),
+      statusContainer: new Container(),
+      footer: nativeFooter,
+      footerDataProvider: footerData,
+      options: { tuiMode: "regular" },
+      defaultWorkingMessage: "Native Working",
+      disposeActiveSelector() {},
+    });
+    host.editorContainer.addChild(native);
+    host.footerContainer.addChild(nativeFooter);
+    const workingOptions: Array<
+      Parameters<ExtensionUIContext["setWorkingIndicator"]>[0]
+    > = [];
+    const uiContext = {
+      theme: { ...mkTheme(), getColorMode: () => "256color" },
+      setHeader() {},
+      setWidget() {},
+      setHiddenThinkingLabel() {},
+      setEditorComponent: (
+        factory: Parameters<ExtensionUIContext["setEditorComponent"]>[0],
+      ) => host.setCustomEditorComponent(factory),
+      getEditorComponent: () => host.editorComponentFactory,
+      setFooter: (factory: Parameters<ExtensionUIContext["setFooter"]>[0]) =>
+        host.setExtensionFooter(factory),
+      setWorkingIndicator(
+        options: Parameters<ExtensionUIContext["setWorkingIndicator"]>[0],
+      ) {
+        workingOptions.push(options);
+        host.setWorkingIndicator(options);
+      },
+      setWorkingMessage(message?: string) {
+        host.workingMessage = message;
+        host.activeStatusIndicator?.setMessage(
+          message ?? host.defaultWorkingMessage,
+        );
+      },
+      notify: (message: string) => errors.push(message),
+    } as unknown as ExtensionUIContext;
+    await session.bindExtensions({
+      mode: "tui",
+      uiContext,
+      onError: (error) => errors.push(error),
+    });
+    const inventory = session.getAllTools().map((tool) => tool.name);
+    const active = session.getActiveToolNames();
+    const nativeFooterLines = nativeFooter.render(120);
+    try {
+      for (const editorStyle of [
+        "rounded",
+        "compact",
+        "native",
+        "rounded",
+        "native",
+        "compact",
+      ] as const) {
+        const beforeEditor = host.editor;
+        const beforeConfig = getConfig();
+        writeFileSync(
+          process.env.PI_UI_ENHANCEMENTS_CONFIG_PATH!,
+          JSON.stringify({
+            ...beforeConfig,
+            editorStyle,
+            editorColor: "muted",
+            editorShowThinkingLevel: false,
+            editorShowCacheTokens: false,
+            editorShowCost: false,
+            editorShowBranch: false,
+            workingIndicatorShowDuration: false,
+            workingIndicatorShowInterruptMsg: false,
+          }),
+        );
+        expect(host.editor).toBe(beforeEditor);
+        expect(getConfig()).toEqual(beforeConfig);
+        await session.reload();
+        expect(errors).toEqual([]);
+        expect(getConfig().editorStyle).toBe(editorStyle);
+        expect(host.editor.getText()).toBe("draft 界 input");
+        expect(host.editor.getPaddingX()).toBe(2);
+        expect(host.editor.getAutocompleteMaxVisible()).toBe(7);
+        expect(session.getAllTools().map((tool) => tool.name)).toEqual(
+          inventory,
+        );
+        expect(session.getActiveToolNames()).toEqual(active);
+        expect(branchSubscriptions).toBe(editorStyle === "native" ? 0 : 1);
+        if (editorStyle === "native") {
+          expect(host.editor).toBe(native);
+          expect(host.editor.embedWorkingStatus).toBe(true);
+          expect(host.customFooter).toBeUndefined();
+          expect(host.footerContainer.render(120)).toEqual(nativeFooterLines);
+          expect(
+            host.footerContainer.render(120).map(stripAnsi).join("\n"),
+          ).toContain("(main)");
+          expect(host.footerContainer.render(80).map(stripAnsi).at(-1)).toBe(
+            "offline status",
+          );
+          expect(host.workingIndicatorOptions).toBeUndefined();
+        } else {
+          expect(host.editor).not.toBe(native);
+          expect(host.editor.embedWorkingStatus).toBe(false);
+          expect(host.footerContainer.render(80).map(stripAnsi)).toEqual([
+            "",
+            "offline status",
+          ]);
+          const rows = host.editor.render(120).map(stripAnsi);
+          expect(rows[0]).toContain(directory);
+          expect(rows[0]).not.toContain("(main)");
+          expect(rows[0]!.startsWith("╭")).toBe(editorStyle === "rounded");
+          expect(rows.at(-1)!.startsWith("╰─")).toBe(editorStyle === "rounded");
+          if (editorStyle === "compact")
+            expect(rows.join("\n")).not.toMatch(/[╭╮╰╯│]/u);
+        }
+        host.showWorkingStatusIndicator();
+        const count = workingOptions.length;
+        await session.extensionRunner.emit({ type: "agent_start" });
+        expect(errors).toEqual([]);
+        if (editorStyle === "native") {
+          expect(workingOptions).toHaveLength(count);
+          expect(host.statusContainer.children).toHaveLength(0);
+          expect(stripAnsi(host.editor.render(80)[0]!)).toContain(
+            "Native Working",
+          );
+        } else {
+          expect(host.statusContainer.children).toHaveLength(1);
+          expect(stripAnsi(host.editor.render(80)[0]!)).not.toContain(
+            "Working",
+          );
+          expect(stripAnsi(host.workingIndicatorOptions.frames[0])).toBe(
+            "Working",
+          );
+        }
+      }
+      const replacement = () => new CustomEditor(tui, editorTheme, keybindings);
+      host.setCustomEditorComponent(replacement);
+      host.setExtensionFooter(() => new Text("other footer", 0, 0));
+      await session.extensionRunner.emit({
+        type: "session_shutdown",
+        reason: "reload",
+      });
+      expect(host.editorComponentFactory).toBe(replacement);
+      expect(host.footerContainer.render(80)).toEqual([
+        "other footer".padEnd(80),
+      ]);
+      expect(branchSubscriptions).toBe(0);
+      expect(errors).toEqual([]);
+      expect(createTransport).not.toHaveBeenCalled();
+    } finally {
+      host.clearStatusIndicator();
+      nativeFooter.dispose();
+    }
   });
 
   it("composes real extension resolvers around the enhancement without taking over self-owned shells", async () => {

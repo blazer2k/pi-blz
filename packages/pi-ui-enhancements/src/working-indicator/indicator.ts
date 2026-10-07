@@ -232,7 +232,7 @@ export function registerWorkingIndicator(
         runtime.current = null;
       }
       stopAnimation();
-      ctx.ui.setWorkingMessage("");
+      ctx.ui.setWorkingMessage();
       ctx.ui.setWorkingIndicator();
     },
   };

@@ -17,11 +17,12 @@ const DEFAULT_CONFIG: Config = {
   maxExpandedEntries: 20,
   collapsedOutputDisplay: "preview",
   showExpansionHint: true,
-  roundedEditorColor: "dim",
-  roundedEditorShowThinkingLevel: true,
-  roundedEditorShowCacheTokens: false,
-  roundedEditorShowCost: false,
-  roundedEditorShowBranch: true,
+  editorStyle: "rounded",
+  editorColor: "dim",
+  editorShowThinkingLevel: true,
+  editorShowCacheTokens: false,
+  editorShowCost: true,
+  editorShowBranch: true,
 };
 
 const ConfigSchema = Type.Object(
@@ -59,15 +60,20 @@ const ConfigSchema = Type.Object(
       Type.Literal("summary"),
     ]),
     showExpansionHint: Type.Boolean(),
-    roundedEditorColor: Type.Union([
+    editorStyle: Type.Union([
+      Type.Literal("native"),
+      Type.Literal("compact"),
+      Type.Literal("rounded"),
+    ]),
+    editorColor: Type.Union([
       Type.Literal("thinking"),
       Type.Literal("dim"),
       Type.Literal("muted"),
     ]),
-    roundedEditorShowThinkingLevel: Type.Boolean(),
-    roundedEditorShowCacheTokens: Type.Boolean(),
-    roundedEditorShowCost: Type.Boolean(),
-    roundedEditorShowBranch: Type.Boolean(),
+    editorShowThinkingLevel: Type.Boolean(),
+    editorShowCacheTokens: Type.Boolean(),
+    editorShowCost: Type.Boolean(),
+    editorShowBranch: Type.Boolean(),
   },
   { additionalProperties: false },
 );
