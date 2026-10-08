@@ -163,7 +163,7 @@ describe("tree-aware text wrapping", () => {
   it("keeps dotted prefixes on wrapped omission rows", () => {
     const text = getResultText({}, optsExpanded, undefined);
     text.setText(
-      "├─ took 562ms • ctrl+o to expand\n┊  +12345678901234567890 lines\n│  visible tail line\n╰─ last line",
+      "├─ took 562ms · ctrl+o to expand\n┊  +12345678901234567890 lines\n│  visible tail line\n╰─ last line",
     );
 
     const lines = text

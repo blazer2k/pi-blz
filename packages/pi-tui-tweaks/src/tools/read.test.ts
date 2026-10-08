@@ -175,7 +175,7 @@ describe("read renderResult", () => {
       mkToolCtx(),
     );
 
-    expect(component.render(120).join("\n")).toContain("truncated • 2 lines");
+    expect(component.render(120).join("\n")).toContain("truncated · 2 lines");
   });
 
   it("does not strip ordinary bracketed file content", () => {

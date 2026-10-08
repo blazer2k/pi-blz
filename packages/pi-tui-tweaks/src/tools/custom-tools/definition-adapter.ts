@@ -211,7 +211,7 @@ function createResultRenderer(
         });
         if (state.truncated) {
           const status = buildResultStatusParts(state, theme).join(
-            theme.fg("muted", " • "),
+            theme.fg("muted", " · "),
           );
           renderedLines.unshift(theme.fg("dim", "├─ ") + status);
         }

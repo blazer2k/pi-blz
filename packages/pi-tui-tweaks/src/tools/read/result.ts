@@ -70,7 +70,7 @@ export function formatReadResult(
     );
   } else if (imageMarker) {
     metadataParts.push(theme.fg("warning", "Image unavailable"));
-    const summary = metadataParts.join(theme.fg("muted", " • ")) + callHint;
+    const summary = metadataParts.join(theme.fg("muted", " · ")) + callHint;
     if (!imageMarker.reason) return theme.fg("dim", "╰─ ") + summary;
 
     const reason = formatTreeLine(imageMarker.reason, {
@@ -92,7 +92,7 @@ export function formatReadResult(
 
   return (
     theme.fg("dim", "╰─ ") +
-    metadataParts.join(theme.fg("muted", " • ")) +
+    metadataParts.join(theme.fg("muted", " · ")) +
     callHint
   );
 }

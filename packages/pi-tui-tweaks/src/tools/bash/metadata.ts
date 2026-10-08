@@ -36,7 +36,7 @@ export function buildBashMetadataParts(
 }
 
 export function joinMetadata(parts: string[], theme: Theme): string {
-  return parts.join(theme.fg("muted", " • "));
+  return parts.join(theme.fg("muted", " · "));
 }
 
 export function getDurationSummary(

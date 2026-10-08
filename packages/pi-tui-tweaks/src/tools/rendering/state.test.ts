@@ -63,16 +63,16 @@ describe("result status rendering", () => {
 });
 
 describe("buildExpansionHint", () => {
-  it("returns a bullet-prefixed expand hint without parens", () => {
+  it("returns a middle-dot-prefixed expand hint without parens", () => {
     const hint = buildExpansionHint(mkTheme(), "expand");
-    expect(hint).toStartWith(" • ");
+    expect(hint).toStartWith(" · ");
     expect(hint).toContain("to expand");
     expect(hint).not.toContain("(");
   });
 
-  it("returns a bullet-prefixed collapse hint without parens", () => {
+  it("returns a middle-dot-prefixed collapse hint without parens", () => {
     const hint = buildExpansionHint(mkTheme(), "collapse");
-    expect(hint).toStartWith(" • ");
+    expect(hint).toStartWith(" · ");
     expect(hint).toContain("to collapse");
     expect(hint).not.toContain("(");
   });

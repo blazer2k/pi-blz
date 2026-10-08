@@ -154,7 +154,7 @@ describe("Codemode output", () => {
     const { text } = render(result("one\ntwo"));
     expect(text).not.toContain("one");
     expect(text).not.toContain("two");
-    expect(text).toContain("2 lines");
+    expect(text).toContain("╰─ took 1.2s · 2 lines · ");
     expect(text).toContain("to expand");
   });
 

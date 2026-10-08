@@ -161,7 +161,7 @@ function formatWriteResult(
   const summary = `${lines} ${lines === 1 ? "line" : "lines"}`;
   const metadataParts = buildResultStatusParts(state, theme);
   metadataParts.push(theme.fg("muted", summary));
-  const metadata = metadataParts.join(theme.fg("muted", " • "));
+  const metadata = metadataParts.join(theme.fg("muted", " · "));
 
   if (lines === 0) {
     return theme.fg("dim", "╰─ ") + metadata + hint;

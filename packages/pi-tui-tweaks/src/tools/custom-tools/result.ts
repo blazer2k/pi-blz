@@ -33,7 +33,7 @@ export function buildGenericResult(
     const metadataParts = buildResultStatusParts(state, theme);
     metadataParts.push(theme.fg("muted", "(no output)"));
     return (
-      theme.fg("dim", "╰─ ") + metadataParts.join(theme.fg("muted", " • "))
+      theme.fg("dim", "╰─ ") + metadataParts.join(theme.fg("muted", " · "))
     );
   }
 
@@ -43,7 +43,7 @@ export function buildGenericResult(
   metadataParts.push(
     theme.fg("muted", `${total} ${total === 1 ? "line" : "lines"}`),
   );
-  const metadata = metadataParts.join(theme.fg("muted", " • "));
+  const metadata = metadataParts.join(theme.fg("muted", " · "));
 
   if (!options.expanded) return theme.fg("dim", "╰─ ") + metadata;
 

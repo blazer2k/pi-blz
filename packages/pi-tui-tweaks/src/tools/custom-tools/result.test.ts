@@ -22,7 +22,7 @@ function render(
 
 describe("buildGenericResult", () => {
   it("renders empty and truncated metadata together", () => {
-    expect(render("", { truncated: true })).toBe("╰─ truncated • (no output)");
+    expect(render("", { truncated: true })).toBe("╰─ truncated · (no output)");
   });
 
   it("summarizes collapsed output", () => {

@@ -14,6 +14,8 @@ import {
   type Color as ThemeColor,
 } from "@earendil-works/pi-tui";
 import { assembleRunDuration, registerWorkingIndicator } from "./indicator";
+import { getConfig } from "../config/store";
+import { setTestConfig } from "../testing/helpers";
 
 function mkIndicatorHarness(colors?: {
   muted: ThemeColor;
@@ -77,7 +79,25 @@ function installFakeClock(initialTime = 10_000) {
   };
 }
 
-describe("working indicator colors", () => {
+describe("working indicator rendering", () => {
+  it("separates duration and interrupt metadata with a middle dot", () => {
+    const previous = getConfig();
+    const clock = installFakeClock();
+    setTestConfig({
+      workingIndicator: { showDuration: true, showInterruptHint: true },
+    });
+    const { pi, ctx, handlers, getLastFrames } = mkIndicatorHarness();
+    const handle = registerWorkingIndicator(pi, ctx);
+    try {
+      handlers.agent_start![0]!();
+      expect(getLastFrames()![0]).toBe("Working (0s · esc to interrupt)");
+    } finally {
+      handle.dispose();
+      clock.restore();
+      setTestConfig(previous);
+    }
+  });
+
   for (const [name, ansi] of [
     ["terminal-default", "\x1b[39m"],
     ["faint", "\x1b[38;2;40;50;60m\x1b[2m"],

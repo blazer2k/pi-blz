@@ -63,7 +63,7 @@ function formatEditResult(
     metadataParts.push(theme.fg("muted", "no diff"));
     return (
       theme.fg("dim", "╰─ ") +
-      metadataParts.join(theme.fg("muted", " • ")) +
+      metadataParts.join(theme.fg("muted", " · ")) +
       buildToolExpansionHint(theme, state, options, false)
     );
   }
@@ -79,7 +79,7 @@ function formatEditResult(
 
   const stats = parts.join(" ");
   if (stats) metadataParts.push(stats);
-  const metadata = metadataParts.join(theme.fg("muted", " • "));
+  const metadata = metadataParts.join(theme.fg("muted", " · "));
   const hint = buildToolExpansionHint(
     theme,
     state,

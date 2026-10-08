@@ -129,7 +129,7 @@ describe("built-in tool output", () => {
       " ● Write notes.txt",
       " │  alpha",
       " │  beta",
-      " ╰─ 2 lines • ctrl+o to collapse",
+      " ╰─ 2 lines · ctrl+o to collapse",
     ]);
   });
 
@@ -152,7 +152,7 @@ describe("built-in tool output", () => {
           },
         },
       ),
-    ).toEqual([" ● Edit src/a.ts", " ╰─ +1 -1 • ctrl+o to expand"]);
+    ).toEqual([" ● Edit src/a.ts", " ╰─ +1 -1 · ctrl+o to expand"]);
   });
 
   it("pins expanded list output", () => {
@@ -171,7 +171,7 @@ describe("built-in tool output", () => {
       " │  src/a.ts",
       " │  src/b.ts",
       " │  src/c.ts",
-      " ╰─ 3 files • ctrl+o to collapse",
+      " ╰─ 3 files · ctrl+o to collapse",
     ]);
   });
 });

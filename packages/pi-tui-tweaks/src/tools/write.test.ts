@@ -177,7 +177,7 @@ describe("write renderResult", () => {
         ctx,
       );
 
-      expect(component.render(120).join("\n")).toContain("truncated • 2 lines");
+      expect(component.render(120).join("\n")).toContain("truncated · 2 lines");
     }
   });
 

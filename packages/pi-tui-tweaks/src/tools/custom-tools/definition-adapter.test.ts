@@ -300,7 +300,7 @@ describe("custom renderer adapters", () => {
           mkToolCtx({ expanded }),
         ),
       );
-      expect(output.trim()).toBe("╰─ truncated • (no output)");
+      expect(output.trim()).toBe("╰─ truncated · (no output)");
     }
   });
 
@@ -386,7 +386,7 @@ describe("custom renderer adapters", () => {
     );
     expect(output).toContain("truncated");
     expect(output).toContain("failure details");
-    expect(output).not.toContain("error •");
+    expect(output).not.toContain("error ·");
     expect(state.truncated).toBe(true);
   });
 
@@ -400,7 +400,7 @@ describe("custom renderer adapters", () => {
         mkToolCtx({ state: { _tuiTweaks: state } }),
       ),
     );
-    expect(output).toContain("truncated • 2 lines");
+    expect(output).toContain("truncated · 2 lines");
     expect(state.truncated).toBe(true);
   });
 

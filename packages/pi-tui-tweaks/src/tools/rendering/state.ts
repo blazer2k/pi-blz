@@ -123,7 +123,7 @@ export function buildExpansionHint(
 ): string {
   if (!getConfig().tools.showExpansionHint) return "";
 
-  const separator = placement === "suffix" ? theme.fg("muted", " • ") : "";
+  const separator = placement === "suffix" ? theme.fg("muted", " · ") : "";
   const shortcut = theme.fg("dim", keyText("app.tools.expand"));
   const description = theme.fg(
     "dim",

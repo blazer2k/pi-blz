@@ -396,7 +396,7 @@ describe("bash renderResult", () => {
     );
 
     const output = component.render(120).join("\n");
-    expect(output).toContain("took 50ms • truncated");
+    expect(output).toContain("took 50ms · truncated");
   });
 
   it("omits error metadata from single-line and expanded errors", () => {
@@ -419,8 +419,8 @@ describe("bash renderResult", () => {
       );
 
       const output = component.render(120).join("\n");
-      expect(output).toContain("took 50ms • truncated");
-      expect(output).not.toContain("error •");
+      expect(output).toContain("took 50ms · truncated");
+      expect(output).not.toContain("error ·");
     }
   });
 
@@ -559,7 +559,7 @@ describe("bash renderResult", () => {
       .join("\n");
 
     expect(output).not.toContain("│  one");
-    expect(output).toContain("╰─ took 50ms • 3 lines");
+    expect(output).toContain("╰─ took 50ms · 3 lines");
     expect(output).toContain("to expand");
   });
 
@@ -589,7 +589,7 @@ describe("bash renderResult", () => {
     const lines = output.split("\n");
 
     expect(lines.at(-2)).toContain(`├─ ${PI_0_84_3_OUTPUT.bash.exited}`);
-    expect(lines.at(-1)).toContain("╰─ took 50ms • 3 lines");
+    expect(lines.at(-1)).toContain("╰─ took 50ms · 3 lines");
     expect(lines.at(-1)).toContain("to expand");
   });
 
@@ -805,9 +805,9 @@ describe("bash renderResult", () => {
       .render(120)
       .join("\n");
 
-    expect(short).toContain("╰─ took 12ms • (no output)");
+    expect(short).toContain("╰─ took 12ms · (no output)");
     expect(short).not.toContain("ctrl+o");
-    expect(longCall).toContain("(no output) • ");
+    expect(longCall).toContain("(no output) · ");
     expect(longCall).toContain("to expand");
   });
 
@@ -972,8 +972,8 @@ describe("bash renderResult", () => {
     );
 
     const output = component.render(120).join("\n");
-    expect(output).toContain("took 123ms • truncated");
-    expect(output).not.toContain("error •");
+    expect(output).toContain("took 123ms · truncated");
+    expect(output).not.toContain("error ·");
     expect(output).toContain("│  line1");
     expect(output).not.toContain("│  line2");
     expect(output).not.toContain("│  line7");
@@ -981,7 +981,7 @@ describe("bash renderResult", () => {
     expect(output).toContain("┊  +6 lines");
     const lines = output.split("\n");
     expect(lines.at(-2)).toContain("├─ Command exited with code 2");
-    expect(lines.at(-1)).toContain("╰─ took 123ms • truncated");
+    expect(lines.at(-1)).toContain("╰─ took 123ms · truncated");
   });
 });
 

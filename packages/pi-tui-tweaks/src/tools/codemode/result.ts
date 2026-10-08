@@ -135,7 +135,7 @@ export function formatCodemodeResult(
   if (hint) metadata.push(hint);
   if (metadata.length)
     lines.push(
-      theme.fg("dim", "╰─ ") + metadata.join(theme.fg("muted", " • ")),
+      theme.fg("dim", "╰─ ") + metadata.join(theme.fg("muted", " · ")),
     );
   return lines.join("\n");
 }

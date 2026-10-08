@@ -71,11 +71,11 @@ export function formatSimpleErrorResult(
   width: number,
 ): string {
   const status = state.truncated
-    ? buildResultStatusParts(state, theme).join(theme.fg("muted", " • "))
+    ? buildResultStatusParts(state, theme).join(theme.fg("muted", " · "))
     : "";
   const errorWidth = Math.max(
     1,
-    width - 3 - visibleWidth(status ? status + " • " : ""),
+    width - 3 - visibleWidth(status ? status + " · " : ""),
   );
   const collapsedBody = formatErrorBody(
     textContent,
@@ -133,7 +133,7 @@ export function formatSimpleErrorResult(
     theme.fg("dim", "╰─ ") +
     status +
     (hasErrorBody
-      ? theme.fg("muted", " • ") + theme.fg("error", bodyText)
+      ? theme.fg("muted", " · ") + theme.fg("error", bodyText)
       : "") +
     suffix
   );
@@ -163,7 +163,7 @@ export function formatListResult(
     emptyParts.push(theme.fg("muted", config.emptyMessage));
     return (
       theme.fg("dim", "╰─ ") +
-      emptyParts.join(theme.fg("muted", " • ")) +
+      emptyParts.join(theme.fg("muted", " · ")) +
       buildToolExpansionHint(theme, state, options, false)
     );
   }
@@ -173,7 +173,7 @@ export function formatListResult(
   const label = total === 1 ? config.singularLabel : config.pluralLabel;
   const summaryParts = buildResultStatusParts(state, theme);
   summaryParts.push(theme.fg("muted", `${total} ${label}`));
-  const summary = summaryParts.join(theme.fg("muted", " • "));
+  const summary = summaryParts.join(theme.fg("muted", " · "));
 
   if (!options.expanded) {
     return (

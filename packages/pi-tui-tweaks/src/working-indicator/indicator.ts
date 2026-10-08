@@ -148,7 +148,7 @@ export function registerWorkingIndicator(
     const frames = [
       shimmered +
         (suffixParts.length > 0
-          ? ctx.ui.theme.fg("dim", ` (${suffixParts.join(" • ")})`)
+          ? ctx.ui.theme.fg("dim", ` (${suffixParts.join(" · ")})`)
           : ""),
     ];
 
