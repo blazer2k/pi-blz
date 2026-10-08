@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import {
   VERSION,
   type ExtensionContext,
+  type QuietStartup,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
 import {
@@ -34,7 +35,7 @@ type HeaderFactory = NonNullable<
   Parameters<ExtensionContext["ui"]["setHeader"]>[0]
 >;
 
-function headerContext() {
+function headerContext(quietStartup?: QuietStartup) {
   let current: HeaderComponent | undefined;
   const calls: Array<HeaderFactory | undefined> = [];
   const ctx = {
@@ -46,7 +47,8 @@ function headerContext() {
       },
     },
   } as unknown as ExtensionContext;
-  return { ctx, calls, current: () => current };
+  const pi = { getSettings: () => ({ quietStartup }) };
+  return { pi, ctx, calls, current: () => current };
 }
 
 describe("buildHeader", () => {
@@ -185,11 +187,45 @@ describe("buildHeader", () => {
 });
 
 describe("registerHeader", () => {
+  it("respects quiet startup and the native verbose flag in every header mode", () => {
+    const argv = process.argv;
+    try {
+      for (const headerMode of ["native", "compact", "large", "off"] as const) {
+        for (const [quietStartup, args, visible] of [
+          [undefined, [], true],
+          [false, [], true],
+          ["header", [], true],
+          [true, [], false],
+          [true, ["--verbose"], true],
+          [true, ["--", "--verbose"], false],
+          [true, ["--append-system-prompt", "--verbose"], false],
+        ] as const) {
+          process.argv = [...argv.slice(0, 2), ...args];
+          setTestConfig({ headerMode });
+          const fixture = headerContext(quietStartup);
+          const handle = registerHeader(fixture.pi, fixture.ctx);
+          if (headerMode === "native") expect(fixture.calls).toEqual([]);
+          else {
+            const output = fixture.current()!.render(80);
+            if (visible && headerMode !== "off")
+              expect(output.join("\n")).toContain(`v${VERSION}`);
+            else expect(output).toEqual([]);
+          }
+          handle.dispose();
+          handle.dispose();
+          expect(fixture.calls).toHaveLength(headerMode === "native" ? 0 : 2);
+        }
+      }
+    } finally {
+      process.argv = argv;
+    }
+  });
+
   it("makes no header calls in native mode, including cleanup", () => {
     for (const headerAlign of ["left", "center"] as const) {
       setTestConfig({ headerMode: "native", headerAlign });
       const fixture = headerContext();
-      const handle = registerHeader(fixture.ctx);
+      const handle = registerHeader(fixture.pi, fixture.ctx);
       handle.dispose();
       handle.dispose();
       expect(fixture.calls).toEqual([]);
@@ -199,7 +235,7 @@ describe("registerHeader", () => {
   it("installs an empty component for off and restores native once on cleanup", () => {
     setTestConfig({ headerMode: "off" });
     const fixture = headerContext();
-    const handle = registerHeader(fixture.ctx);
+    const handle = registerHeader(fixture.pi, fixture.ctx);
     expect(fixture.calls[0]).toBeFunction();
     expect(fixture.current()!.render(80)).toEqual([]);
     handle.dispose();
@@ -211,12 +247,12 @@ describe("registerHeader", () => {
   it("retains loaded settings until reinstall and leaves replacement headers alone", () => {
     setTestConfig({ headerMode: "compact", headerAlign: "center" });
     const fixture = headerContext();
-    const old = registerHeader(fixture.ctx);
+    const old = registerHeader(fixture.pi, fixture.ctx);
     const before = fixture.current()!.render(80);
     setTestConfig({ headerMode: "large", headerAlign: "left" });
     fixture.current()!.invalidate();
     expect(fixture.current()!.render(80)).toEqual(before);
-    const next = registerHeader(fixture.ctx);
+    const next = registerHeader(fixture.pi, fixture.ctx);
     old.dispose();
     expect(fixture.calls).toHaveLength(2);
     expect(fixture.current()!.render(80).map(stripAnsi).join("\n")).toContain(

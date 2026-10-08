@@ -285,6 +285,14 @@ describe("public renderer integration", () => {
             : " ".repeat(38) + "▀▀█ ",
         );
     }
+    const normalHeader = header!.render(80);
+    for (const quietStartup of [true, "header", false] as const) {
+      session.settingsManager.setQuietStartup(quietStartup);
+      await session.reload();
+      expect(header!.render(80)).toEqual(
+        quietStartup === true ? [] : normalHeader,
+      );
+    }
     expect(errors).toEqual([]);
     expect(createTransport).not.toHaveBeenCalled();
   });

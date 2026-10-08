@@ -81,6 +81,8 @@ For example:
 | `large`      | Enlarged logo, eight columns wide and four lines tall, with the version below it and no startup hints.  |
 | `off`        | No header content. Pi's startup warnings and resource notices are unchanged.                            |
 
+Custom headers respect Pi's `quietStartup` setting: `false` and `"header"` show the logo; `true` hides it unless you pass `--verbose`. Our `headerMode: "off"` stays hidden even with `--verbose`, and `native` leaves this behavior to Pi.
+
 `headerAlign` supports `left` and `center`. It applies to `compact` and `large`, including their Apple Terminal fallback. It has no effect in `native` or `off`.
 
 The logo uses Pi's coral, blue, and yellow colors in the terminal's color mode. In Apple Terminal, both custom modes show a colored `Pi` wordmark instead. The version remains below it.

@@ -52,7 +52,7 @@ export default function (pi: ExtensionAPI) {
 
     if (ctx.mode === "tui") {
       uiHandles.push(registerTuiCapture(ctx));
-      uiHandles.push(registerHeader(ctx));
+      uiHandles.push(registerHeader(pi, ctx));
       if (getConfig().editorStyle !== "native") {
         uiHandles.push(
           registerEditor(pi, ctx),

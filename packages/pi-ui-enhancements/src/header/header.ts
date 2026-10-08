@@ -1,5 +1,7 @@
 import {
   VERSION,
+  parseArgs,
+  type ExtensionAPI,
   type ExtensionContext,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
@@ -83,15 +85,22 @@ export function buildHeader(
   ];
 }
 
-export function registerHeader(ctx: ExtensionContext): Handle {
+export function registerHeader(
+  pi: Pick<ExtensionAPI, "getSettings">,
+  ctx: ExtensionContext,
+): Handle {
   const config = getConfig();
   if (config.headerMode === "native") return { dispose() {} };
+  const showHeader =
+    pi.getSettings().quietStartup !== true ||
+    parseArgs(process.argv.slice(2)).verbose === true;
   const appleTerminal = isAppleTerminalSession();
   let owned = false;
   ctx.ui.setHeader((_tui, theme) => {
     owned = true;
     return {
-      render: (width) => buildHeader(theme, width, config, appleTerminal),
+      render: (width) =>
+        showHeader ? buildHeader(theme, width, config, appleTerminal) : [],
       invalidate() {},
       dispose() {
         owned = false;

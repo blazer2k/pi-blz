@@ -50,6 +50,7 @@ function mkPi() {
       activeToolsArg = tools;
     },
     getThinkingLevel: () => "off",
+    getSettings: () => ({}),
     // Test helpers
     _handlers: handlers,
     _registeredTools: () => registeredTools,
