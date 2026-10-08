@@ -7,7 +7,15 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mock,
+  spyOn,
+} from "bun:test";
 import {
   createAgentSession,
   CustomEditor,
@@ -314,7 +322,7 @@ describe("public renderer integration", () => {
       },
     } as ConstructorParameters<typeof FooterComponent>[1];
     const tui = {
-      terminal: { rows: 24 },
+      terminal: { rows: 24, setProgress() {} },
       requestRender() {},
       setFocus() {},
       getClearOnShrink: () => false,
@@ -345,6 +353,8 @@ describe("public renderer integration", () => {
       footerDataProvider: footerData,
       options: { tuiMode: "regular" },
       defaultWorkingMessage: "Native Working",
+      isInitialized: true,
+      programStatus: { handleEvent() {} },
       disposeActiveSelector() {},
     });
     host.editorContainer.addChild(native);
@@ -385,14 +395,17 @@ describe("public renderer integration", () => {
     const inventory = session.getAllTools().map((tool) => tool.name);
     const active = session.getActiveToolNames();
     const nativeFooterLines = nativeFooter.render(120);
+    let disposeIndicator: ReturnType<typeof spyOn> | undefined;
     try {
-      for (const editorStyle of [
-        "rounded",
-        "compact",
-        "native",
-        "rounded",
-        "native",
-        "compact",
+      for (const [editorStyle, workingIndicatorStyle] of [
+        ["rounded", "shimmer"],
+        ["rounded", "native"],
+        ["compact", "native"],
+        ["native", "shimmer"],
+        ["rounded", "shimmer"],
+        ["native", "native"],
+        ["compact", "shimmer"],
+        ["compact", "native"],
       ] as const) {
         const beforeEditor = host.editor;
         const beforeConfig = getConfig();
@@ -401,13 +414,15 @@ describe("public renderer integration", () => {
           JSON.stringify({
             ...beforeConfig,
             editorStyle,
+            workingIndicatorStyle,
             editorColor: "muted",
             editorShowThinkingLevel: false,
             editorShowCacheTokens: false,
             editorShowCost: false,
             editorShowBranch: false,
-            workingIndicatorShowDuration: false,
-            workingIndicatorShowInterruptMsg: false,
+            workingIndicatorShowDuration: workingIndicatorStyle === "native",
+            workingIndicatorShowInterruptMsg:
+              workingIndicatorStyle === "native",
           }),
         );
         expect(host.editor).toBe(beforeEditor);
@@ -415,6 +430,9 @@ describe("public renderer integration", () => {
         await session.reload();
         expect(errors).toEqual([]);
         expect(getConfig().editorStyle).toBe(editorStyle);
+        expect(getConfig().workingIndicatorStyle).toBe(workingIndicatorStyle);
+        const embedded =
+          editorStyle === "native" || workingIndicatorStyle === "native";
         expect(host.editor.getText()).toBe("draft 界 input");
         expect(host.editor.getPaddingX()).toBe(2);
         expect(host.editor.getAutocompleteMaxVisible()).toBe(7);
@@ -437,7 +455,7 @@ describe("public renderer integration", () => {
           expect(host.workingIndicatorOptions).toBeUndefined();
         } else {
           expect(host.editor).not.toBe(native);
-          expect(host.editor.embedWorkingStatus).toBe(false);
+          expect(host.editor.embedWorkingStatus).toBe(embedded);
           expect(host.footerContainer.render(80).map(stripAnsi)).toEqual([
             "",
             "offline status",
@@ -454,8 +472,9 @@ describe("public renderer integration", () => {
         const count = workingOptions.length;
         await session.extensionRunner.emit({ type: "agent_start" });
         expect(errors).toEqual([]);
-        if (editorStyle === "native") {
+        if (embedded) {
           expect(workingOptions).toHaveLength(count);
+          expect(host.workingIndicatorOptions).toBeUndefined();
           expect(host.statusContainer.children).toHaveLength(0);
           expect(stripAnsi(host.editor.render(80)[0]!)).toContain(
             "Native Working",
@@ -469,23 +488,91 @@ describe("public renderer integration", () => {
             "Working",
           );
         }
+        await session.extensionRunner.emit({
+          type: "agent_settled",
+          aborted: false,
+        });
+        host.clearStatusIndicator();
+        expect(host.editor.render(120).map(stripAnsi).join("\n")).not.toContain(
+          "Working",
+        );
+        if (embedded) {
+          for (const [event, kind, label] of [
+            [
+              {
+                type: "auto_retry_start",
+                attempt: 1,
+                maxAttempts: 3,
+                delayMs: 60_000,
+                errorMessage: "offline retry",
+              },
+              "retry",
+              "Retrying",
+            ],
+            [
+              { type: "compaction_start", reason: "manual" },
+              "compaction",
+              "Compacting",
+            ],
+            [
+              {
+                type: "summarization_retry_attempt_start",
+                source: "branchSummary",
+              },
+              "branchSummary",
+              "Summarizing branch",
+            ],
+          ] as const) {
+            const optionsBefore = workingOptions.length;
+            await host.handleEvent(event);
+            const indicator = host.activeStatusIndicator;
+            expect(indicator.kind).toBe(kind);
+            expect(host.statusContainer.children).toHaveLength(0);
+            expect(stripAnsi(host.editor.render(120)[0]!)).toContain(label);
+            const input = host.editor.getText();
+            host.editor.setText("draft input");
+            for (const width of editorStyle === "native"
+              ? [8, 24, 80, 120]
+              : [1, 8, 24, 80, 120]) {
+              expect(
+                host.editor
+                  .render(width)
+                  .filter((row: string) => visibleWidth(row) > width)
+                  .map(stripAnsi),
+              ).toEqual([]);
+            }
+            host.editor.setText(input);
+            expect(workingOptions).toHaveLength(optionsBefore);
+            host.clearStatusIndicator(kind);
+            expect(stripAnsi(host.editor.render(120)[0]!)).not.toContain(label);
+          }
+        }
       }
+      host.showWorkingStatusIndicator();
+      const nativeIndicator = host.activeStatusIndicator;
+      disposeIndicator = spyOn(nativeIndicator, "dispose");
       const replacement = () => new CustomEditor(tui, editorTheme, keybindings);
       host.setCustomEditorComponent(replacement);
+      expect(host.activeStatusIndicator).toBe(nativeIndicator);
       host.setExtensionFooter(() => new Text("other footer", 0, 0));
       await session.extensionRunner.emit({
         type: "session_shutdown",
         reason: "reload",
       });
       expect(host.editorComponentFactory).toBe(replacement);
+      expect(host.activeStatusIndicator).toBe(nativeIndicator);
+      expect(disposeIndicator).not.toHaveBeenCalled();
       expect(host.footerContainer.render(80)).toEqual([
         "other footer".padEnd(80),
       ]);
       expect(branchSubscriptions).toBe(0);
       expect(errors).toEqual([]);
       expect(createTransport).not.toHaveBeenCalled();
+      host.clearStatusIndicator();
+      expect(disposeIndicator).toHaveBeenCalledTimes(1);
     } finally {
       host.clearStatusIndicator();
+      disposeIndicator?.mockRestore();
       nativeFooter.dispose();
     }
   });

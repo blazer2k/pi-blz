@@ -10,7 +10,7 @@ This extension adds:
 
 - A compact or enlarged Pi logo at session start, with the version below it. You can also keep Pi's own header or hide the header content.
 - Native, compact, or rounded editor styles. The custom styles show the working directory, git branch, model, token usage, and context percentage in their borders.
-- A shimmer animation on the "Working" label in compact and rounded styles, with elapsed time and an interrupt hint.
+- A choice of Pi's embedded Working indicator or a separate shimmer label in compact and rounded styles.
 - Compact tool output with tree-style lines and clickable paths when your terminal supports them. This also works with eligible third-party tools.
 - Optional capitalization of tool headers, enabled by default.
 
@@ -46,6 +46,7 @@ For example:
   "headerMode": "compact",
   "headerAlign": "left",
   "editorStyle": "compact",
+  "workingIndicatorStyle": "native",
   "editorColor": "dim",
   "collapsedOutputDisplay": "summary",
   "maxExpandedEntries": 50
@@ -56,8 +57,9 @@ For example:
 | ---------------------------------- | ----------- | ------------------------------------------------------------- |
 | `headerMode`                       | `"compact"` | `"native"`, `"compact"`, `"large"`, `"off"`                   |
 | `headerAlign`                      | `"left"`    | `"left"`, `"center"`; applies to compact/large only           |
-| `workingIndicatorShowInterruptMsg` | `true`      | Boolean: show "esc to interrupt"                              |
-| `workingIndicatorShowDuration`     | `true`      | Boolean: show elapsed time and completion duration            |
+| `workingIndicatorStyle`            | `"shimmer"` | `"native"`, `"shimmer"`; custom editors only                  |
+| `workingIndicatorShowInterruptMsg` | `true`      | Boolean: show "esc to interrupt"; shimmer only                |
+| `workingIndicatorShowDuration`     | `true`      | Boolean: show elapsed and completion time; shimmer only       |
 | `patchCustomTools`                 | `true`      | Boolean: compact eligible extension tools, including Codemode |
 | `capitalizeToolNames`              | `true`      | Boolean: capitalize headers drawn by this extension           |
 | `indicatorStyle`                   | `"circle"`  | `"dot"`, `"circle"`, `"diamond"`                              |
@@ -99,7 +101,16 @@ In compact and rounded styles, the working directory and optional branch sit in 
 
 `editorColor` and the `editorShow*` settings apply only to compact and rounded. The default color is `dim`; `thinking` follows Pi's thinking-level colors. Shell input uses Pi's Bash-mode color. High context usage retains warning and error colors.
 
-Compact and rounded use the separate shimmer Working indicator and a footer for extension status messages. `workingIndicatorShowInterruptMsg` and `workingIndicatorShowDuration` apply to those styles only. Native leaves Working and footer status messages to Pi.
+Compact and rounded use a footer for extension status messages. Native leaves both Working and footer status messages to Pi.
+
+## Working indicator
+
+`workingIndicatorStyle` applies only to compact and rounded editors:
+
+- `shimmer` (default): The current standalone animated "Working" label, with optional elapsed time, interrupt hint, and completion duration. `workingIndicatorShowInterruptMsg` and `workingIndicatorShowDuration` apply only to this style.
+- `native`: Pi's own indicator in the top border, with status on the left and directory/branch on the right. Pi manages its animation, lifecycle, retry, compaction, and branch-summary statuses. Narrow layouts shorten metadata or show only the spinner; compact scroll counts remain centered when space allows.
+
+With `editorStyle: "native"`, this setting and the shimmer options are ignored. Pi's editor and indicator remain untouched. Change styles through the settings file and `/reload`.
 
 ## Built-in tool display
 

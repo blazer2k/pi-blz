@@ -16,11 +16,14 @@ import {
   buildCompactBottomLine,
   frameEditorLines,
   type BorderFn,
+  type EditorStatusIndicator,
 } from "./frame";
 import { buildEditorFrameData } from "./status";
 import type { SessionUsage } from "./usage";
 
 export class EnhancedEditor extends CustomEditor {
+  private nativeStatusIndicator?: EditorStatusIndicator;
+
   constructor(
     tui: TUI,
     theme: EditorTheme,
@@ -33,8 +36,18 @@ export class EnhancedEditor extends CustomEditor {
   ) {
     super(tui, theme, kb, {
       paddingX: style === "rounded" ? 0 : 1,
-      embedWorkingStatus: false,
+      embedWorkingStatus: getConfig().workingIndicatorStyle === "native",
     });
+  }
+
+  override setWorkingStatusIndicator(
+    indicator: EditorStatusIndicator | undefined,
+  ): void {
+    // Our final frame draws the indicator; keep Pi's intermediate border plain.
+    super.setWorkingStatusIndicator(undefined);
+    this.nativeStatusIndicator = this.embedWorkingStatus
+      ? indicator
+      : undefined;
   }
 
   private buildFrameData(config: Config) {
@@ -88,6 +101,7 @@ export class EnhancedEditor extends CustomEditor {
       this.buildFrameData(config).cwd,
       this.getBorder(config),
       hiddenLineCount,
+      this.nativeStatusIndicator,
     );
   }
 
@@ -123,6 +137,7 @@ export class EnhancedEditor extends CustomEditor {
       this.buildFrameData(config),
       this.ctx.ui.theme,
       this.getBorder(config),
+      this.nativeStatusIndicator,
     );
   }
 }

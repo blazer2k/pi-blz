@@ -1,3 +1,4 @@
+import type { CustomEditor } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import {
   adaptNativeEditorLayout,
@@ -8,6 +9,9 @@ import { formatTokens } from "./usage";
 export type { ScrollIndicators } from "./native-layout";
 
 export type BorderFn = (text: string) => string;
+export type EditorStatusIndicator = NonNullable<
+  Parameters<CustomEditor["setWorkingStatusIndicator"]>[0]
+>;
 
 export type FooterTheme = {
   fg(color: string, text: string): string;
@@ -42,7 +46,28 @@ function buildTopLine(
   cwd: string,
   border: BorderFn,
   rounded: boolean,
+  indicator?: EditorStatusIndicator,
 ): string {
+  if (indicator) {
+    if (width < 8) return indicator.renderSpinnerInBorder(Math.max(0, width));
+    const available = width - 6;
+    let status = indicator.renderInBorder(available);
+    if (visibleWidth(status) + 2 > available)
+      status = indicator.renderSpinnerInBorder(available);
+    if (status) {
+      const cwdDisplay = truncateToWidth(
+        cwd,
+        Math.max(0, available - visibleWidth(status) - 3),
+        "...",
+      );
+      const left = border(rounded ? "╭─ " : "── ") + status + border(" ");
+      const right = border(
+        ` ${cwdDisplay ? cwdDisplay + " " : ""}${rounded ? "─╮" : "──"}`,
+      );
+      const gap = Math.max(0, width - visibleWidth(left) - visibleWidth(right));
+      return left + border("─".repeat(gap)) + right;
+    }
+  }
   const cwdBudget = Math.max(1, width - 5);
   const cwdDisplay = truncateToWidth(cwd, cwdBudget, "...");
   const topRight = ` ${border(cwdDisplay)} `;
@@ -176,18 +201,33 @@ export function buildCompactTopLine(
   cwd: string,
   border: BorderFn,
   hiddenLineCount: number,
+  indicator?: EditorStatusIndicator,
 ): string {
+  let status = "";
+  if (indicator && hiddenLineCount > 0) {
+    const noticeWidth = visibleWidth(` ↑ ${hiddenLineCount} more `);
+    const statusBudget = Math.max(0, Math.floor((width - noticeWidth) / 2) - 4);
+    if (statusBudget === 0)
+      return truncateToWidth(
+        buildTopLine(width, cwd, border, false, indicator),
+        Math.max(0, width),
+        "",
+      );
+    status = indicator.renderInBorder(Math.max(0, width));
+    if (visibleWidth(status) > statusBudget)
+      status = indicator.renderSpinnerInBorder(statusBudget);
+  }
   const line =
     hiddenLineCount > 0
       ? buildScrollLine(
           width,
-          "",
+          status ? ` ${status} ` : "",
           ` ${border(cwd)} `,
           "↑",
           hiddenLineCount,
           border,
         )
-      : buildTopLine(width, cwd, border, false);
+      : buildTopLine(width, cwd, border, false, indicator);
   return truncateToWidth(line, Math.max(0, width), "");
 }
 
@@ -233,6 +273,7 @@ export function frameEditorLines(
   data: EditorFrameData,
   theme: FooterTheme,
   border: BorderFn,
+  indicator?: EditorStatusIndicator,
 ): string[] {
   if (nativeLines.length < 2) return [...nativeLines];
 
@@ -245,7 +286,7 @@ export function frameEditorLines(
 
   const { lines, scroll } = nativeLayout;
   const innerWidth = Math.max(1, width - 2);
-  lines[0] = buildTopLine(width, data.cwd, border, true);
+  lines[0] = buildTopLine(width, data.cwd, border, true, indicator);
   lines.push(buildBottomLine(width, data, theme, border, true));
   frameInterior(lines, width, innerWidth, border, scroll);
 

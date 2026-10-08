@@ -54,10 +54,9 @@ export default function (pi: ExtensionAPI) {
       uiHandles.push(registerTuiCapture(ctx));
       uiHandles.push(registerHeader(pi, ctx));
       if (getConfig().editorStyle !== "native") {
-        uiHandles.push(
-          registerEditor(pi, ctx),
-          registerWorkingIndicator(pi, ctx),
-        );
+        uiHandles.push(registerEditor(pi, ctx));
+        if (getConfig().workingIndicatorStyle === "shimmer")
+          uiHandles.push(registerWorkingIndicator(pi, ctx));
       }
       ctx.ui.setHiddenThinkingLabel("(think)");
       uiHandles.push({

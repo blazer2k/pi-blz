@@ -41,6 +41,7 @@ describe("config validation", () => {
     expect(getDefaultConfig()).toMatchObject({
       headerMode: "compact",
       headerAlign: "left",
+      workingIndicatorStyle: "shimmer",
       editorStyle: "rounded",
       editorColor: "dim",
       editorShowThinkingLevel: true,
@@ -128,6 +129,26 @@ describe("config validation", () => {
           editorColor,
         });
       }
+    }
+  });
+
+  it("accepts native and shimmer Working styles and rejects other values", () => {
+    for (const workingIndicatorStyle of [
+      "native",
+      "shimmer",
+      "unsupported",
+      false,
+      null,
+    ]) {
+      loadConfig(
+        undefined,
+        createStorage({
+          read: () => JSON.stringify({ workingIndicatorStyle }),
+        }),
+      );
+      expect(getConfig().workingIndicatorStyle).toBe(
+        workingIndicatorStyle === "native" ? "native" : "shimmer",
+      );
     }
   });
 

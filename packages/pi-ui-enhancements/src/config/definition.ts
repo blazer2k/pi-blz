@@ -8,6 +8,7 @@ export type ConfigKey = keyof Config;
 const DEFAULT_CONFIG: Config = {
   headerMode: "compact",
   headerAlign: "left",
+  workingIndicatorStyle: "shimmer",
   workingIndicatorShowInterruptMsg: true,
   workingIndicatorShowDuration: true,
   patchCustomTools: true,
@@ -34,6 +35,10 @@ const ConfigSchema = Type.Object(
       Type.Literal("off"),
     ]),
     headerAlign: Type.Union([Type.Literal("left"), Type.Literal("center")]),
+    workingIndicatorStyle: Type.Union([
+      Type.Literal("native"),
+      Type.Literal("shimmer"),
+    ]),
     workingIndicatorShowInterruptMsg: Type.Boolean(),
     workingIndicatorShowDuration: Type.Boolean(),
     patchCustomTools: Type.Boolean(),

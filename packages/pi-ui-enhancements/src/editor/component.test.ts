@@ -1,7 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { CustomEditor } from "@earendil-works/pi-coding-agent";
 import {
   CURSOR_MARKER,
+  truncateToWidth,
   visibleWidth,
   type AutocompleteProvider,
 } from "@earendil-works/pi-tui";
@@ -16,6 +17,7 @@ import type { Config } from "../config/definition";
 import { getConfig, loadConfig, type ConfigStorage } from "../config/store";
 import { mkTheme, setTestConfig } from "../testing/helpers";
 import { EnhancedEditor } from "./component";
+import type { EditorStatusIndicator } from "./frame";
 
 const memoryStorage: ConfigStorage = {
   prepare() {},
@@ -240,6 +242,75 @@ describe("EnhancedEditor", () => {
     expect(editor.getText()).toBe("/hello");
     expect(editor.getText()).toBe(native.getText());
     expect(editor.isShowingAutocomplete()).toBe(false);
+  });
+
+  it("embeds supplied native statuses without changing input, scrolling, autocomplete, or ownership", async () => {
+    for (const style of ["compact", "rounded"] as const) {
+      setTestConfig({ workingIndicatorStyle: "native" });
+      const { editor } = createEditor("draft 界 input", style);
+      expect(editor.embedWorkingStatus).toBe(true);
+      editor.focused = true;
+      const before = editor.render(80);
+      const indicator = {
+        renderInBorder: mock((width: number) =>
+          truncateToWidth("\x1b[33m* Pi Working\x1b[0m", width, ""),
+        ),
+        renderSpinnerInBorder: mock((width: number) =>
+          truncateToWidth("\x1b[33m*\x1b[0m", width, ""),
+        ),
+        dispose: mock(() => {}),
+      } as unknown as EditorStatusIndicator;
+      editor.setWorkingStatusIndicator(indicator);
+      const active = editor.render(80);
+      expect(active[0]).toContain("\x1b[33m* Pi Working\x1b[0m");
+      expect(stripAnsi(active[0]!)).toContain("/repo (main)");
+      expect(active.slice(1)).toEqual(before.slice(1));
+      expect(active[0]!.startsWith("╭")).toBe(style === "rounded");
+      editor.setWorkingStatusIndicator(undefined);
+      expect(editor.render(80)).toEqual(before);
+      expect(indicator.dispose).not.toHaveBeenCalled();
+
+      editor.setText(
+        Array.from({ length: 20 }, (_, i) => `line ${i}`).join("\n"),
+      );
+      const scrolled = editor.render(80);
+      editor.setWorkingStatusIndicator(indicator);
+      expect(editor.render(80).slice(1)).toEqual(scrolled.slice(1));
+      if (style === "compact")
+        expect(stripAnsi(editor.render(80)[0]!)).toMatch(/↑ \d+ more/);
+      else expect(editor.render(80).slice(1).join("\n")).toContain("▲");
+      editor.setText("long input".repeat(10));
+      for (let width = 0; width <= 200; width++) {
+        for (const line of editor.render(width))
+          expect(visibleWidth(line)).toBeLessThanOrEqual(width);
+      }
+      expect(indicator.renderSpinnerInBorder).toHaveBeenCalled();
+
+      editor.setText("/h");
+      editor.setAutocompleteProvider({
+        async getSuggestions() {
+          return {
+            prefix: "/h",
+            items: [{ value: "/hello", label: "/hello" }],
+          };
+        },
+        applyCompletion() {
+          return { lines: ["/hello"], cursorLine: 0, cursorCol: 6 };
+        },
+      });
+      editor.handleInput("\t");
+      await Bun.sleep(0);
+      expect(editor.isShowingAutocomplete()).toBe(true);
+      editor.setWorkingStatusIndicator(undefined);
+      const completion = editor.render(80);
+      editor.setWorkingStatusIndicator(indicator);
+      expect(editor.render(80).slice(1)).toEqual(completion.slice(1));
+      expect(indicator.dispose).not.toHaveBeenCalled();
+      editor.handleInput("\t");
+      expect(editor.getText()).toBe("/hello");
+    }
+    setTestConfig({ workingIndicatorStyle: "shimmer" });
+    expect(createEditor().editor.embedWorkingStatus).toBe(false);
   });
 
   it("fits both custom styles at widths zero through 200", () => {
