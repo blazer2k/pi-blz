@@ -4,7 +4,6 @@ import type {
   ToolRenderers,
 } from "@earendil-works/pi-coding-agent";
 import { getConfig } from "../config/store";
-import type { BashTimingLookup } from "./bash";
 import { patchTools } from "./built-ins";
 import { createCodemodeRenderers } from "./codemode";
 import { clearCodemodeTimers } from "./codemode/timing";
@@ -33,11 +32,10 @@ export function createToolRendering(
   options: {
     isToolCallActive: (toolCallId: string) => boolean;
     isEnabled: () => boolean;
-    getBashTiming?: BashTimingLookup;
     reportIssue?: CustomToolRenderingReporter;
   },
 ) {
-  const core = patchTools(options.getBashTiming);
+  const core = patchTools();
   const customStates = new Set<BaseRenderState>();
   const reported = new Set<string>();
   const reportIssue = (issue: CustomToolRenderingIssue): void => {

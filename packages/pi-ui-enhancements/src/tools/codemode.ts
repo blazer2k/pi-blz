@@ -41,7 +41,12 @@ export function createCodemodeRenderers(
     },
     renderResult(result, options, theme, context) {
       const state = getCustomState(context.state) as CodemodeRenderState;
-      const text = getResultText(state, options, context.lastComponent);
+      const text = getResultText(
+        state,
+        options,
+        context.lastComponent,
+        context.outputPad,
+      );
       updateCodemodeTiming(
         state,
         options.isPartial,

@@ -1,11 +1,14 @@
-import type { ToolRenderResultOptions } from "@earendil-works/pi-coding-agent";
+import type {
+  BashToolDetails,
+  ToolRenderResultOptions,
+} from "@earendil-works/pi-coding-agent";
 import { formatErrorBody } from "../rendering/results";
 import { extractTextContent } from "../rendering/text";
 import { selectOutputWindow, type OutputWindow } from "../rendering/output";
 import { getDurationSummary } from "./metadata";
 import { parseBashErrorText, stripBashTruncationNotice } from "./native-output";
 import type { ToolTextResult } from "../rendering/types";
-import type { BashDetailsWithTiming, BashRenderState } from "./types";
+import type { BashRenderState } from "./types";
 
 type BaseBashResultView = {
   expanded: boolean;
@@ -93,12 +96,12 @@ export function buildBashResultView(
   options: ToolRenderResultOptions,
   policy: BashResultPolicy,
 ): BashResultView {
-  const details = result.details as BashDetailsWithTiming | undefined;
+  const details = result.details as BashToolDetails | undefined;
   const rawText = extractTextContent(result);
   const base: BaseBashResultView = {
     expanded: options.expanded,
     collapsedDisplay: policy.collapsedDisplay,
-    durationSummary: getDurationSummary(details, state, options),
+    durationSummary: getDurationSummary(state, options),
     callExpandable: state.callExpandable === true,
     toolTruncated: state.truncated === true,
   };

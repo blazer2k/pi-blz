@@ -22,6 +22,7 @@ type BashCallContext = {
   executionStarted?: boolean;
   isPartial?: boolean;
   expanded: boolean;
+  outputPad: number;
   invalidate: () => void;
 };
 
@@ -51,7 +52,6 @@ export function renderBashCall(
 
   if (toolContext.executionStarted && state.startedAt === undefined) {
     state.startedAt = Date.now();
-    state.endedAt = undefined;
   }
 
   const command =
@@ -65,7 +65,7 @@ export function renderBashCall(
   const inlineTimeoutSuffix = timeoutText
     ? theme.fg("dim", ` ${timeoutText}`)
     : "";
-  const text = getCallText(theme);
+  const text = getCallText(theme, toolContext.outputPad);
   text.setText((width) => {
     const title = theme.fg(
       "toolTitle",

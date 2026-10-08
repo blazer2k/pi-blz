@@ -97,6 +97,8 @@ export function mkToolCtx(overrides: Record<string, unknown> = {}) {
     expanded: false,
     argsComplete: true,
     showImages: false,
+    durationMs: undefined as number | undefined,
+    outputPad: 1,
     ...overrides,
   };
 }

@@ -1,4 +1,3 @@
-import type { BashToolDetails } from "@earendil-works/pi-coding-agent";
 import type { BaseRenderState } from "../rendering/types";
 
 export type BashRenderState = BaseRenderState & {
@@ -8,12 +7,7 @@ export type BashRenderState = BaseRenderState & {
     collapsedCommand: string;
   };
   startedAt?: number;
-  endedAt?: number;
   durationTimer?: ReturnType<typeof setInterval>;
   durationMs?: number;
   resultExpandable?: boolean;
-};
-
-export type BashDetailsWithTiming = BashToolDetails & {
-  durationMs?: number;
 };

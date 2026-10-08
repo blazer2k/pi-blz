@@ -163,10 +163,22 @@ describe("Codemode output", () => {
         type: "text",
         text: "Script error:\nError: broken\nstack",
       });
-      const { text } = render(input, false, true);
-      expect(text).toContain("Error: broken");
-      expect(text).toContain("script failed");
-      expect(text.match(/Error: broken/g)).toHaveLength(1);
+      const joined = {
+        ...input,
+        content: [
+          input.content[0]!,
+          {
+            type: "text" as const,
+            text: "first\nsecond\nthird\nfourth\nScript error:\nError: broken\nstack",
+          },
+        ],
+      };
+      for (const output of [input, joined]) {
+        const { text } = render(output, false, true);
+        expect(text).toContain("Error: broken");
+        expect(text).toContain("script failed");
+        expect(text.match(/Error: broken/g)).toHaveLength(1);
+      }
     }
   });
 
@@ -597,6 +609,7 @@ describe("Codemode output", () => {
     for (const code of [
       'text("one"); text("two"); text("three"); text("four");',
       'text("before"); throw new Error("actual failure");',
+      'console.log("before"); throw new Error("actual failure");',
     ]) {
       const input = await definition.execute(
         "real",
@@ -618,9 +631,12 @@ describe("Codemode output", () => {
       if (input.isError) {
         expect(rendered).toContain("actual failure");
         expect(view.output).toContain("before");
+        expect(view.diagnostic).toBe("Error: actual failure");
       } else {
-        expect(rendered).toContain("+2 lines");
-        expect(view.output).toBe("one\ntwo\nthree\nfour");
+        expect(rendered).toContain("+6 lines");
+        expect(view.output).toBe(
+          "==> text 1/4 <==\none\n==> text 2/4 <==\ntwo\n==> text 3/4 <==\nthree\n==> text 4/4 <==\nfour",
+        );
       }
     }
   });

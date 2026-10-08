@@ -44,9 +44,9 @@ export function buildCodemodeResultView(result: ToolTextResult) {
     .split("\n")
     .map(sanitizeRenderedText)
     .join("\n");
-  const error = blocks.findLast((text) => text.startsWith("Script error:\n"));
+  const errorStart = output.lastIndexOf("Script error:\n");
   const diagnostic =
-    (error ?? output)
+    (errorStart < 0 ? output : output.slice(errorStart))
       .split("\n")
       .map(sanitizeRenderedText)
       .find(

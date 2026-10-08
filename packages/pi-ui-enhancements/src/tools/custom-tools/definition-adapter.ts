@@ -146,7 +146,12 @@ function createResultRenderer(
   const { reportIssue } = adapterOptions;
   return (result, options, theme, toolContext) => {
     const state = getCustomState(toolContext.state);
-    const text = getResultText(state, options, toolContext.lastComponent);
+    const text = getResultText(
+      state,
+      options,
+      toolContext.lastComponent,
+      toolContext.outputPad,
+    );
     const details = result.details as
       | { truncation?: { truncated?: boolean } }
       | undefined;

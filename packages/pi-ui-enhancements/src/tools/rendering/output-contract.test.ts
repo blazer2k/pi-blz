@@ -2,7 +2,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
-import { Text, visibleWidth } from "@earendil-works/pi-tui";
+import { Text, visibleWidth, type Component } from "@earendil-works/pi-tui";
 import {
   setupCustomTool,
   mkTheme,
@@ -60,10 +60,11 @@ function renderCompletedTool(
   args: Record<string, unknown>,
   result: ToolResult,
   expanded = false,
+  durationMs?: number,
 ): string[] {
   const definition = setupTool(patchTool);
   const state = {};
-  const toolCtx = mkToolCtx({ state, args, expanded });
+  const toolCtx = mkToolCtx({ state, args, expanded, durationMs });
   const resultComponent = definition.renderResult!(
     result,
     { expanded, isPartial: false },
@@ -86,8 +87,10 @@ describe("built-in tool output", () => {
         { command: "printf hello" },
         {
           content: [{ type: "text", text: "hello\nworld" }],
-          details: { durationMs: 50 },
+          details: {},
         },
+        false,
+        50,
       ),
     ).toEqual([
       " ● Bash $ printf hello",
@@ -189,19 +192,21 @@ describe("custom tool output", () => {
     try {
       const wrapped = handle.renderers;
       const state = {};
-      const toolCtx = mkToolCtx({ state, args: { query: "pi" } });
-      const result = wrapped.renderResult!(
-        { content: [{ type: "text", text: "two" }], details: {} },
-        { expanded: false, isPartial: false },
-        mkTheme(),
-        toolCtx,
-      );
-      const call = wrapped.renderCall!({ query: "pi" }, mkTheme(), toolCtx);
-
-      expect([...meaningfulLines(call), ...meaningfulLines(result)]).toEqual([
-        " ● Lookup pi",
-        " ╰─ 2 matches",
-      ]);
+      for (const outputPad of [0, 1]) {
+        const toolCtx = mkToolCtx({ state, args: { query: "pi" }, outputPad });
+        const result = wrapped.renderResult!(
+          { content: [{ type: "text", text: "two" }], details: {} },
+          { expanded: false, isPartial: false },
+          mkTheme(),
+          toolCtx,
+        );
+        const call = wrapped.renderCall!({ query: "pi" }, mkTheme(), toolCtx);
+        const padding = " ".repeat(outputPad);
+        expect([...meaningfulLines(call), ...meaningfulLines(result)]).toEqual([
+          padding + "● Lookup pi",
+          padding + "╰─ 2 matches",
+        ]);
+      }
     } finally {
       handle.dispose();
     }
@@ -247,6 +252,40 @@ describe("terminal width contract", () => {
       expect(invalidations).toBe(3);
     });
   }
+
+  it("applies output padding to calls and results for every built-in", () => {
+    for (const [patchTool, args] of calls) {
+      const definition = setupTool(patchTool);
+      const state = { hasResult: true };
+      let previousResult: Component | undefined;
+      for (const outputPad of [0, 1, 0]) {
+        const context = mkToolCtx({
+          state,
+          args,
+          outputPad,
+          executionStarted: false,
+          lastComponent: previousResult,
+        });
+        const call = definition.renderCall!(args, mkTheme(), context);
+        const result = definition.renderResult!(
+          { content: [{ type: "text", text: "result" }], details: {} },
+          { expanded: false, isPartial: false },
+          mkTheme(),
+          context,
+        );
+        if (previousResult) expect(result).toBe(previousResult);
+        previousResult = result;
+        for (const component of [call, result]) {
+          const rows = meaningfulLines(component, 40);
+          expect(rows.length).toBeGreaterThan(0);
+          expect(
+            rows.every((row) => row.startsWith(" ") === (outputPad === 1)),
+          ).toBe(true);
+          expect(rows.every((row) => visibleWidth(row) <= 40)).toBe(true);
+        }
+      }
+    }
+  });
 
   it("keeps Bash calls with timeouts on one row in narrow viewports", () => {
     const definition = setupTool(patchBashTool);
@@ -295,7 +334,7 @@ describe("terminal width contract", () => {
     const component = definition.renderResult!(
       {
         content: [{ type: "text", text: "x".repeat(60) }],
-        details: { durationMs: 5 },
+        details: {},
       },
       { expanded: false, isPartial: false },
       mkTheme(),
@@ -317,7 +356,7 @@ describe("terminal width contract", () => {
     for (const patchTool of [patchBashTool, patchWriteTool]) {
       const definition = setupTool(patchTool);
       const component = definition.renderResult!(
-        { content: [{ type: "text", text: body }], details: { durationMs: 5 } },
+        { content: [{ type: "text", text: body }], details: {} },
         { expanded: true, isPartial: false },
         mkTheme(),
         mkToolCtx({
@@ -342,7 +381,7 @@ describe("terminal width contract", () => {
       const component = definition.renderResult!(
         {
           content: [{ type: "text", text: `failure ${"x".repeat(100)}` }],
-          details: { durationMs: 5 },
+          details: {},
         },
         { expanded: false, isPartial: false },
         mkTheme(),

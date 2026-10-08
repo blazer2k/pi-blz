@@ -45,7 +45,7 @@ export function renderCodemodeCall(
     };
   }
   const preview = state.callHighlightCache.preview;
-  const text = getCallText(theme);
+  const text = getCallText(theme, context.outputPad);
   let nativeCall: CodemodeRenderState["nativeCall"];
   if (context.expanded && native.renderCall) {
     try {

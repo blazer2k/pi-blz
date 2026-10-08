@@ -1,10 +1,11 @@
 import type {
   BashToolInput,
+  BashToolDetails,
   ToolRenderers,
 } from "@earendil-works/pi-coding-agent";
 import { renderBashCall } from "./bash/call";
 import { formatBashResult } from "./bash/result";
-import type { BashDetailsWithTiming, BashRenderState } from "./bash/types";
+import type { BashRenderState } from "./bash/types";
 import {
   invalidateIfChanged,
   registerToolTimer,
@@ -15,36 +16,22 @@ import { getResultText } from "./rendering/tree";
 
 const DURATION_UPDATE_INTERVAL_MS = 250;
 
-export type BashTiming = {
-  startedAt?: number;
-  durationMs?: number;
-};
-export type BashTimingLookup = (toolCallId: string) => BashTiming | undefined;
-
-export function patchBashTool(
-  getTiming: BashTimingLookup = () => undefined,
-): ToolRenderers {
-  function updateTiming(state: BashRenderState, toolCallId: string): void {
-    const timing = getTiming(toolCallId);
-    if (!timing) return;
-    if (timing.startedAt !== undefined) state.startedAt = timing.startedAt;
-    if (timing.durationMs !== undefined) state.durationMs = timing.durationMs;
-  }
-
+export function patchBashTool(): ToolRenderers {
   return {
     renderShell: "self",
     renderCall(args, theme, toolContext) {
-      updateTiming(
-        toolContext.state as BashRenderState,
-        toolContext.toolCallId,
-      );
       return renderBashCall(args as BashToolInput, theme, toolContext);
     },
     renderResult(result, options, theme, toolContext) {
       const state = toolContext.state as BashRenderState;
-      updateTiming(state, toolContext.toolCallId);
-      const text = getResultText(state, options, toolContext.lastComponent);
-      const details = result.details as BashDetailsWithTiming | undefined;
+      state.durationMs = options.isPartial ? undefined : toolContext.durationMs;
+      const text = getResultText(
+        state,
+        options,
+        toolContext.lastComponent,
+        toolContext.outputPad,
+      );
+      const details = result.details as BashToolDetails | undefined;
 
       if (
         state.startedAt !== undefined &&
@@ -59,7 +46,6 @@ export function patchBashTool(
       }
 
       if (!options.isPartial || toolContext.isError) {
-        state.endedAt ??= Date.now();
         if (state.durationTimer) {
           clearInterval(state.durationTimer);
           unregisterToolTimer(state.durationTimer);

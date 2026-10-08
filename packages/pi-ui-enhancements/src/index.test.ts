@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it, spyOn } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import type {
   ExtensionAPI,
   ExtensionContext,
@@ -352,103 +352,32 @@ describe("extension lifecycle", () => {
     expect(pi._resolverCount()).toBe(1);
   });
 
-  for (const isError of [false, true]) {
-    it(`uses execution-event timing without wrapping Bash execute, isError=${isError}`, async () => {
-      const pi = mkPi();
-      const clock = spyOn(Date, "now").mockReturnValue(1000);
-      ext(pi);
-      try {
-        const renderer = pi._resolve("bash")!;
-        const context = mkToolCtx({ args: { command: "echo result" } });
-        await pi._handlers.tool_execution_start![0]!({
-          toolCallId: "call-1",
-          toolName: "bash",
-        });
-        clock.mockReturnValue(2250);
-        await pi._handlers.tool_execution_end![0]!({
-          toolCallId: "call-1",
-          toolName: "bash",
-        });
-        const output = renderer.renderResult!(
-          {
-            content: [
-              { type: "text", text: isError ? "Command aborted" : "result" },
-            ],
-            details: undefined,
-          },
-          { expanded: false, isPartial: false },
-          mkTheme(),
-          { ...context, isError },
-        )
-          .render(80)
-          .join("\n");
-        expect(output).toContain("took 1.3s");
-        expect(pi._registeredTools()).toEqual([]);
-      } finally {
-        await pi._handlers.session_shutdown![0]!({});
-        clock.mockRestore();
-      }
-    });
-  }
-
-  it("keeps Bash durations across history rebuilds and restores only valid branch timing records", async () => {
+  it("renders Pi's recorded Bash duration without extra session records", async () => {
     const pi = mkPi();
-    const clock = spyOn(Date, "now").mockReturnValue(1000);
     ext(pi);
-    const ctx = mkCtx({ mode: "json", hasUI: false });
-    ctx.sessionManager.getBranch = () =>
-      pi._entries() as ReturnType<typeof ctx.sessionManager.getBranch>;
-    const render = () =>
-      pi._resolve("bash")!.renderResult!(
-        { content: [{ type: "text", text: "result" }], details: undefined },
-        { expanded: false, isPartial: false },
-        mkTheme(),
-        mkToolCtx({ executionStarted: false }),
-      )
-        .render(80)
-        .join("\n");
     try {
       await pi._handlers.tool_execution_start![0]!({
         toolCallId: "call-1",
         toolName: "bash",
       });
-      clock.mockReturnValue(2250);
       await pi._handlers.tool_execution_end![0]!({
         toolCallId: "call-1",
         toolName: "bash",
+        durationMs: 1250,
       });
-      expect(pi._entries()).toEqual([
-        {
-          type: "custom",
-          customType: "pi-ui-enhancements:bash-timing",
-          data: { toolCallId: "call-1", durationMs: 1250 },
-        },
-      ]);
-      for (let rebuild = 0; rebuild < 2; rebuild++)
-        expect(render()).toContain("took 1.3s");
-      await pi._handlers.session_shutdown![0]!({});
-      pi._entries().push({
-        type: "custom",
-        customType: "pi-ui-enhancements:bash-timing",
-        data: { toolCallId: "call-1", durationMs: -10 },
-      });
-      await pi._handlers.session_start![0]!({}, ctx);
-      expect(render()).toContain("took 1.3s");
-      const historical = mkToolCtx({ executionStarted: false });
-      pi._resolve("bash")!.renderCall!(
-        { command: "echo result" },
+      const output = pi._resolve("bash")!.renderResult!(
+        { content: [{ type: "text", text: "result" }], details: {} },
+        { expanded: false, isPartial: false },
         mkTheme(),
-        historical,
-      ).render(80);
-      expect(
-        (historical.state as { startedAt?: number }).startedAt,
-      ).toBeUndefined();
-      expect((historical.state as { durationMs?: number }).durationMs).toBe(
-        1250,
-      );
+        mkToolCtx({ durationMs: 1250, executionStarted: false }),
+      )
+        .render(80)
+        .join("\n");
+      expect(output).toContain("took 1.3s");
+      expect(pi._entries()).toEqual([]);
+      expect(pi._registeredTools()).toEqual([]);
     } finally {
       await pi._handlers.session_shutdown![0]!({});
-      clock.mockRestore();
     }
   });
 

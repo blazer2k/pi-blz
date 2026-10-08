@@ -36,6 +36,7 @@ import {
   isAppleTerminalSession,
   Image,
   Container,
+  visibleWidth,
   setCapabilities,
   Text,
   type Component,
@@ -222,7 +223,8 @@ describe("public renderer integration", () => {
     const args = { command: "echo config" };
     const result = {
       content: [{ type: "text" as const, text: "first\nsecond\nthird\nlast" }],
-      details: { durationMs: 1 },
+      details: {},
+      durationMs: 1,
       isError: false,
     };
     const component = toolComponent(session, "bash", args);
@@ -802,6 +804,51 @@ describe("public renderer integration", () => {
     }
   });
 
+  it("uses Pi's live padding and recorded duration with real tool components", async () => {
+    const { session } = await createSession(true);
+    for (const [name, args] of [
+      ["bash", { command: "echo result" }],
+      ["read", { path: "native.txt" }],
+      ["codemode", { code: 'text("result")' }],
+    ] as const) {
+      const component = toolComponent(session, name, args);
+      component.setArgsComplete();
+      const input = {
+        content:
+          name === "codemode"
+            ? [
+                {
+                  type: "text" as const,
+                  text: "Script completed\nWall time 1.2 seconds\nOutput:\n",
+                },
+                { type: "text" as const, text: "result" },
+              ]
+            : [{ type: "text" as const, text: "result" }],
+        details: name === "codemode" ? { calls: [] } : {},
+        durationMs: 2345,
+        isError: false,
+      };
+      const snapshot = structuredClone(input);
+      component.updateResult(input);
+      for (const outputPad of [0, 1, 0]) {
+        component.setOutputPad(outputPad);
+        for (const width of [8, 40, 80]) {
+          const rows = component
+            .render(width)
+            .map(stripAnsi)
+            .filter((row) => row.trim());
+          expect(rows.every((row) => visibleWidth(row) <= width)).toBe(true);
+          expect(
+            rows.every((row) => row.startsWith(" ") === (outputPad === 1)),
+          ).toBe(true);
+          if (name === "bash" && width === 80)
+            expect(rows.join("\n")).toContain("took 2.3s");
+        }
+      }
+      expect(input).toEqual(snapshot);
+    }
+  });
+
   it("does not mutate Pi's registry method or re-register any tools", async () => {
     const original = ExtensionRunner.prototype.getAllRegisteredTools;
     const { session, resourceLoader } = await createSession(true);
@@ -883,7 +930,7 @@ describe("public renderer integration", () => {
     });
   });
 
-  it("preserves Bash durations on reopening without changing results or model context", async () => {
+  it("uses Pi's saved Bash duration on reopening without extra records", async () => {
     const { session } = await createSession(true);
     session.sessionManager.appendMessage({
       role: "user",
@@ -914,12 +961,6 @@ describe("public renderer integration", () => {
       stopReason: "toolUse",
       timestamp: 1,
     });
-    await session.extensionRunner.emit({
-      type: "tool_execution_start",
-      toolCallId: "history-bash",
-      toolName: "bash",
-      args: { command: "echo timed" },
-    });
     const result = await session
       .getToolDefinition("bash")!
       .execute(
@@ -933,34 +974,19 @@ describe("public renderer integration", () => {
         } as unknown as ExtensionToolContext,
       );
     const snapshot = structuredClone(result);
-    await session.extensionRunner.emit({
-      type: "tool_execution_end",
-      toolCallId: "history-bash",
-      toolName: "bash",
-      result,
-      isError: false,
-    });
     session.sessionManager.appendMessage({
       role: "toolResult",
       toolCallId: "history-bash",
       toolName: "bash",
       content: result.content,
       details: result.details as ToolResultMessage["details"],
+      durationMs: 1250,
       isError: false,
       timestamp: 2,
     });
     expect(result).toEqual(snapshot);
     const entries = session.sessionManager.getBranch();
-    expect(
-      entries.some(
-        (entry) =>
-          entry.type === "custom" &&
-          entry.customType === "pi-ui-enhancements:bash-timing",
-      ),
-    ).toBe(true);
-    expect(
-      JSON.stringify(session.sessionManager.buildSessionContext().messages),
-    ).not.toContain("pi-ui-enhancements:bash-timing");
+    expect(entries.filter((entry) => entry.type === "custom")).toEqual([]);
     const file = session.sessionManager.getSessionFile()!;
     await session.extensionRunner.emit({
       type: "session_shutdown",
@@ -971,20 +997,24 @@ describe("public renderer integration", () => {
     const reopened = (
       await createSession(true, undefined, SessionManager.open(file))
     ).session;
-    const context = mkToolCtx({
-      toolCallId: "history-bash",
-      executionStarted: false,
-    });
-    const output = resolve(reopened, "bash")!.renderResult!(
-      result,
-      { expanded: false, isPartial: false },
-      mkTheme(),
-      context,
-    )
-      .render(80)
-      .join("\n");
-    expect(output).toContain("took ");
-    expect((context.state as { startedAt?: number }).startedAt).toBeUndefined();
+    const saved = reopened.sessionManager
+      .getBranch()
+      .find(
+        (entry) =>
+          entry.type === "message" && entry.message.role === "toolResult",
+      );
+    expect(saved?.type).toBe("message");
+    const message = (saved as { type: "message"; message: ToolResultMessage })
+      .message;
+    const component = toolComponent(
+      reopened,
+      "bash",
+      { command: "echo timed" },
+      "history-bash",
+    );
+    component.setArgsComplete();
+    component.updateResult(message);
+    expect(component.render(80).join("\n")).toContain("took 1.3s");
     expect(result).toEqual(snapshot);
   });
 

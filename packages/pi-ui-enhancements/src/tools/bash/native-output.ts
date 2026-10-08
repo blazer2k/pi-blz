@@ -1,5 +1,5 @@
 import { normalizeOutput } from "../rendering/text";
-import type { BashDetailsWithTiming } from "./types";
+import type { BashToolDetails } from "@earendil-works/pi-coding-agent";
 
 const BASH_STATUS_PATTERN =
   /^(?:Command exited with code \d+|Command terminated without an exit code|Command timed out after .+ seconds|Command aborted)$/;
@@ -26,7 +26,7 @@ export function parseBashErrorText(text: string): {
 
 export function stripBashTruncationNotice(
   text: string,
-  details: BashDetailsWithTiming | undefined,
+  details: BashToolDetails | undefined,
 ): string {
   if (!details?.truncation?.truncated && !details?.fullOutputPath) return text;
 

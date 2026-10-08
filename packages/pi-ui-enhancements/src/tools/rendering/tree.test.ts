@@ -64,6 +64,26 @@ describe("tree-aware text wrapping", () => {
     expect(widths).toEqual([38, 78, 78]);
   });
 
+  it("reflows reused results when output padding changes at the same width", () => {
+    const state = {};
+    const text = getResultText(state, optsExpanded, undefined);
+    const widths: number[] = [];
+    text.setText((width) => {
+      widths.push(width);
+      return "╰─ " + "界 result ".repeat(12);
+    });
+    for (const outputPad of [1, 0, 1]) {
+      expect(getResultText(state, optsExpanded, text, outputPad)).toBe(text);
+      for (const width of [40, 1, 40]) {
+        const rows = text.render(width);
+        expect(rows.every((row) => visibleWidth(row) <= width)).toBe(true);
+        if (width === 40)
+          expect(rows[0]!.startsWith(" ")).toBe(outputPad === 1);
+      }
+    }
+    expect(widths).toEqual([38, 1, 38, 40, 1, 40, 38, 1, 38]);
+  });
+
   it("prefixes every wrapped result row and closes only the final row", () => {
     const text = getResultText({}, optsExpanded, undefined);
     text.setText(

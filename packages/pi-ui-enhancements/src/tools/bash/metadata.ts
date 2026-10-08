@@ -4,7 +4,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { buildResultStatusParts } from "../rendering/state";
 import { formatDuration } from "../rendering/output";
-import type { BashDetailsWithTiming, BashRenderState } from "./types";
+import type { BashRenderState } from "./types";
 
 type MetadataOptions = {
   durationSummary?: string;
@@ -40,16 +40,14 @@ export function joinMetadata(parts: string[], theme: Theme): string {
 }
 
 export function getDurationSummary(
-  details: BashDetailsWithTiming | undefined,
   state: BashRenderState,
   options: ToolRenderResultOptions,
 ): string | undefined {
-  const elapsedMs =
-    details?.durationMs ??
-    state.durationMs ??
-    (state.startedAt === undefined
+  const elapsedMs = options.isPartial
+    ? state.startedAt === undefined
       ? undefined
-      : (state.endedAt ?? Date.now()) - state.startedAt);
+      : Math.max(0, Date.now() - state.startedAt)
+    : state.durationMs;
 
   return elapsedMs === undefined
     ? undefined

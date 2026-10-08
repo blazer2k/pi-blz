@@ -103,13 +103,13 @@ Compact and rounded use the separate shimmer Working indicator and a footer for 
 
 The extension changes how read, write, edit, bash, ls, find, and grep look. Pi still runs the original tools and controls their arguments, source information, and availability. Your `defaultTools` setting and CLI options decide which tools are active; this extension does not enable them.
 
-Tool calls and output fit the available terminal width and adjust when you resize it.
+Tool calls and output fit the available terminal width and adjust when you resize it. They follow Pi's `outputPad` setting, including changes made during a session.
 
 Expanded Bash and Write show their full content. Expanded list tools show the beginning and end of a list, with an omission marker between them. `maxExpandedEntries` controls that limit and also applies to generic custom-tool results.
 
 Unfinished indicators in expanded Bash, Write, and wrapped Codemode blink in fullscreen mode. In regular mode they stay dim and still, avoiding repeated redraws of terminal scrollback. Completed indicators stay still in both modes. These mode rules apply only to expanded calls and work with every editor style.
 
-Bash duration is measured from execution events. Small extension-only records in the session file keep those durations available when you reopen a session or Pi rebuilds the conversation display. These records are not sent to the model and do not change tool results. Saved results with `details.durationMs` also remain supported.
+Running Bash calls show elapsed time. Completed calls use Pi's recorded duration, including when you reopen a session. Older results without a recorded duration show no timing label. Pi's HTML export shows the command and output without a duration label.
 
 ## Collapsed Bash and Codemode output
 

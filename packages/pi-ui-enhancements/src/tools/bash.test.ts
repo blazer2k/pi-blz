@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import {
   initTheme,
   createBashToolDefinition,
@@ -228,15 +228,51 @@ describe("bash renderResult", () => {
     const component = renderResult(
       {
         content: [{ type: "text", text: "hello" }],
-        details: { durationMs: 1200 },
+        details: {},
       },
       { expanded: false, isPartial: false },
       theme,
-      ctx,
+      { ...ctx, durationMs: 1200 },
     );
 
     const output = component.render(120).join("\n");
     expect(output).toContain("took 1.2s");
+  });
+
+  it("uses only Pi's recorded duration for completed results", () => {
+    const def = patchBashTool();
+    for (const [durationMs, expected] of [
+      [2345, "took 2.3s"],
+      [0, "took 0ms"],
+      [undefined, undefined],
+    ] as const) {
+      for (const isError of [false, true]) {
+        const input = {
+          content: [
+            {
+              type: "text" as const,
+              text: isError ? "Command aborted" : "done",
+            },
+          ],
+          details: {},
+        };
+        const snapshot = structuredClone(input);
+        const component = def.renderResult!(
+          input,
+          { expanded: false, isPartial: false },
+          mkTheme(),
+          mkToolCtx({
+            durationMs,
+            isError,
+            state: { startedAt: Date.now() - 9999 },
+          }),
+        );
+        const output = component.render(80).join("\n");
+        if (expected) expect(output).toContain(expected);
+        else expect(output).not.toContain("took");
+        expect(input).toEqual(snapshot);
+      }
+    }
   });
 
   it("formats minute and hour durations", () => {
@@ -249,20 +285,19 @@ describe("bash renderResult", () => {
       const component = def.renderResult!(
         {
           content: [{ type: "text", text: "hello" }],
-          details: { durationMs },
+          details: {},
         },
         { expanded: false, isPartial: false },
         mkTheme(),
-        mkToolCtx(),
+        mkToolCtx({ durationMs }),
       );
 
       expect(component.render(120).join("\n")).toContain(expected);
     }
   });
 
-  it("retains duration when execution is aborted", async () => {
+  it("renders an aborted execution without inventing its duration", async () => {
     const execute = createBashToolDefinition(process.cwd()).execute;
-    const startedAt = Date.now();
     const controller = new AbortController();
     controller.abort();
     let errorText = "";
@@ -286,8 +321,7 @@ describe("bash renderResult", () => {
     }
 
     expect(errorText).toContain("Command aborted");
-    const durationMs = Date.now() - startedAt;
-    const def = patchBashTool(() => ({ durationMs }));
+    const def = patchBashTool();
 
     const component = def.renderResult!(
       { content: [{ type: "text", text: errorText }], details: undefined },
@@ -300,11 +334,10 @@ describe("bash renderResult", () => {
       }),
     );
 
-    expect(component.render(120).join("\n")).toContain("took ");
+    expect(component.render(120).join("\n")).not.toContain("took ");
   });
 
-  it("preserves nonzero exit results and their duration", async () => {
-    const startedAt = Date.now();
+  it("preserves nonzero exit results without inventing their duration", async () => {
     const result = await createBashToolDefinition(process.cwd()).execute(
       "nonzero-call",
       { command: "echo before failure; exit 4" },
@@ -328,8 +361,7 @@ describe("bash renderResult", () => {
       (result.details as { durationMs?: number } | undefined)?.durationMs,
     ).toBeUndefined();
     const snapshot = structuredClone(result);
-    const durationMs = Date.now() - startedAt;
-    const def = patchBashTool(() => ({ durationMs }));
+    const def = patchBashTool();
 
     const component = def.renderResult!(
       result,
@@ -341,7 +373,7 @@ describe("bash renderResult", () => {
 
     expect(text).toContain("before failure");
     expect(text).toContain("exited with code 4");
-    expect(text).toContain("took ");
+    expect(text).not.toContain("took ");
     expect(result).toEqual(snapshot);
   });
 
@@ -355,13 +387,12 @@ describe("bash renderResult", () => {
       {
         content: [{ type: "text", text: "hello" }],
         details: {
-          durationMs: 50,
           truncation: { truncated: true },
         },
       },
       { expanded: false, isPartial: false },
       theme,
-      ctx,
+      { ...ctx, durationMs: 50 },
     );
 
     const output = component.render(120).join("\n");
@@ -379,13 +410,12 @@ describe("bash renderResult", () => {
         {
           content: [{ type: "text", text: "failure" }],
           details: {
-            durationMs: 50,
             truncation: { truncated: true },
           },
         },
         { expanded, isPartial: false },
         theme,
-        ctx,
+        { ...ctx, durationMs: 50 },
       );
 
       const output = component.render(120).join("\n");
@@ -445,11 +475,11 @@ describe("bash renderResult", () => {
             ).join("\n"),
           },
         ],
-        details: { durationMs: 50 },
+        details: {},
       },
       { expanded: false, isPartial: false },
       mkTheme(),
-      mkToolCtx(),
+      mkToolCtx({ durationMs: 50 }),
     )
       .render(120)
       .join("\n");
@@ -467,11 +497,11 @@ describe("bash renderResult", () => {
     const lines = def.renderResult!(
       {
         content: [{ type: "text", text: "\none\ntwo\nthree\nfour" }],
-        details: { durationMs: 50 },
+        details: {},
       },
       { expanded: false, isPartial: false },
       mkTheme(),
-      mkToolCtx(),
+      mkToolCtx({ durationMs: 50 }),
     )
       .render(120)
       .map((line) => line.trimEnd());
@@ -485,11 +515,11 @@ describe("bash renderResult", () => {
     const output = def.renderResult!(
       {
         content: [{ type: "text", text: "one\ntwo\nthree" }],
-        details: { durationMs: 50 },
+        details: {},
       },
       { expanded: false, isPartial: false },
       mkTheme(),
-      mkToolCtx(),
+      mkToolCtx({ durationMs: 50 }),
     )
       .render(120)
       .join("\n");
@@ -507,11 +537,11 @@ describe("bash renderResult", () => {
     const output = def.renderResult!(
       {
         content: [{ type: "text", text: "one\ntwo\nthree" }],
-        details: { durationMs: 50 },
+        details: {},
       },
       { expanded: false, isPartial: false },
       mkTheme(),
-      mkToolCtx(),
+      mkToolCtx({ durationMs: 50 }),
     )
       .render(120)
       .join("\n");
@@ -532,11 +562,11 @@ describe("bash renderResult", () => {
             text: `one\ntwo\nthree\n${PI_0_84_3_OUTPUT.bash.exited}`,
           },
         ],
-        details: { durationMs: 50 },
+        details: {},
       },
       { expanded: false, isPartial: false },
       mkTheme(),
-      mkToolCtx({ isError: true }),
+      mkToolCtx({ isError: true, durationMs: 50 }),
     )
       .render(120)
       .join("\n");
@@ -564,11 +594,11 @@ describe("bash renderResult", () => {
     const result = def.renderResult!(
       {
         content: [{ type: "text", text: "done" }],
-        details: { durationMs: 50 },
+        details: {},
       },
       { expanded: true, isPartial: false },
       theme,
-      ctx,
+      { ...ctx, durationMs: 50 },
     );
     const call = def.renderCall!(args, theme, ctx);
     const output = [...call.render(200), ...result.render(200)]
@@ -592,22 +622,22 @@ describe("bash renderResult", () => {
     const expanded = renderResult(
       {
         content: [{ type: "text", text: tenLines }],
-        details: { durationMs: 50 },
+        details: {},
       },
       { expanded: true, isPartial: false },
       theme,
-      mkToolCtx({ expanded: true }),
+      mkToolCtx({ expanded: true, durationMs: 50 }),
     );
     expect(expanded.render(120).join("\n")).toContain("to collapse");
 
     const expandedSingleLine = renderResult(
       {
         content: [{ type: "text", text: "done" }],
-        details: { durationMs: 50 },
+        details: {},
       },
       { expanded: true, isPartial: false },
       theme,
-      mkToolCtx({ expanded: true }),
+      mkToolCtx({ expanded: true, durationMs: 50 }),
     );
     expect(expandedSingleLine.render(120).join("\n")).not.toContain(
       "to collapse",
@@ -619,22 +649,22 @@ describe("bash renderResult", () => {
       const collapsed = renderResult(
         {
           content: [{ type: "text", text: tenLines }],
-          details: { durationMs: 50 },
+          details: {},
         },
         { expanded: false, isPartial: false },
         theme,
-        mkToolCtx(),
+        mkToolCtx({ durationMs: 50 }),
       );
       expect(collapsed.render(120).join("\n")).not.toContain("to expand");
 
       const expandedDisabled = renderResult(
         {
           content: [{ type: "text", text: tenLines }],
-          details: { durationMs: 50 },
+          details: {},
         },
         { expanded: true, isPartial: false },
         theme,
-        mkToolCtx({ expanded: true }),
+        mkToolCtx({ expanded: true, durationMs: 50 }),
       );
       expect(expandedDisabled.render(120).join("\n")).not.toContain(
         "to collapse",
@@ -661,11 +691,11 @@ describe("bash renderResult", () => {
             ].join("\n"),
           },
         ],
-        details: { durationMs: 50 },
+        details: {},
       },
       { expanded: true, isPartial: false },
       theme,
-      ctx,
+      { ...ctx, durationMs: 50 },
     );
 
     const lines = component
@@ -710,14 +740,13 @@ describe("bash renderResult", () => {
           },
         ],
         details: {
-          durationMs: 50,
           truncation: { truncated: true },
           fullOutputPath: PI_0_84_3_OUTPUT.bash.fullOutputPath,
         },
       },
       { expanded: true, isPartial: false },
       mkTheme(),
-      mkToolCtx({ expanded: true }),
+      mkToolCtx({ expanded: true, durationMs: 50 }),
     );
 
     const output = component.render(120).join("\n");
@@ -732,22 +761,22 @@ describe("bash renderResult", () => {
     const short = def.renderResult!(
       {
         content: [{ type: "text", text: "" }],
-        details: { durationMs: 12 },
+        details: {},
       },
       { expanded: false, isPartial: false },
       mkTheme(),
-      mkToolCtx(),
+      mkToolCtx({ durationMs: 12 }),
     )
       .render(120)
       .join("\n");
     const longCall = def.renderResult!(
       {
         content: [{ type: "text", text: "" }],
-        details: { durationMs: 12 },
+        details: {},
       },
       { expanded: false, isPartial: false },
       mkTheme(),
-      mkToolCtx({ state: { callExpandable: true } }),
+      mkToolCtx({ state: { callExpandable: true }, durationMs: 12 }),
     )
       .render(120)
       .join("\n");
@@ -772,11 +801,11 @@ describe("bash renderResult", () => {
             text: "(no output)\n\nCommand exited with code 1",
           },
         ],
-        details: { durationMs: 50 },
+        details: {},
       },
       { expanded: false, isPartial: false },
       theme,
-      ctx,
+      { ...ctx, durationMs: 50 },
     );
 
     const output = component.render(120).join("\n");
@@ -847,11 +876,11 @@ describe("bash renderResult", () => {
             text: "a deliberately long output line that cannot share one row with duration metadata and the complete collapse hint without wrapping badly",
           },
         ],
-        details: { durationMs: 50 },
+        details: {},
       },
       { expanded: true, isPartial: false },
       mkTheme(),
-      mkToolCtx({ expanded: true }),
+      mkToolCtx({ expanded: true, durationMs: 50 }),
     );
     const lines = component
       .render(120)
@@ -863,23 +892,36 @@ describe("bash renderResult", () => {
     expect(lines.at(-1)).toContain("╰─ took 50ms");
   });
 
-  it("shows all short preview output while partial", () => {
-    const def = setupBashTool();
-    const component = def.renderResult!(
-      {
-        content: [{ type: "text", text: "line one\nline two\n\n" }],
-        details: { durationMs: 3400 },
-      },
-      { expanded: false, isPartial: true },
-      mkTheme(),
-      mkToolCtx({ isPartial: true }),
-    );
-    const output = component.render(120).join("\n");
-
-    expect(output).toContain("│  line one");
-    expect(output).toContain("│  line two");
-    expect(output).toContain("╰─ elapsed 3.4s");
-    expect(output).not.toContain("ctrl+o");
+  it("shows short preview output and elapsed time while partial", () => {
+    const clock = spyOn(Date, "now").mockReturnValue(4400);
+    try {
+      const def = setupBashTool();
+      const state = { startedAt: 1000 };
+      const ctx = mkToolCtx({ state, isPartial: true, durationMs: 99 });
+      const component = def.renderResult!(
+        {
+          content: [{ type: "text", text: "line one\nline two\n\n" }],
+          details: {},
+        },
+        { expanded: false, isPartial: true },
+        mkTheme(),
+        ctx,
+      );
+      const output = component.render(120).join("\n");
+      expect(output).toContain("│  line one");
+      expect(output).toContain("│  line two");
+      expect(output).toContain("╰─ elapsed 3.4s");
+      expect(output).not.toContain("ctrl+o");
+      def.renderResult!(
+        { content: [], details: {} },
+        { expanded: false, isPartial: false },
+        mkTheme(),
+        ctx,
+      );
+      expect((state as BashRenderState).durationTimer).toBeUndefined();
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   it("collapsed errors use the three-row output preview", () => {
@@ -893,19 +935,16 @@ describe("bash renderResult", () => {
         content: [
           {
             type: "text",
-            text: `${Array.from({ length: 8 }, (_, i) => `line${i + 1}`).join(
-              "\n",
-            )}\nCommand exited with code 2`,
+            text: `${Array.from({ length: 8 }, (_, i) => `line${i + 1}`).join("\n")}\nCommand exited with code 2`,
           },
         ],
         details: {
-          durationMs: 123,
           truncation: { truncated: true },
         },
       },
       { expanded: false, isPartial: false },
       theme,
-      ctx,
+      { ...ctx, durationMs: 123 },
     );
 
     const output = component.render(120).join("\n");
@@ -945,15 +984,14 @@ describe("bash partial duration timer", () => {
     );
     expect(state.durationTimer).toBeDefined();
 
-    // Final render should clear it
     renderResult(
       {
         content: [{ type: "text", text: "done" }],
-        details: { durationMs: 100 },
+        details: {},
       },
       { expanded: false, isPartial: false },
       theme,
-      ctx,
+      { ...ctx, durationMs: 100 },
     );
     expect(state.durationTimer).toBeUndefined();
 
@@ -988,11 +1026,11 @@ describe("bash partial duration timer", () => {
     renderResult(
       {
         content: [{ type: "text", text: "done" }],
-        details: { durationMs: 100 },
+        details: {},
       },
       { expanded: false, isPartial: false },
       theme,
-      ctx,
+      { ...ctx, durationMs: 100 },
     );
     expect(state.hasResult).toBe(true);
 

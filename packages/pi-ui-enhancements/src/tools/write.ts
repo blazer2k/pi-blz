@@ -239,7 +239,12 @@ export function patchWriteTool(): ToolRenderers {
     },
     renderResult(result, options, theme, toolCtx) {
       const state = toolCtx.state as WriteRenderState;
-      const text = getResultText(state, options, toolCtx.lastComponent);
+      const text = getResultText(
+        state,
+        options,
+        toolCtx.lastComponent,
+        toolCtx.outputPad,
+      );
 
       const details = result.details as
         | { truncation?: { truncated?: boolean } }

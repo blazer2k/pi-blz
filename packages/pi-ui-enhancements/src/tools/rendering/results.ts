@@ -228,7 +228,12 @@ export function buildRenderResult(
 ): NonNullable<Parameters<ExtensionAPI["registerTool"]>[0]["renderResult"]> {
   return (result, options, theme, toolContext) => {
     const state = toolContext.state as BaseRenderState;
-    const text = getResultText(state, options, toolContext.lastComponent);
+    const text = getResultText(
+      state,
+      options,
+      toolContext.lastComponent,
+      toolContext.outputPad,
+    );
     const details = result.details as
       | { truncation?: { truncated?: boolean } }
       | undefined;
