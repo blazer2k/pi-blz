@@ -78,6 +78,41 @@ describe("public tool renderer resolver", () => {
     expect(layer.resolve("read", () => undefined)).toBeUndefined();
   });
 
+  it("bypasses all enhancements and metadata lookup when tools are disabled", () => {
+    setTestConfig({ tools: { enabled: false } });
+    let metadataReads = 0;
+    const names = ["read", "codemode", "custom"];
+    const layer = createToolRendering(
+      {
+        getAllTools: () => {
+          metadataReads++;
+          return [];
+        },
+      },
+      { isEnabled: () => true, isToolCallActive: () => true },
+    );
+    for (const name of names) {
+      let calls = 0;
+      expect(
+        layer.resolve(name, () => {
+          calls++;
+          return native;
+        }),
+      ).toBe(native);
+      expect(calls).toBe(1);
+    }
+    const self = { ...native, renderShell: "self" as const };
+    expect(layer.resolve("custom", () => self)).toBe(self);
+    expect(layer.resolve("read", () => undefined)).toBeUndefined();
+    const failure = new Error("downstream failure");
+    expect(() =>
+      layer.resolve("read", () => {
+        throw failure;
+      }),
+    ).toThrow(failure);
+    expect(metadataReads).toBe(0);
+  });
+
   it("overrides only verified native core tools, including native self-rendering Edit", () => {
     const layer = createToolRendering(
       { getAllTools: () => [info("read"), info("edit")] },

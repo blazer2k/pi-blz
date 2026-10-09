@@ -57,6 +57,7 @@ For example:
     "showDuration": true
   },
   "tools": {
+    "enabled": true,
     "enhanceCustomTools": true,
     "capitalizeNames": true,
     "indicator": {
@@ -87,6 +88,7 @@ The table uses dotted paths for the nested JSON fields:
 | `workingIndicator.style`             | `"shimmer"` | `"native"`, `"shimmer"`; custom editors only          |
 | `workingIndicator.showInterruptHint` | `true`      | Show the interrupt hint; shimmer only                 |
 | `workingIndicator.showDuration`      | `true`      | Show elapsed and completion time; shimmer only        |
+| `tools.enabled`                      | `true`      | Enable this extension's tool rendering overrides      |
 | `tools.enhanceCustomTools`           | `true`      | Compact eligible extension tools, including Codemode  |
 | `tools.capitalizeNames`              | `true`      | Capitalize headers drawn by this extension            |
 | `tools.indicator.style`              | `"circle"`  | `"dot"`, `"circle"`, `"diamond"`                      |
@@ -140,6 +142,8 @@ Compact and rounded use a footer for extension status messages. Native leaves bo
 With `editor.style: "native"`, this setting and the shimmer options are ignored. Pi's editor and indicator remain untouched. Change styles through the settings file and `/reload`.
 
 ## Built-in tool display
+
+Set `tools.enabled` to `false` to leave all tool display to Pi and other extensions. This overrides the other `tools` settings, including Codemode and custom-tool enhancements. Header, editor, and Working indicator settings are unaffected. Apply the change with `/reload`.
 
 The extension changes how read, write, edit, bash, ls, find, and grep look. Pi still runs the original tools and controls their arguments, source information, and availability. Your `defaultTools` setting and CLI options decide which tools are active; this extension does not enable them.
 

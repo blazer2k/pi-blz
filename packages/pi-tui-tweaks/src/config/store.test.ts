@@ -47,6 +47,7 @@ describe("config validation", () => {
       workingIndicator: {
         style: "shimmer",
       },
+      tools: { enabled: true },
       editor: {
         style: "rounded",
         color: "dim",
@@ -57,6 +58,18 @@ describe("config validation", () => {
       },
     });
     expect(getConfig()).toEqual(getDefaultConfig());
+  });
+
+  it("accepts the tools master flag without coercion or resetting siblings", () => {
+    for (const enabled of [true, false, 0, 1, "true", "false", null, [], {}]) {
+      expect(
+        validateConfig({ tools: { enabled, maxExpandedEntries: 50 } }).tools,
+      ).toEqual({
+        ...getDefaultConfig().tools,
+        enabled: typeof enabled === "boolean" ? enabled : true,
+        maxExpandedEntries: 50,
+      });
+    }
   });
 
   it("resolves nested fields independently without coercion or unknown keys", () => {

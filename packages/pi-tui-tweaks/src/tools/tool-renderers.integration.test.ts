@@ -191,13 +191,15 @@ describe("public renderer integration", () => {
   it("loads externally edited settings only after Pi reloads and registers no settings command", async () => {
     let header: (Component & { dispose?(): void }) | undefined;
     const errors: unknown[] = [];
+    const setWidget = mock((_key: string, _content: unknown) => {});
+    const setEditorComponent = mock((_factory: unknown) => {});
     const uiContext = {
       setHeader(factory: Parameters<ExtensionUIContext["setHeader"]>[0]) {
         header?.dispose?.();
         header = factory?.({} as TUI, mkTheme());
       },
-      setWidget() {},
-      setEditorComponent() {},
+      setWidget,
+      setEditorComponent,
       getEditorComponent: () => undefined,
       setFooter() {},
       setStatus() {},
@@ -289,6 +291,77 @@ describe("public renderer integration", () => {
     expect(after).not.toContain("│  first");
     expect(session.getAllTools().map((tool) => tool.name)).toEqual(inventory);
     expect(session.getActiveToolNames()).toEqual(active);
+    const runningContext = mkToolCtx({
+      isPartial: true,
+      executionStarted: true,
+    });
+    await session.extensionRunner.emit({
+      type: "tool_execution_start",
+      toolCallId: runningContext.toolCallId,
+      toolName: "codemode",
+      args: { code: "text(1);" },
+    });
+    const running = resolve(session, "codemode")!;
+    running.renderCall!({ code: "text(1);" }, mkTheme(), runningContext).render(
+      80,
+    );
+    running.renderResult!(
+      { content: [], details: { calls: [] } },
+      { expanded: false, isPartial: true },
+      mkTheme(),
+      runningContext,
+    );
+    expect(runningContext.state).toMatchObject({
+      _tuiTweaks: { durationTimer: expect.anything() },
+    });
+    const styledHeader = header!.render(80);
+    for (const enabled of [false, true]) {
+      const config = getConfig();
+      writeFileSync(
+        process.env.PI_TUI_TWEAKS_CONFIG_PATH!,
+        JSON.stringify({
+          ...config,
+          tools: { ...config.tools, enabled },
+        }),
+      );
+      expect(getConfig().tools.enabled).toBe(config.tools.enabled);
+      setWidget.mockClear();
+      setEditorComponent.mockClear();
+      await session.reload();
+      expect(getConfig().tools.enabled).toBe(enabled);
+      for (const name of [
+        "read",
+        "write",
+        "edit",
+        "bash",
+        "ls",
+        "find",
+        "grep",
+        "codemode",
+      ]) {
+        const original = session.getToolDefinition(name);
+        expect(original).toBeDefined();
+        if (enabled) expect(resolve(session, name)).not.toBe(original);
+        else expect(resolve(session, name)).toBe(original);
+      }
+      expect(runningContext.state).toMatchObject({
+        _tuiTweaks: { durationTimer: undefined, blinkTimer: undefined },
+      });
+      expect(
+        setWidget.mock.calls.filter(
+          ([, content]) => typeof content === "function",
+        ),
+      ).toHaveLength(enabled ? 1 : 0);
+      expect(
+        setEditorComponent.mock.calls.filter(
+          ([factory]) => typeof factory === "function",
+        ),
+      ).toHaveLength(1);
+      expect(header!.render(80)).toEqual(styledHeader);
+      expect(session.extensionRunner.hasHandlers("agent_start")).toBe(true);
+      expect(session.getAllTools().map((tool) => tool.name)).toEqual(inventory);
+      expect(session.getActiveToolNames()).toEqual(active);
+    }
     for (const headerMode of ["native", "off", "compact"] as const) {
       writeFileSync(
         process.env.PI_TUI_TWEAKS_CONFIG_PATH!,

@@ -38,6 +38,7 @@ const ConfigSchema = Type.Object(
     ),
     tools: Type.Object(
       {
+        enabled: flag(true),
         enhanceCustomTools: flag(true),
         capitalizeNames: flag(true),
         indicator: Type.Object(

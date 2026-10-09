@@ -221,32 +221,26 @@ describe("Codemode timing", () => {
     expect(state.blinkTimer).toBeUndefined();
   });
 
-  it("cleans timers when wrapping is disabled and resumes the same bundle when enabled", () => {
-    const { handle, state, progress } = setup();
-    progress();
-    const timer = state.durationTimer;
-    setTestConfig({
-      tools: {
-        enhanceCustomTools: false,
-      },
+  for (const setting of ["enabled", "enhanceCustomTools"] as const) {
+    it(`cleans timers with tools.${setting}=false and resumes the same bundle when enabled`, () => {
+      const { handle, state, progress } = setup();
+      progress();
+      const timer = state.durationTimer;
+      setTestConfig({ tools: { [setting]: false } });
+      handle.clearCustomTimers();
+      expect(state.durationTimer).toBeUndefined();
+      expect(state.blinkTimer).toBeUndefined();
+      progress();
+      expect(intervals.size).toBe(0);
+      setTestConfig({ tools: { [setting]: true } });
+      progress();
+      expect(state.durationTimer).toBeDefined();
+      expect(state.durationTimer).not.toBe(timer);
+      expect(intervals.size).toBe(1);
+      handle.dispose();
+      expect(intervals.size).toBe(0);
     });
-    handle.clearCustomTimers();
-    expect(state.durationTimer).toBeUndefined();
-    expect(state.blinkTimer).toBeUndefined();
-    progress();
-    expect(intervals.size).toBe(0);
-    setTestConfig({
-      tools: {
-        enhanceCustomTools: true,
-      },
-    });
-    progress();
-    expect(state.durationTimer).toBeDefined();
-    expect(state.durationTimer).not.toBe(timer);
-    expect(intervals.size).toBe(1);
-    handle.dispose();
-    expect(intervals.size).toBe(0);
-  });
+  }
 
   it("does not clear another instance's Codemode or unrelated Bash timers", () => {
     const { handle, progress } = setup();

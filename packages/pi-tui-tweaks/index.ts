@@ -48,11 +48,12 @@ export default function (pi: ExtensionAPI) {
       );
     });
 
-    if (!getConfig().tools.enhanceCustomTools)
+    const tools = getConfig().tools;
+    if (!tools.enabled || !tools.enhanceCustomTools)
       toolRendering.clearCustomTimers();
 
     if (ctx.mode === "tui") {
-      uiHandles.push(registerTuiCapture(ctx));
+      if (tools.enabled) uiHandles.push(registerTuiCapture(ctx));
       uiHandles.push(registerHeader(pi, ctx));
       if (getConfig().editor.style !== "native") {
         uiHandles.push(registerEditor(pi, ctx));

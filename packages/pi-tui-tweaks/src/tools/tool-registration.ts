@@ -48,8 +48,9 @@ export function createToolRendering(
       /* Diagnostics must not interrupt rendering. */
     }
   };
+  const isEnabled = () => options.isEnabled() && getConfig().tools.enabled;
   const customEnabled = () =>
-    options.isEnabled() && getConfig().tools.enhanceCustomTools;
+    isEnabled() && getConfig().tools.enhanceCustomTools;
   function createAdapterOptions(toolName: string): DefinitionAdapterOptions {
     return {
       isToolCallActive(toolCallId) {
@@ -73,7 +74,7 @@ export function createToolRendering(
 
   const resolve: ToolRendererResolver = (toolName, next) => {
     const native = next();
-    if (!native || !options.isEnabled()) return native;
+    if (!native || !isEnabled()) return native;
     try {
       const source = pi
         .getAllTools()
