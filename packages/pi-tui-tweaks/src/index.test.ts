@@ -1,16 +1,21 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "bun:test";
 import type {
   ExtensionAPI,
   ExtensionContext,
   ToolRendererResolver,
 } from "@earendil-works/pi-coding-agent";
-import { ExtensionRunner } from "@earendil-works/pi-coding-agent";
+import {
+  DefaultPackageManager,
+  ExtensionRunner,
+  SettingsManager,
+} from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { mkTheme, mkToolCtx } from "./testing/helpers";
-import ext from "./index";
+import ext from "../index";
 import { loadConfig } from "./config/store";
 import { isFullscreenTui } from "./tools/rendering/tui-runtime";
 
@@ -116,6 +121,31 @@ function mkCtx(overrides?: Partial<ExtensionContext>) {
 }
 
 describe("extension lifecycle", () => {
+  it("discovers the root entry once from the package and monorepo manifests", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "pi-tui-tweaks-discovery-"));
+    const packageRoot = fileURLToPath(new URL("../", import.meta.url));
+    const repoRoot = fileURLToPath(new URL("../../../", import.meta.url));
+    const manager = new DefaultPackageManager({
+      cwd: directory,
+      agentDir: directory,
+      settingsManager: SettingsManager.inMemory(),
+    });
+    try {
+      const own = await manager.resolveExtensionSources([packageRoot]);
+      expect(own.extensions.map((entry) => entry.path)).toEqual([
+        join(packageRoot, "index.ts"),
+      ]);
+      const monorepo = await manager.resolveExtensionSources([repoRoot]);
+      expect(
+        monorepo.extensions.filter(
+          (entry) => entry.path === join(packageRoot, "index.ts"),
+        ),
+      ).toHaveLength(1);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it("keeps core renderers without Codemode registration or the hook when disabled", () => {
     const directory = mkdtempSync(
       join(tmpdir(), "pi-tui-tweaks-codemode-lifecycle-"),

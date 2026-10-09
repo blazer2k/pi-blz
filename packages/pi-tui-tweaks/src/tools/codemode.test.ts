@@ -12,7 +12,7 @@ import {
   type ExtensionAPI,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import extension from "../index";
+import extension from "../../index";
 import { loadConfig } from "../config/store";
 import { mkTheme, mkToolCtx, writeTestConfig } from "../testing/helpers";
 import { createCodemodeRenderers } from "./codemode";

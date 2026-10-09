@@ -1,13 +1,13 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-import { getConfig, loadConfig } from "./config/store";
-import { registerEditor } from "./editor/registration";
-import { registerHeader } from "./header/header";
-import type { Handle } from "./shared/handle";
-import { createToolRendering } from "./tools/tool-registration";
-import { clearBlinkTimers } from "./tools/rendering/state";
-import { registerTuiCapture } from "./tools/rendering/tui-runtime";
-import { registerWorkingIndicator } from "./working-indicator/indicator";
+import { getConfig, loadConfig } from "./src/config/store";
+import { registerEditor } from "./src/editor/registration";
+import { registerHeader } from "./src/header/header";
+import type { Handle } from "./src/shared/handle";
+import { createToolRendering } from "./src/tools/tool-registration";
+import { clearBlinkTimers } from "./src/tools/rendering/state";
+import { registerTuiCapture } from "./src/tools/rendering/tui-runtime";
+import { registerWorkingIndicator } from "./src/working-indicator/indicator";
 
 function disposeHandles(handles: readonly Handle[], description: string): void {
   for (const handle of handles) {

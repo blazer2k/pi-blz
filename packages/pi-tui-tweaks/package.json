@@ -22,6 +22,7 @@
     "access": "public"
   },
   "files": [
+    "index.ts",
     "src/**/*.ts",
     "!src/**/*.test.ts",
     "!src/testing/**",
@@ -38,7 +39,7 @@
   },
   "pi": {
     "extensions": [
-      "./src/index.ts"
+      "./index.ts"
     ],
     "image": "https://raw.githubusercontent.com/blazer2k/pi-blz/main/packages/pi-tui-tweaks/images/example.webp"
   }

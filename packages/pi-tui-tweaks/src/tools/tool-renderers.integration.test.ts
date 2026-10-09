@@ -51,7 +51,7 @@ import {
   type TUI,
 } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
-import extension from "../index";
+import extension from "../../index";
 import { getConfig, loadConfig } from "../config/store";
 import { stripAnsi } from "./rendering/text";
 import { mkTheme, mkToolCtx, writeTestConfig } from "../testing/helpers";

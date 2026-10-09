@@ -25,7 +25,7 @@
     "extensions": [
       "packages/searxng-suite/src/index.ts",
       "packages/pi-personality/src/index.ts",
-      "packages/pi-tui-tweaks/src/index.ts"
+      "packages/pi-tui-tweaks/index.ts"
     ]
   },
   "engines": {

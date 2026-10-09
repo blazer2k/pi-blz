@@ -30,8 +30,10 @@ For local development:
 git clone https://github.com/blazer2k/pi-blz.git
 cd pi-blz
 npm install
-pi -e ./packages/pi-tui-tweaks/src/index.ts
+pi -e ./packages/pi-tui-tweaks/index.ts
 ```
+
+The entry point is the package-root `index.ts`. Update any Pi extension paths or enable/disable filters that still reference this package's previous `src/index.ts` entry.
 
 ## Settings
 
