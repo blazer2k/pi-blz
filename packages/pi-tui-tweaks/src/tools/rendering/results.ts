@@ -13,7 +13,12 @@ import {
   updateResultState,
 } from "./state";
 import { extractTextContent, normalizeOutput } from "./text";
-import { formatOmissionRow, formatTreeLine, getResultText } from "./tree";
+import {
+  formatOmissionRow,
+  formatTreeLine,
+  getResultText,
+  getTreeEndPrefix,
+} from "./tree";
 import type {
   BaseRenderState,
   FormatResultFn,
@@ -113,24 +118,29 @@ export function formatSimpleErrorResult(
         (line, index, lines) =>
           formatTreeLine(line, {
             theme,
-            prefix: !footer && index === lines.length - 1 ? "╰─ " : "│  ",
+            prefix:
+              !footer && index === lines.length - 1
+                ? getTreeEndPrefix()
+                : "│  ",
             color: "error",
           }).text,
       )
       .join("\n");
 
     return footer
-      ? formatted + "\n" + theme.fg("dim", "╰─ ") + footer
+      ? formatted + "\n" + theme.fg("dim", getTreeEndPrefix()) + footer
       : formatted;
   }
 
   const suffix = isExpandable ? buildExpansionHint(theme, "expand") : "";
   if (!state.truncated) {
-    return theme.fg("dim", "╰─ ") + theme.fg("error", bodyText) + suffix;
+    return (
+      theme.fg("dim", getTreeEndPrefix()) + theme.fg("error", bodyText) + suffix
+    );
   }
 
   return (
-    theme.fg("dim", "╰─ ") +
+    theme.fg("dim", getTreeEndPrefix()) +
     status +
     (hasErrorBody
       ? theme.fg("muted", " · ") + theme.fg("error", bodyText)
@@ -162,7 +172,7 @@ export function formatListResult(
     const emptyParts = buildResultStatusParts(state, theme);
     emptyParts.push(theme.fg("muted", config.emptyMessage));
     return (
-      theme.fg("dim", "╰─ ") +
+      theme.fg("dim", getTreeEndPrefix()) +
       emptyParts.join(theme.fg("muted", " · ")) +
       buildToolExpansionHint(theme, state, options, false)
     );
@@ -177,7 +187,7 @@ export function formatListResult(
 
   if (!options.expanded) {
     return (
-      theme.fg("dim", "╰─ ") +
+      theme.fg("dim", getTreeEndPrefix()) +
       summary +
       buildToolExpansionHint(theme, state, options, true)
     );
@@ -214,7 +224,7 @@ export function formatListResult(
   }
   tail.forEach(renderItem);
   lines.push(
-    theme.fg("dim", "╰─ ") +
+    theme.fg("dim", getTreeEndPrefix()) +
       summary +
       buildToolExpansionHint(theme, state, options, true),
   );

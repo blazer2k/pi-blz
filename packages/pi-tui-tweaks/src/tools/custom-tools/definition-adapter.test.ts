@@ -116,6 +116,37 @@ describe("custom renderer adapters", () => {
     });
   }
 
+  it("uses named closing corners for native and fallback results without rewriting content", () => {
+    const payload = "payload ╰─ and └─";
+    for (const treeCorner of ["rounded", "square"] as const) {
+      setTestConfig({ tools: { treeCorner } });
+      const corner = treeCorner === "square" ? "└" : "╰";
+      for (const hasRenderer of [false, true]) {
+        const definition = tool();
+        if (hasRenderer)
+          definition.renderResult = () => new Text(payload, 0, 0);
+        const renderer = wrap(definition).renderResult!;
+        const input = {
+          content: [{ type: "text" as const, text: payload }],
+          details: undefined,
+        };
+        expect(
+          plain(
+            renderer(
+              input,
+              { ...resultOptions, expanded: true },
+              mkTheme(),
+              mkToolCtx(),
+            ),
+          ),
+        ).toContain(`${corner}─ ${payload}`);
+        expect(
+          plain(renderer(input, resultOptions, mkTheme(), mkToolCtx())),
+        ).toContain(`${corner}─ ${hasRenderer ? payload : "1 line"}`);
+      }
+    }
+  });
+
   it("preserves safe ANSI styling from original call rendering", () => {
     const definition = tool();
     definition.renderCall = (_args, theme) =>

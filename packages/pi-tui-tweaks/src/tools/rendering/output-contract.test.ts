@@ -1,14 +1,19 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
+import {
+  initTheme,
+  type ToolDefinition,
+} from "@earendil-works/pi-coding-agent";
 import { Text, visibleWidth, type Component } from "@earendil-works/pi-tui";
 import {
   setupCustomTool,
   mkTheme,
   mkToolCtx,
   setupTool,
+  setTestConfig,
 } from "../../testing/helpers";
+import { getConfig } from "../../config/store";
 import { patchBashTool } from "../bash";
 import { patchEditTool } from "../edit";
 import { patchFindTool } from "../find";
@@ -284,6 +289,49 @@ describe("terminal width contract", () => {
           expect(rows.every((row) => visibleWidth(row) <= 40)).toBe(true);
         }
       }
+    }
+  });
+
+  it("changes only generated corners across core results and errors", () => {
+    initTheme("dark", false);
+    const originalCorner = getConfig().tools.treeCorner;
+    const payload = "payload ╰─ and └─";
+    try {
+      for (const [patchTool, args] of calls) {
+        const definition = setupTool(patchTool);
+        for (const expanded of [false, true]) {
+          for (const isError of [false, true]) {
+            const render = () =>
+              meaningfulLines(
+                definition.renderResult!(
+                  {
+                    content: [{ type: "text", text: payload }],
+                    details: { diff: `-old\n+${payload}` },
+                  },
+                  { expanded, isPartial: false },
+                  mkTheme(),
+                  mkToolCtx({
+                    args:
+                      patchTool === patchWriteTool
+                        ? { ...args, content: payload }
+                        : args,
+                    expanded,
+                    isError,
+                  }),
+                ),
+              );
+            setTestConfig({ tools: { treeCorner: "rounded" } });
+            const rounded = render();
+            expect(rounded.at(-1)).toStartWith(" ╰─ ");
+            setTestConfig({ tools: { treeCorner: "square" } });
+            expect(render()).toEqual(
+              rounded.map((line) => line.replace(/^( *)╰─ /u, "$1└─ ")),
+            );
+          }
+        }
+      }
+    } finally {
+      setTestConfig({ tools: { treeCorner: originalCorner } });
     }
   });
 

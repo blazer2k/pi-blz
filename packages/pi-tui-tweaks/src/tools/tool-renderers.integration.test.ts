@@ -247,6 +247,7 @@ describe("public renderer integration", () => {
       tools: {
         ...initial.tools,
         capitalizeNames: false,
+        treeCorner: "square",
         expandedOutputLimit: 10,
         collapsedOutputDisplay: "summary",
         indicator: {
@@ -289,6 +290,7 @@ describe("public renderer integration", () => {
     const after = rebuilt.render(80).map(stripAnsi).join("\n");
     expect(after).toContain("◆ bash $ echo config");
     expect(after).toContain("4 lines");
+    expect(after).toContain("└─ took 1ms");
     expect(after).not.toContain("│  first");
     expect(session.getAllTools().map((tool) => tool.name)).toEqual(inventory);
     expect(session.getActiveToolNames()).toEqual(active);
@@ -675,6 +677,7 @@ describe("public renderer integration", () => {
   });
 
   it("composes real extension resolvers around the enhancement without taking over self-owned shells", async () => {
+    writeTestConfig({ tools: { treeCorner: "square" } });
     const trace: string[] = [];
     let beforeResult: ToolRenderers | undefined;
     let afterResult: ToolRenderers | undefined;
@@ -699,6 +702,7 @@ describe("public renderer integration", () => {
           execute: async () => ({ content: [], details: undefined }),
           renderShell: name === "self_owned" ? "self" : "default",
           renderCall: () => new Text("Registered wording", 0, 0),
+          renderResult: () => new Text("╰─ Own corner", 0, 0),
         });
       }
       pi.registerToolRenderer((name, next) => {
@@ -744,6 +748,18 @@ describe("public renderer integration", () => {
       } else {
         expect(afterResult).toBe(base);
         expect(resolved).toBe(base);
+        if (name === "self_owned") {
+          expect(
+            resolved!.renderResult!(
+              { content: [], details: {} },
+              { expanded: false, isPartial: false },
+              mkTheme(),
+              mkToolCtx(),
+            )
+              .render(80)
+              .map((row) => row.trimEnd()),
+          ).toEqual(["╰─ Own corner"]);
+        }
       }
     }
   });

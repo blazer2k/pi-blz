@@ -7,7 +7,11 @@ import {
   updateResultState,
 } from "../rendering/state";
 import { safeTruncateToWidth } from "../rendering/text";
-import { getCallRenderParts, getResultText } from "../rendering/tree";
+import {
+  getCallRenderParts,
+  getResultText,
+  getTreeEndPrefix,
+} from "../rendering/tree";
 import type { BaseRenderState } from "../rendering/types";
 import {
   applyArgumentHyperlinks,
@@ -206,7 +210,8 @@ function createResultRenderer(
         }
 
         const renderedLines = innerLines.map((line, index) => {
-          const prefix = index === innerLines.length - 1 ? "╰─ " : "│  ";
+          const prefix =
+            index === innerLines.length - 1 ? getTreeEndPrefix() : "│  ";
           return theme.fg("dim", prefix) + line;
         });
         if (state.truncated) {

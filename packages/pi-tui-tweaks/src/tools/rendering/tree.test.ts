@@ -84,21 +84,24 @@ describe("tree-aware text wrapping", () => {
     expect(widths).toEqual([38, 1, 38, 40, 1, 40, 38, 1, 38]);
   });
 
-  it("prefixes every wrapped result row and closes only the final row", () => {
-    const text = getResultText({}, optsExpanded, undefined);
-    text.setText(
-      "├─ summary\n╰─ a long result line that wraps across several visual rows",
-    );
-
-    const lines = text
-      .render(28)
-      .map((line) => line.trimEnd().slice(1))
-      .filter(Boolean);
-
-    expect(lines.length).toBeGreaterThan(3);
-    expect(lines.every((line) => /^[├│╰]/u.test(line))).toBe(true);
-    expect(lines.at(-1)).toStartWith("╰─ ");
-  });
+  for (const corner of ["╰", "└"]) {
+    it(`prefixes wrapped ${corner} results and closes only the final row`, () => {
+      const text = getResultText({}, optsExpanded, undefined);
+      text.setText(
+        `├─ summary\n${corner}─ a long result line that wraps across several visual rows`,
+      );
+      const lines = text
+        .render(28)
+        .map((line) => line.trimEnd().slice(1))
+        .filter(Boolean);
+      expect(lines.length).toBeGreaterThan(3);
+      expect(lines[0]).toStartWith("├─ ");
+      expect(lines.slice(1, -1).every((line) => line.startsWith("│  "))).toBe(
+        true,
+      );
+      expect(lines.at(-1)).toStartWith(`${corner}─ `);
+    });
+  }
 
   it("preserves content color across wrapped tree rows", () => {
     const dim = "\x1b[90m";
@@ -115,7 +118,7 @@ describe("tree-aware text wrapping", () => {
         "ENOENT: no such file or directory, access '/tmp/pi-tui-tweaks/missing-file.txt'",
         {
           theme,
-          prefix: "│  ",
+          prefix: "└─ ",
           color: "error",
         },
       ).text,
@@ -148,7 +151,7 @@ describe("tree-aware text wrapping", () => {
       invalidate: () => {},
     });
     text.setText(
-      `${prefix}Write file\n╰─ a long preview line that wraps across visual rows`,
+      `${prefix}Write file\n└─ a long preview line that wraps across visual rows`,
     );
 
     const lines = text
@@ -156,7 +159,10 @@ describe("tree-aware text wrapping", () => {
       .map((line) => line.trimEnd().slice(1))
       .filter(Boolean);
 
-    expect(lines.slice(1).every((line) => /^[│╰]/u.test(line))).toBe(true);
+    expect(lines.slice(1, -1).every((line) => line.startsWith("│  "))).toBe(
+      true,
+    );
+    expect(lines.at(-1)).toStartWith("└─ ");
     clearBlinkTimers();
   });
 

@@ -1,6 +1,6 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { countLines, normalizeOutput } from "./text";
-import { formatOmissionRow, formatTreeLine } from "./tree";
+import { formatOmissionRow, formatTreeLine, getTreeEndPrefix } from "./tree";
 
 export type OutputWindow = {
   fullText: string;
@@ -70,7 +70,7 @@ function formatOutputLine(
 ): { text: string; truncated: boolean } {
   return formatTreeLine(line, {
     theme,
-    prefix: closeLine ? "╰─ " : "│  ",
+    prefix: closeLine ? getTreeEndPrefix() : "│  ",
     width: maxLineWidth === undefined ? undefined : maxLineWidth + 3,
     color,
   });

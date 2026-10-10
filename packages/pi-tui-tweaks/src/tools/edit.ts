@@ -20,6 +20,7 @@ import { extractTextContent, renderPath } from "./rendering/text";
 import {
   formatTreeLine,
   getCallRenderParts,
+  getTreeEndPrefix,
   formatExpandableCallText,
 } from "./rendering/tree";
 import type { BaseRenderState, ToolTextResult } from "./rendering/types";
@@ -62,7 +63,7 @@ function formatEditResult(
   if (!diff) {
     metadataParts.push(theme.fg("muted", "no diff"));
     return (
-      theme.fg("dim", "╰─ ") +
+      theme.fg("dim", getTreeEndPrefix()) +
       metadataParts.join(theme.fg("muted", " · ")) +
       buildToolExpansionHint(theme, state, options, false)
     );
@@ -89,7 +90,7 @@ function formatEditResult(
   );
 
   if (!options.expanded) {
-    return theme.fg("dim", "╰─ ") + metadata + hint;
+    return theme.fg("dim", getTreeEndPrefix()) + metadata + hint;
   }
 
   const rendered = renderDiff(diff);
@@ -98,11 +99,12 @@ function formatEditResult(
     (line, index, lines) =>
       formatTreeLine(line, {
         theme,
-        prefix: !hasFooter && index === lines.length - 1 ? "╰─ " : "│  ",
+        prefix:
+          !hasFooter && index === lines.length - 1 ? getTreeEndPrefix() : "│  ",
       }).text,
   );
   if (hasFooter) {
-    renderedLines.push(theme.fg("dim", "╰─ ") + metadata + hint);
+    renderedLines.push(theme.fg("dim", getTreeEndPrefix()) + metadata + hint);
   }
   return renderedLines.join("\n");
 }

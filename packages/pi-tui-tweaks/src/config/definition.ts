@@ -41,6 +41,12 @@ const ConfigSchema = Type.Object(
         enabled: flag(true),
         enhanceCustomTools: flag(true),
         capitalizeNames: flag(true),
+        treeCorner: Type.Union(
+          [Type.Literal("rounded"), Type.Literal("square")],
+          {
+            default: "rounded",
+          },
+        ),
         indicator: Type.Object(
           {
             style: Type.Union(

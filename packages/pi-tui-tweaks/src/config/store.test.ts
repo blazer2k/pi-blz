@@ -47,7 +47,7 @@ describe("config validation", () => {
       workingIndicator: {
         style: "shimmer",
       },
-      tools: { enabled: true },
+      tools: { enabled: true, treeCorner: "rounded" },
       editor: {
         style: "rounded",
         color: "dim",
@@ -67,6 +67,28 @@ describe("config validation", () => {
       ).toEqual({
         ...getDefaultConfig().tools,
         enabled: typeof enabled === "boolean" ? enabled : true,
+        expandedOutputLimit: 50,
+      });
+    }
+  });
+
+  it("accepts named tree corners and preserves valid siblings on fallback", () => {
+    for (const treeCorner of [
+      "rounded",
+      "square",
+      "unknown",
+      false,
+      null,
+      0,
+      [],
+      {},
+    ]) {
+      expect(
+        validateConfig({ tools: { treeCorner, expandedOutputLimit: 50 } })
+          .tools,
+      ).toEqual({
+        ...getDefaultConfig().tools,
+        treeCorner: treeCorner === "square" ? "square" : "rounded",
         expandedOutputLimit: 50,
       });
     }

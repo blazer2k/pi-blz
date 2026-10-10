@@ -18,9 +18,14 @@ import {
   isBlinkOn,
   updateBlinkTimer,
 } from "./state";
+import { getConfig } from "../../config/store";
 import { safeTruncateToWidth, stripAnsi } from "./text";
 import type { BaseRenderState } from "./types";
 import { isFullscreenTui } from "./tui-runtime";
+
+export function getTreeEndPrefix(): "╰─ " | "└─ " {
+  return getConfig().tools.treeCorner === "square" ? "└─ " : "╰─ ";
+}
 
 export function formatOmissionRow(
   hiddenCount: number,
@@ -37,7 +42,7 @@ export function formatTreeLine(
   line: string,
   options: {
     theme: Theme;
-    prefix: "│  " | "├─ " | "╰─ ";
+    prefix: "│  " | "├─ " | "╰─ " | "└─ ";
     width?: number;
     color?: "toolOutput" | "error" | "muted";
   },
@@ -147,7 +152,7 @@ function wrapTreeText(
       const lineWidth = visibleWidth(line);
       const slicedPrefix = sliceByColumn(line, 0, 3);
       const visiblePrefix = stripAnsi(slicedPrefix);
-      const hasTreePrefix = /^[│├╰┊][─ ] /u.test(visiblePrefix);
+      const hasTreePrefix = /^[│├╰└┊][─ ] /u.test(visiblePrefix);
 
       if (!hasTreePrefix && callContinuationPrefix) {
         const chunks = wrapTextWithAnsi(line, Math.max(1, width - 3));
@@ -166,14 +171,12 @@ function wrapTreeText(
       const content = line.slice(rawContentStart);
       const prefix = slicedPrefix + "\x1b[39m";
       const chunks = wrapTextWithAnsi(content, Math.max(1, width - 3));
-      const continuationPrefix = prefix
-        .replace("├─ ", "│  ")
-        .replace("╰─ ", "│  ");
+      const continuationPrefix = prefix.replace(/[├╰└]─ /u, "│  ");
 
       return chunks.map((chunk, index) => {
         const isLastChunk = index === chunks.length - 1;
         const chunkPrefix =
-          visiblePrefix === "╰─ "
+          visiblePrefix === "╰─ " || visiblePrefix === "└─ "
             ? isLastChunk
               ? prefix
               : continuationPrefix

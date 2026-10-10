@@ -8,7 +8,7 @@ import {
 } from "../rendering/state";
 import { extractTextContent, normalizeOutput } from "../rendering/text";
 import { formatSimpleErrorResult } from "../rendering/results";
-import { formatTreeLine } from "../rendering/tree";
+import { formatTreeLine, getTreeEndPrefix } from "../rendering/tree";
 import type { BaseRenderState, ToolTextResult } from "../rendering/types";
 
 export function buildGenericResult(
@@ -33,7 +33,8 @@ export function buildGenericResult(
     const metadataParts = buildResultStatusParts(state, theme);
     metadataParts.push(theme.fg("muted", "(no output)"));
     return (
-      theme.fg("dim", "╰─ ") + metadataParts.join(theme.fg("muted", " · "))
+      theme.fg("dim", getTreeEndPrefix()) +
+      metadataParts.join(theme.fg("muted", " · "))
     );
   }
 
@@ -45,7 +46,7 @@ export function buildGenericResult(
   );
   const metadata = metadataParts.join(theme.fg("muted", " · "));
 
-  if (!options.expanded) return theme.fg("dim", "╰─ ") + metadata;
+  if (!options.expanded) return theme.fg("dim", getTreeEndPrefix()) + metadata;
 
   const limit = getExpandedOutputLimit();
   const visible = lines.slice(0, limit);
@@ -57,14 +58,15 @@ export function buildGenericResult(
     rendered.push(
       formatTreeLine(line, {
         theme,
-        prefix: isLast ? "╰─ " : "│  ",
+        prefix: isLast ? getTreeEndPrefix() : "│  ",
       }).text,
     );
   });
 
   if (remaining > 0) {
     rendered.push(
-      theme.fg("dim", "╰─ ") + theme.fg("muted", `${remaining} more lines`),
+      theme.fg("dim", getTreeEndPrefix()) +
+        theme.fg("muted", `${remaining} more lines`),
     );
   }
 

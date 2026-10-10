@@ -12,7 +12,7 @@ import {
   extractTextContent,
   sanitizeDisplayText,
 } from "../rendering/text";
-import { formatTreeLine } from "../rendering/tree";
+import { formatTreeLine, getTreeEndPrefix } from "../rendering/tree";
 import type { ResultStatusState, ToolTextResult } from "../rendering/types";
 
 function stripReadContinuationNotice(text: string): string {
@@ -71,14 +71,15 @@ export function formatReadResult(
   } else if (imageMarker) {
     metadataParts.push(theme.fg("warning", "Image unavailable"));
     const summary = metadataParts.join(theme.fg("muted", " · ")) + callHint;
-    if (!imageMarker.reason) return theme.fg("dim", "╰─ ") + summary;
+    if (!imageMarker.reason)
+      return theme.fg("dim", getTreeEndPrefix()) + summary;
 
     const reason = formatTreeLine(imageMarker.reason, {
       theme,
       prefix: "│  ",
       color: "muted",
     }).text;
-    return reason + "\n" + theme.fg("dim", "╰─ ") + summary;
+    return reason + "\n" + theme.fg("dim", getTreeEndPrefix()) + summary;
   } else {
     const fileContent = stripReadContinuationNotice(textContent);
     const lines = countLines(fileContent);
@@ -91,7 +92,7 @@ export function formatReadResult(
   }
 
   return (
-    theme.fg("dim", "╰─ ") +
+    theme.fg("dim", getTreeEndPrefix()) +
     metadataParts.join(theme.fg("muted", " · ")) +
     callHint
   );

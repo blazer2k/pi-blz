@@ -8,6 +8,7 @@ import {
 } from "../rendering/state";
 import { formatCollapsedOutput, formatOutputLines } from "../rendering/output";
 import type { ToolTextResult } from "../rendering/types";
+import { getTreeEndPrefix } from "../rendering/tree";
 import { renderUnknownError } from "./error-result";
 import { buildBashMetadataParts, joinMetadata } from "./metadata";
 import { buildBashResultView } from "./model";
@@ -78,9 +79,10 @@ export function formatBashResult(
   return [
     output.text,
     view.kind === "command-error"
-      ? theme.fg("dim", footer ? "├─ " : "╰─ ") + theme.fg("error", view.status)
+      ? theme.fg("dim", footer ? "├─ " : getTreeEndPrefix()) +
+        theme.fg("error", view.status)
       : undefined,
-    footer ? theme.fg("dim", "╰─ ") + footer : undefined,
+    footer ? theme.fg("dim", getTreeEndPrefix()) + footer : undefined,
   ]
     .filter((line): line is string => Boolean(line))
     .join("\n");

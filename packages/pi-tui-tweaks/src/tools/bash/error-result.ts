@@ -4,6 +4,7 @@ import { buildBashMetadataParts, joinMetadata } from "./metadata";
 import type { BashUnknownErrorView } from "./model";
 import type { BashRenderState } from "./types";
 import { formatOutputLines } from "../rendering/output";
+import { getTreeEndPrefix } from "../rendering/tree";
 
 export function renderUnknownError(
   view: BashUnknownErrorView,
@@ -40,7 +41,10 @@ export function renderUnknownError(
     { closeLastLine: !footer },
   ).text;
 
-  return [output, footer ? theme.fg("dim", "╰─ ") + footer : undefined]
+  return [
+    output,
+    footer ? theme.fg("dim", getTreeEndPrefix()) + footer : undefined,
+  ]
     .filter((line): line is string => Boolean(line))
     .join("\n");
 }

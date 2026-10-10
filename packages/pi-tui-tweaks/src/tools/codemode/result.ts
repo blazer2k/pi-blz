@@ -13,7 +13,7 @@ import {
 } from "../rendering/state";
 import type { ToolTextResult } from "../rendering/types";
 import { renderPath } from "../rendering/text";
-import { formatTreeLine } from "../rendering/tree";
+import { formatTreeLine, getTreeEndPrefix } from "../rendering/tree";
 import { buildCodemodeResultView } from "./model";
 import type { CodemodeRenderState } from "./types";
 
@@ -135,7 +135,8 @@ export function formatCodemodeResult(
   if (hint) metadata.push(hint);
   if (metadata.length)
     lines.push(
-      theme.fg("dim", "╰─ ") + metadata.join(theme.fg("muted", " · ")),
+      theme.fg("dim", getTreeEndPrefix()) +
+        metadata.join(theme.fg("muted", " · ")),
     );
   return lines.join("\n");
 }

@@ -19,6 +19,7 @@ import {
   formatTreeLine,
   getCallRenderParts,
   getResultText,
+  getTreeEndPrefix,
   formatExpandableCallText,
 } from "./rendering/tree";
 import type { BaseRenderState, ToolTextResult } from "./rendering/types";
@@ -164,7 +165,7 @@ function formatWriteResult(
   const metadata = metadataParts.join(theme.fg("muted", " · "));
 
   if (lines === 0) {
-    return theme.fg("dim", "╰─ ") + metadata + hint;
+    return theme.fg("dim", getTreeEndPrefix()) + metadata + hint;
   }
 
   if (options.expanded) {
@@ -180,11 +181,11 @@ function formatWriteResult(
           prefix: "│  ",
         }).text,
     );
-    renderedLines.push(theme.fg("dim", "╰─ ") + metadata + hint);
+    renderedLines.push(theme.fg("dim", getTreeEndPrefix()) + metadata + hint);
     return renderedLines.join("\n");
   }
 
-  return theme.fg("dim", "╰─ ") + metadata + hint;
+  return theme.fg("dim", getTreeEndPrefix()) + metadata + hint;
 }
 
 export function patchWriteTool(): ToolRenderers {

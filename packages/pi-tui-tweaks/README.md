@@ -60,6 +60,7 @@ For example:
     "enabled": true,
     "enhanceCustomTools": true,
     "capitalizeNames": true,
+    "treeCorner": "rounded",
     "indicator": {
       "style": "circle",
       "color": "success"
@@ -91,6 +92,7 @@ The table uses dotted paths for the nested JSON fields:
 | `tools.enabled`                      | `true`      | Enable this extension's tool rendering overrides      |
 | `tools.enhanceCustomTools`           | `true`      | Compact eligible extension tools, including Codemode  |
 | `tools.capitalizeNames`              | `true`      | Capitalize headers drawn by this extension            |
+| `tools.treeCorner`                   | `"rounded"` | `"rounded"` (╰), `"square"` (└); closing connector    |
 | `tools.indicator.style`              | `"circle"`  | `"dot"`, `"circle"`, `"diamond"`                      |
 | `tools.indicator.color`              | `"success"` | `"success"`, `"text"`, `"toolTitle"`                  |
 | `tools.expandedOutputLimit`          | `20`        | `-1`, `10`, `20`, `50`, `100`; `-1` means unlimited   |
@@ -146,6 +148,8 @@ With `editor.style: "native"`, this setting and the shimmer options are ignored.
 Set `tools.enabled` to `false` to leave all tool display to Pi and other extensions. This overrides the other `tools` settings, including Codemode and custom-tool enhancements. Header, editor, and Working indicator settings are unaffected. Apply the change with `/reload`.
 
 The extension changes how read, write, edit, bash, ls, find, and grep look. Pi still runs the original tools and controls their arguments, source information, and availability. Your `defaultTools` setting and CLI options decide which tools are active; this extension does not enable them.
+
+`tools.treeCorner` chooses the closing connector: `"rounded"` (default) draws `╰─`, and `"square"` draws `└─`. Vertical lines, intermediate branches, and omission markers are unchanged. This affects only connectors drawn by this extension, not output text, native/self-owned renderers, or editor borders. Apply changes with `/reload`.
 
 Tool calls and output fit the available terminal width and adjust when you resize it. They follow Pi's `outputPad` setting, including changes made during a session.
 

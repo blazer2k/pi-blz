@@ -238,6 +238,19 @@ describe("Codemode output", () => {
     expect(text).not.toContain("script failed");
   });
 
+  it("uses named closing corners without rewriting script output", () => {
+    for (const treeCorner of ["rounded", "square"] as const) {
+      setTestConfig({ tools: { treeCorner } });
+      for (const expanded of [false, true]) {
+        const { text } = render(result("payload ╰─ and └─"), expanded);
+        expect(text).toContain(
+          `${treeCorner === "square" ? "└" : "╰"}─ took 1.2s`,
+        );
+        expect(text).toContain("payload ╰─ and └─");
+      }
+    }
+  });
+
   it("keeps full expanded arguments, errors, blank lines and long output despite the list cap", () => {
     setTestConfig({
       tools: {
