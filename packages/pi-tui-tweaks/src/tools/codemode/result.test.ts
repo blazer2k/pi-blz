@@ -241,7 +241,7 @@ describe("Codemode output", () => {
   it("keeps full expanded arguments, errors, blank lines and long output despite the list cap", () => {
     setTestConfig({
       tools: {
-        maxExpandedEntries: 10,
+        expandedOutputLimit: 10,
       },
     });
     setTestConfig({

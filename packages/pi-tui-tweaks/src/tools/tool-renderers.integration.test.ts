@@ -247,6 +247,7 @@ describe("public renderer integration", () => {
       tools: {
         ...initial.tools,
         capitalizeNames: false,
+        expandedOutputLimit: 10,
         collapsedOutputDisplay: "summary",
         indicator: {
           ...initial.tools.indicator,

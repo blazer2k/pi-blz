@@ -64,7 +64,7 @@ For example:
       "style": "circle",
       "color": "success"
     },
-    "maxExpandedEntries": 20,
+    "expandedOutputLimit": 20,
     "collapsedOutputDisplay": "preview",
     "showExpansionHint": true
   },
@@ -93,7 +93,7 @@ The table uses dotted paths for the nested JSON fields:
 | `tools.capitalizeNames`              | `true`      | Capitalize headers drawn by this extension            |
 | `tools.indicator.style`              | `"circle"`  | `"dot"`, `"circle"`, `"diamond"`                      |
 | `tools.indicator.color`              | `"success"` | `"success"`, `"text"`, `"toolTitle"`                  |
-| `tools.maxExpandedEntries`           | `20`        | `-1`, `10`, `20`, `50`, `100`; `-1` means unlimited   |
+| `tools.expandedOutputLimit`          | `20`        | `-1`, `10`, `20`, `50`, `100`; `-1` means unlimited   |
 | `tools.collapsedOutputDisplay`       | `"preview"` | `"preview"`, `"summary"`                              |
 | `tools.showExpansionHint`            | `true`      | Show expand/collapse keybinding hints                 |
 | `editor.style`                       | `"rounded"` | `"native"`, `"compact"`, `"rounded"`                  |
@@ -149,7 +149,9 @@ The extension changes how read, write, edit, bash, ls, find, and grep look. Pi s
 
 Tool calls and output fit the available terminal width and adjust when you resize it. They follow Pi's `outputPad` setting, including changes made during a session.
 
-Expanded Bash and Write show their full content. Expanded list tools show the beginning and end of a list, with an omission marker between them. `tools.maxExpandedEntries` controls that limit and also applies to generic custom-tool results.
+`tools.expandedOutputLimit` limits expanded ls/find/grep list items and generic custom-tool text lines. It defaults to `20`; `-1` means unlimited. Lists show the beginning and end with an omission marker between them; generic text shows the first lines. The limit counts logical items or lines, not wrapped screen rows, and does not cap Bash, Read, Write, Edit, Codemode, or expanded errors.
+
+Rename `tools.maxExpandedEntries` to `tools.expandedOutputLimit` in existing settings before reloading to preserve your chosen limit. The old key is ignored; there is no alias or automatic migration.
 
 Unfinished indicators in expanded Bash, Write, and wrapped Codemode blink in fullscreen mode. In regular mode they stay dim and still, avoiding repeated redraws of terminal scrollback. Completed indicators stay still in both modes. These mode rules apply only to expanded calls and work with every editor style.
 
@@ -170,7 +172,7 @@ With `tools.enhanceCustomTools` enabled, collapsed Codemode shows a syntax-highl
 
 The live timer starts when script execution is observed. Pi's reported wall time supplies the final duration when available. Saved results without timing information do not get an estimated duration.
 
-Expanding Codemode shows Pi's script display, nested-call details, and all returned output, followed by the extension's summary line. `tools.maxExpandedEntries` does not limit Codemode output. Costs can appear both in Pi's nested-call details and in the extension's summary.
+Expanding Codemode shows Pi's script display, nested-call details, and all returned output, followed by the extension's summary line. `tools.expandedOutputLimit` does not limit Codemode output. Costs can appear both in Pi's nested-call details and in the extension's summary.
 
 Links to full output files remain visible in both preview and summary mode, as do warnings about failed saves. Expanding the display does not read those files or restore output that Pi omitted. Pi handles image display.
 

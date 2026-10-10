@@ -132,21 +132,21 @@ function resultStatusState(
 }
 
 describe("formatListResult", () => {
-  let originalMaxEntries: ReturnType<
+  let originalLimit: ReturnType<
     typeof getConfig
-  >["tools"]["maxExpandedEntries"];
+  >["tools"]["expandedOutputLimit"];
   beforeEach(() => {
-    originalMaxEntries = getConfig().tools.maxExpandedEntries;
+    originalLimit = getConfig().tools.expandedOutputLimit;
     setTestConfig({
       tools: {
-        maxExpandedEntries: 20,
+        expandedOutputLimit: 20,
       },
     });
   });
   afterEach(() => {
     setTestConfig({
       tools: {
-        maxExpandedEntries: originalMaxEntries,
+        expandedOutputLimit: originalLimit,
       },
     });
   });
@@ -213,10 +213,10 @@ describe("formatListResult", () => {
     expect(rendered.at(-1)).toContain("╰─ 25 files");
   });
 
-  it("renders every item when maxExpandedEntries is unlimited", () => {
+  it("renders every item when expandedOutputLimit is unlimited", () => {
     setTestConfig({
       tools: {
-        maxExpandedEntries: -1,
+        expandedOutputLimit: -1,
       },
     });
     const items = Array.from({ length: 25 }, (_, i) => `file${i}.txt`);

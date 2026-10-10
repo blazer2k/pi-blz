@@ -4,7 +4,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import {
   buildResultStatusParts,
-  getMaxExpandedEntries,
+  getExpandedOutputLimit,
 } from "../rendering/state";
 import { extractTextContent, normalizeOutput } from "../rendering/text";
 import { formatSimpleErrorResult } from "../rendering/results";
@@ -47,9 +47,9 @@ export function buildGenericResult(
 
   if (!options.expanded) return theme.fg("dim", "╰─ ") + metadata;
 
-  const maxEntries = getMaxExpandedEntries();
-  const visible = lines.slice(0, maxEntries);
-  const remaining = Math.max(0, total - maxEntries);
+  const limit = getExpandedOutputLimit();
+  const visible = lines.slice(0, limit);
+  const remaining = Math.max(0, total - limit);
   const rendered: string[] = [theme.fg("dim", "├─ ") + metadata];
 
   visible.forEach((line, index) => {

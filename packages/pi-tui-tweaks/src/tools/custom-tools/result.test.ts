@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { mkTheme } from "../../testing/helpers";
-import { getMaxExpandedEntries } from "../rendering/state";
+import { getExpandedOutputLimit } from "../rendering/state";
 import type { BaseRenderState } from "../rendering/types";
 import { buildGenericResult } from "./result";
 
@@ -33,9 +33,9 @@ describe("buildGenericResult", () => {
     expect(render("one\ntwo", {}, true)).toBe("├─ 2 lines\n│  one\n╰─ two");
   });
 
-  it("limits expanded output using the configured entry count", () => {
-    const maxEntries = getMaxExpandedEntries();
-    const total = maxEntries + 2;
+  it("limits expanded output using expandedOutputLimit", () => {
+    const limit = getExpandedOutputLimit();
+    const total = limit + 2;
     const text = Array.from(
       { length: total },
       (_, index) => `line ${index + 1}`,
@@ -43,8 +43,8 @@ describe("buildGenericResult", () => {
     const output = render(text, {}, true);
 
     expect(output).toContain(`├─ ${total} lines`);
-    expect(output).toContain(`│  line ${maxEntries}`);
-    expect(output).not.toContain(`line ${maxEntries + 1}`);
+    expect(output).toContain(`│  line ${limit}`);
+    expect(output).not.toContain(`line ${limit + 1}`);
     expect(output).toContain("╰─ 2 more lines");
   });
 });

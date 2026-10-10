@@ -62,7 +62,7 @@ const ConfigSchema = Type.Object(
           },
           { additionalProperties: false },
         ),
-        maxExpandedEntries: Type.Union(
+        expandedOutputLimit: Type.Union(
           [
             Type.Literal(-1),
             Type.Literal(10),

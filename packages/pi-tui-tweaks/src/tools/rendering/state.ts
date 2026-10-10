@@ -14,8 +14,8 @@ export function getBlinkIndicator(): BlinkIndicator {
   }
 }
 
-export function getMaxExpandedEntries(): number {
-  const value = getConfig().tools.maxExpandedEntries;
+export function getExpandedOutputLimit(): number {
+  const value = getConfig().tools.expandedOutputLimit;
   return value === -1 ? Infinity : value;
 }
 

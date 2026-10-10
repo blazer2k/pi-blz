@@ -63,11 +63,11 @@ describe("config validation", () => {
   it("accepts the tools master flag without coercion or resetting siblings", () => {
     for (const enabled of [true, false, 0, 1, "true", "false", null, [], {}]) {
       expect(
-        validateConfig({ tools: { enabled, maxExpandedEntries: 50 } }).tools,
+        validateConfig({ tools: { enabled, expandedOutputLimit: 50 } }).tools,
       ).toEqual({
         ...getDefaultConfig().tools,
         enabled: typeof enabled === "boolean" ? enabled : true,
-        maxExpandedEntries: 50,
+        expandedOutputLimit: 50,
       });
     }
   });
@@ -85,7 +85,7 @@ describe("config validation", () => {
           indicator: { style: "invalid", color: "text" },
           capitalizeNames: "false",
           enhanceCustomTools: 0,
-          maxExpandedEntries: 50,
+          expandedOutputLimit: 50,
           unknown: true,
         },
         editor: {
@@ -107,7 +107,7 @@ describe("config validation", () => {
       tools: {
         ...getDefaultConfig().tools,
         indicator: { style: "circle", color: "text" },
-        maxExpandedEntries: 50,
+        expandedOutputLimit: 50,
       },
       editor: {
         ...getDefaultConfig().editor,
@@ -127,9 +127,9 @@ describe("config validation", () => {
       ).toEqual(getDefaultConfig());
       expect(
         validateConfig({
-          tools: { indicator: malformed, maxExpandedEntries: 50 },
+          tools: { indicator: malformed, expandedOutputLimit: 50 },
         }).tools,
-      ).toEqual({ ...getDefaultConfig().tools, maxExpandedEntries: 50 });
+      ).toEqual({ ...getDefaultConfig().tools, expandedOutputLimit: 50 });
     }
   });
 
@@ -155,14 +155,14 @@ describe("config validation", () => {
     setTestConfig({
       tools: {
         indicator: { style: "diamond", color: "text" },
-        maxExpandedEntries: 50,
+        expandedOutputLimit: 50,
       },
       editor: { showCost: false },
     });
     setTestConfig({ tools: { indicator: { style: "dot" } } });
     const before = getConfig();
     expect(before.tools.indicator).toEqual({ style: "dot", color: "text" });
-    expect(before.tools.maxExpandedEntries).toBe(50);
+    expect(before.tools.expandedOutputLimit).toBe(50);
     expect(before.editor.showCost).toBe(false);
     writeTestConfig({ header: { align: "center" } });
     expect(getConfig()).toEqual({
@@ -213,7 +213,7 @@ describe("config validation", () => {
               align: "center",
             },
             tools: {
-              maxExpandedEntries: 25,
+              expandedOutputLimit: 25,
             },
             editor: {
               showCost: false,
@@ -375,7 +375,13 @@ describe("config validation", () => {
 });
 
 describe("config numeric values", () => {
-  it("accepts only configured maxExpandedEntries values", () => {
+  it("ignores the old limit key rather than migrating it", () => {
+    expect(validateConfig({ tools: { maxExpandedEntries: 50 } })).toEqual(
+      getDefaultConfig(),
+    );
+  });
+
+  it("accepts only configured expandedOutputLimit values", () => {
     for (const value of [-1, 10, 20, 50, 100] as const) {
       loadConfig(
         undefined,
@@ -383,12 +389,12 @@ describe("config numeric values", () => {
           read: () =>
             JSON.stringify({
               tools: {
-                maxExpandedEntries: value,
+                expandedOutputLimit: value,
               },
             }),
         }),
       );
-      expect(getConfig().tools.maxExpandedEntries).toBe(value);
+      expect(getConfig().tools.expandedOutputLimit).toBe(value);
     }
 
     for (const value of [0, 25, 99, 20.5, null, "20", "NaN", "Infinity"]) {
@@ -398,13 +404,13 @@ describe("config numeric values", () => {
           read: () =>
             JSON.stringify({
               tools: {
-                maxExpandedEntries: value,
+                expandedOutputLimit: value,
               },
             }),
         }),
       );
-      expect(getConfig().tools.maxExpandedEntries).toBe(
-        getDefaultConfig().tools.maxExpandedEntries,
+      expect(getConfig().tools.expandedOutputLimit).toBe(
+        getDefaultConfig().tools.expandedOutputLimit,
       );
     }
   });
@@ -414,12 +420,12 @@ describe("config numeric values", () => {
       process.env.PI_TUI_TWEAKS_CONFIG_PATH!,
       JSON.stringify({
         tools: {
-          maxExpandedEntries: 10.5,
+          expandedOutputLimit: 10.5,
         },
       }),
     );
     loadConfig();
-    expect(getConfig().tools.maxExpandedEntries).toBe(20);
+    expect(getConfig().tools.expandedOutputLimit).toBe(20);
   });
 
   it("validates collapsedOutputDisplay against allowed values", () => {

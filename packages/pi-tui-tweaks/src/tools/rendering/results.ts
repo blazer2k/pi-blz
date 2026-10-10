@@ -8,7 +8,7 @@ import {
   buildExpansionHint,
   buildResultStatusParts,
   buildToolExpansionHint,
-  getMaxExpandedEntries,
+  getExpandedOutputLimit,
   invalidateIfChanged,
   updateResultState,
 } from "./state";
@@ -183,10 +183,10 @@ export function formatListResult(
     );
   }
 
-  const maxEntries = getMaxExpandedEntries();
-  const hasOmission = Number.isFinite(maxEntries) && total > maxEntries;
-  const headCount = hasOmission ? Math.ceil(maxEntries / 2) : total;
-  const tailCount = hasOmission ? Math.floor(maxEntries / 2) : 0;
+  const limit = getExpandedOutputLimit();
+  const hasOmission = Number.isFinite(limit) && total > limit;
+  const headCount = hasOmission ? Math.ceil(limit / 2) : total;
+  const tailCount = hasOmission ? Math.floor(limit / 2) : 0;
   const head = items.slice(0, headCount);
   const tail = tailCount > 0 ? items.slice(-tailCount) : [];
   const hiddenCount = total - head.length - tail.length;
