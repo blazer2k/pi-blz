@@ -4,6 +4,7 @@ import type {
   Theme,
 } from "@earendil-works/pi-coding-agent";
 import { mixColors, styleText } from "@earendil-works/pi-tui";
+import type { Config } from "../config/definition";
 import { getConfig } from "../config/store";
 import type { Handle } from "../shared/handle";
 
@@ -68,10 +69,14 @@ function getRuntime(pi: ExtensionAPI): WorkingIndicatorRuntime {
   return runtime;
 }
 
-function shimmerText(text: string, theme: Theme): string {
+function shimmerText(
+  text: string,
+  theme: Theme,
+  color: Config["workingIndicator"]["shimmerColor"],
+): string {
   if (theme.getColorMode() !== "truecolor") return theme.fg("dim", text);
 
-  const { muted, accent } = theme.colors;
+  const { muted, [color]: highlight } = theme.colors;
   const t = Date.now() / 1000;
   const chars = [...text];
   const pad = 10;
@@ -89,7 +94,7 @@ function shimmerText(text: string, theme: Theme): string {
 
     out += styleText(
       ch,
-      { fg: mixColors(muted, accent, intensity * 0.9, "srgb") },
+      { fg: mixColors(muted, highlight, intensity * 0.9, "srgb") },
       "truecolor",
     );
   }
@@ -134,7 +139,11 @@ export function registerWorkingIndicator(
 
   function renderFrame(): void {
     const cfg = getConfig();
-    const shimmered = shimmerText(LABEL, ctx.ui.theme);
+    const shimmered = shimmerText(
+      LABEL,
+      ctx.ui.theme,
+      cfg.workingIndicator.shimmerColor,
+    );
     const suffixParts: string[] = [];
 
     if (runStartTime > 0 && cfg.workingIndicator.showDuration) {

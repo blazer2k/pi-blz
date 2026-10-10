@@ -53,6 +53,7 @@ For example:
   },
   "workingIndicator": {
     "style": "native",
+    "shimmerColor": "accent",
     "showInterruptHint": true,
     "showDuration": true
   },
@@ -87,6 +88,7 @@ The table uses dotted paths for the nested JSON fields:
 | `header.style`                       | `"compact"` | `"native"`, `"compact"`, `"large"`, `"off"`           |
 | `header.align`                       | `"left"`    | `"left"`, `"center"`; custom headers only             |
 | `workingIndicator.style`             | `"shimmer"` | `"native"`, `"shimmer"`; custom editors only          |
+| `workingIndicator.shimmerColor`      | `"accent"`  | `"accent"`, `"success"`, `"text"`; shimmer highlight  |
 | `workingIndicator.showInterruptHint` | `true`      | Show the interrupt hint; shimmer only                 |
 | `workingIndicator.showDuration`      | `true`      | Show elapsed and completion time; shimmer only        |
 | `tools.enabled`                      | `true`      | Enable this extension's tool rendering overrides      |
@@ -141,7 +143,9 @@ Compact and rounded use a footer for extension status messages. Native leaves bo
 - `shimmer` (default): The current standalone animated "Working" label, with optional elapsed time, interrupt hint, and completion duration. `workingIndicator.showInterruptHint` and `workingIndicator.showDuration` apply only to this style.
 - `native`: Pi's own indicator in the top border, with status on the left and directory/branch on the right. Pi manages its animation, lifecycle, retry, compaction, and branch-summary statuses. Narrow layouts shorten metadata or show only the spinner; compact scroll counts remain centered when space allows.
 
-With `editor.style: "native"`, this setting and the shimmer options are ignored. Pi's editor and indicator remain untouched. Change styles through the settings file and `/reload`.
+`workingIndicator.shimmerColor` selects the shimmer highlight: `"accent"` (default), `"success"`, or `"text"` from Pi's theme. The muted base, animation, dim duration and interrupt hint stay unchanged. Outside truecolor mode, the label remains static dim text. Native Working indicators ignore this setting.
+
+With `editor.style: "native"`, all `workingIndicator` settings are ignored. Pi's editor and indicator remain untouched. Change styles through the settings file and `/reload`.
 
 ## Built-in tool display
 

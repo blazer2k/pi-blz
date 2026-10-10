@@ -264,6 +264,10 @@ describe("public renderer integration", () => {
         ...initial.editor,
         color: "muted",
       },
+      workingIndicator: {
+        ...initial.workingIndicator,
+        shimmerColor: "success",
+      },
     } as const;
     writeFileSync(
       process.env.PI_TUI_TWEAKS_CONFIG_PATH!,
@@ -400,6 +404,7 @@ describe("public renderer integration", () => {
   });
 
   it("reloads all editor styles with real Pi editor/footer setters and native embedded Working", async () => {
+    writeTestConfig({ workingIndicator: { shimmerColor: "success" } });
     const { session, createTransport } = await createSession(true);
     const errors: unknown[] = [];
     const statuses = new Map([["offline", "offline status"]]);

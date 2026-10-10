@@ -20,6 +20,8 @@ import { setTestConfig } from "../testing/helpers";
 function mkIndicatorHarness(colors?: {
   muted: ThemeColor;
   accent: ThemeColor;
+  success?: ThemeColor;
+  text?: ThemeColor;
 }) {
   const handlers: Record<string, Array<(...args: any[]) => void>> = {};
   const pi = {
@@ -98,6 +100,42 @@ describe("working indicator rendering", () => {
     }
   });
 
+  it("uses the selected shimmer highlight while keeping suffixes dim", () => {
+    const previous = getConfig();
+    const clock = installFakeClock(11_000);
+    const { pi, ctx, handlers, getLastFrames } = mkIndicatorHarness({
+      muted: rgbColor(10, 20, 30),
+      accent: rgbColor(100, 150, 200),
+      success: rgbColor(20, 220, 60),
+      text: rgbColor(240, 245, 250),
+    });
+    ctx.ui.theme.fg = (color, text) => `[${color}]${text}`;
+    const handle = registerWorkingIndicator(pi, ctx);
+    try {
+      for (const [shimmerColor, r, g, b] of [
+        ["accent", 27, 44, 62],
+        ["success", 12, 57, 36],
+        ["text", 53, 62, 71],
+      ] as const) {
+        setTestConfig({
+          workingIndicator: {
+            shimmerColor,
+            showDuration: true,
+            showInterruptHint: true,
+          },
+        });
+        handlers.agent_start![0]!();
+        const frame = getLastFrames()![0]!;
+        expect(frame).toStartWith(`\x1b[38;2;${r};${g};${b}mW\x1b[39m`);
+        expect(frame).toEndWith("[dim] (0s · esc to interrupt)");
+      }
+    } finally {
+      handle.dispose();
+      clock.restore();
+      setTestConfig(previous);
+    }
+  });
+
   for (const [name, ansi] of [
     ["terminal-default", "\x1b[39m"],
     ["faint", "\x1b[38;2;40;50;60m\x1b[2m"],
@@ -138,6 +176,7 @@ describe("working indicator rendering", () => {
   });
 
   it("uses dim text without resolving colors outside truecolor mode", () => {
+    const previous = getConfig();
     const { pi, ctx, handlers, getLastFrames } = mkIndicatorHarness();
     ctx.ui.theme.getColorMode = () => "256color";
     ctx.ui.theme.fg = (color, text) => `[${color}]${text}`;
@@ -148,18 +187,25 @@ describe("working indicator rendering", () => {
     });
     const handle = registerWorkingIndicator(pi, ctx);
     try {
-      handlers.agent_start![0]!();
-      expect(getLastFrames()![0]).toStartWith("[dim]Working");
-      expect(getLastFrames()![0]).not.toContain("\x1b[38;2;");
+      for (const shimmerColor of ["accent", "success", "text"] as const) {
+        setTestConfig({ workingIndicator: { shimmerColor } });
+        handlers.agent_start![0]!();
+        expect(getLastFrames()![0]).toStartWith("[dim]Working");
+        expect(getLastFrames()![0]).not.toContain("\x1b[38;2;");
+      }
     } finally {
       handle.dispose();
+      setTestConfig(previous);
     }
   });
 
   it("reads current theme colors on each frame", () => {
+    const previous = getConfig();
+    setTestConfig({ workingIndicator: { shimmerColor: "success" } });
     const colors = {
       muted: rgbColor(10, 20, 30),
       accent: rgbColor(100, 150, 200),
+      success: rgbColor(100, 150, 200),
     };
     const { pi, ctx, handlers, getLastFrames } = mkIndicatorHarness(colors);
     const clock = installFakeClock();
@@ -168,13 +214,14 @@ describe("working indicator rendering", () => {
       handlers.agent_start![0]!();
       expect(getLastFrames()![0]).toStartWith("\x1b[38;2;10;20;30mW");
       colors.muted = rgbColor(40, 50, 60);
-      colors.accent = rgbColor(200, 150, 100);
+      colors.success = rgbColor(200, 150, 100);
       clock.advance(1_000);
       handlers.agent_start![0]!();
       expect(getLastFrames()![0]).toStartWith("\x1b[38;2;70;69;67mW");
     } finally {
       handle.dispose();
       clock.restore();
+      setTestConfig(previous);
     }
   });
 

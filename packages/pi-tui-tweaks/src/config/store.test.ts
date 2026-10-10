@@ -46,6 +46,7 @@ describe("config validation", () => {
       },
       workingIndicator: {
         style: "shimmer",
+        shimmerColor: "accent",
       },
       tools: { enabled: true, treeCorner: "rounded" },
       editor: {
@@ -58,6 +59,38 @@ describe("config validation", () => {
       },
     });
     expect(getConfig()).toEqual(getDefaultConfig());
+  });
+
+  it("validates shimmer theme colors independently of style and duration", () => {
+    for (const shimmerColor of [
+      "accent",
+      "success",
+      "text",
+      "dim",
+      false,
+      null,
+      0,
+      [],
+      {},
+    ]) {
+      expect(
+        validateConfig({
+          workingIndicator: {
+            style: "native",
+            shimmerColor,
+            showDuration: false,
+          },
+        }).workingIndicator,
+      ).toEqual({
+        ...getDefaultConfig().workingIndicator,
+        style: "native",
+        shimmerColor:
+          shimmerColor === "success" || shimmerColor === "text"
+            ? shimmerColor
+            : "accent",
+        showDuration: false,
+      });
+    }
   });
 
   it("accepts the tools master flag without coercion or resetting siblings", () => {
@@ -123,6 +156,7 @@ describe("config validation", () => {
       header: { style: "compact", align: "center" },
       workingIndicator: {
         style: "native",
+        shimmerColor: "accent",
         showInterruptHint: false,
         showDuration: true,
       },

@@ -31,6 +31,14 @@ const ConfigSchema = Type.Object(
         style: Type.Union([Type.Literal("native"), Type.Literal("shimmer")], {
           default: "shimmer",
         }),
+        shimmerColor: Type.Union(
+          [
+            Type.Literal("accent"),
+            Type.Literal("success"),
+            Type.Literal("text"),
+          ],
+          { default: "accent" },
+        ),
         showInterruptHint: flag(true),
         showDuration: flag(true),
       },
