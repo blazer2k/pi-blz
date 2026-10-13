@@ -23,6 +23,7 @@ export function formatCodemodeResult(
   options: ToolRenderResultOptions,
   theme: Theme,
   width: number,
+  durationMs: number | undefined,
   nativeLines?: string[],
   cwd = process.cwd(),
 ) {
@@ -88,11 +89,11 @@ export function formatCodemodeResult(
     if (count) metadata.push(theme.fg(color, `${count} ${label}`));
   }
   if (state.isError) metadata.push(theme.fg("error", "script failed"));
-  const duration =
-    data.durationMs ??
-    (state.startedAt === undefined
+  const duration = options.isPartial
+    ? state.startedAt === undefined
       ? undefined
-      : Math.max(0, (state.endedAt ?? Date.now()) - state.startedAt));
+      : Math.max(0, (state.endedAt ?? Date.now()) - state.startedAt)
+    : durationMs;
   if (duration !== undefined)
     metadata.push(
       theme.fg(

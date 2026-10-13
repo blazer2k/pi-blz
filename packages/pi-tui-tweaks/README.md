@@ -178,9 +178,9 @@ This setting applies to Codemode while `tools.enhanceCustomTools` is enabled. Fa
 
 With `tools.enhanceCustomTools` enabled, collapsed Codemode shows a syntax-highlighted script preview and a count of nested tool calls. Below the output, it shows running, failed, and cancelled call counts when available, along with duration, available model-call costs, and hints for expanding the display.
 
-The live timer starts when script execution is observed. Pi's reported wall time supplies the final duration when available. Saved results without timing information do not get an estimated duration.
+The live timer starts when script execution is observed. Completed calls use Pi's recorded execution duration, including when you reopen a session. Results without a recorded duration show no timing label, even if their output includes a wall-time header.
 
-Expanding Codemode shows Pi's script display, nested-call details, and all returned output, followed by the extension's summary line. `tools.expandedOutputLimit` does not limit Codemode output. Costs can appear both in Pi's nested-call details and in the extension's summary.
+Expanding Codemode shows Pi's script display, nested-call details, and all returned output, followed by the extension's summary line. Execution timing appears once, in that summary line. `tools.expandedOutputLimit` does not limit Codemode output. Costs can appear both in Pi's nested-call details and in the extension's summary.
 
 Links to full output files remain visible in both preview and summary mode, as do warnings about failed saves. Expanding the display does not read those files or restore output that Pi omitted. Pi handles image display.
 

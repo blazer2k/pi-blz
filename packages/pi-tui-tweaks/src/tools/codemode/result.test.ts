@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { Container, visibleWidth } from "@earendil-works/pi-tui";
+import { Container, Text, visibleWidth } from "@earendil-works/pi-tui";
 import {
   initTheme,
   highlightCode,
@@ -95,6 +95,7 @@ function render(
   expanded = false,
   isError = false,
   state: CodemodeRenderState = {},
+  timing: { durationMs?: number } = { durationMs: 1200 },
 ) {
   const definition = setup();
   const context = mkToolCtx({
@@ -102,6 +103,7 @@ function render(
     isError,
     state: { _tuiTweaks: state },
     executionStarted: false,
+    ...timing,
   });
   const component = definition.renderResult!(
     input,
@@ -127,6 +129,78 @@ describe("Codemode output", () => {
     expect(text).toContain("╰─ took 1.2s");
     expect(text).not.toContain("Script completed");
     expect(text).not.toContain("to expand");
+  });
+
+  it("uses one recorded duration instead of header or observed time", () => {
+    for (const [durationMs, label] of [
+      [0, "0ms"],
+      [451, "451ms"],
+      [1270, "1.3s"],
+      [61000, "1m 1s"],
+      [3601000, "1h 0m 1s"],
+    ] as const) {
+      for (const expanded of [false, true]) {
+        const input = result("output");
+        const snapshot = structuredClone(input);
+        const { text } = render(
+          input,
+          expanded,
+          false,
+          { startedAt: 1000, endedAt: 9000 },
+          { durationMs },
+        );
+        expect(text).toContain(`╰─ took ${label}`);
+        expect(text.match(/\b(?:Took|took) /g)).toHaveLength(1);
+        expect(text).not.toContain("Wall time");
+        expect(input).toEqual(snapshot);
+      }
+    }
+  });
+
+  it("omits unrecorded final timing even with a header or observed clock", () => {
+    for (const expanded of [false, true]) {
+      for (const state of [{}, { startedAt: 1000, endedAt: 9000 }]) {
+        const { text } = render(
+          result("old output"),
+          expanded,
+          false,
+          state,
+          {},
+        );
+        expect(text).toContain("old output");
+        expect(text).not.toMatch(/\b(?:Took|took) /);
+        expect(text).not.toContain("Wall time");
+      }
+    }
+  });
+
+  it("preserves timing-shaped script output while omitting only the native footer", () => {
+    const payload = "Took 1.3s\n\nElapsed 1.3s\nTook 1.3s";
+    const { text } = render(
+      result(payload),
+      true,
+      false,
+      {},
+      { durationMs: 1270 },
+    );
+    expect(text.match(/Took 1\.3s/g)).toHaveLength(2);
+    expect(text).toContain("Elapsed 1.3s");
+    expect(text).toContain("Took 1.3s\n │\n │  Elapsed 1.3s");
+    expect(text.match(/╰─ took 1\.3s/g)).toHaveLength(1);
+  });
+
+  it("leaves unfamiliar native component layouts unchanged", () => {
+    const native = new Container();
+    native.addChild(new Text("Took 1.3s", 0, 0));
+    const definition = setup({ renderResult: () => native });
+    const component = definition.renderResult!(
+      result("output"),
+      { expanded: true, isPartial: false },
+      mkTheme(),
+      mkToolCtx({ expanded: true, durationMs: 1270 }),
+    );
+    expect(component.render(120).join("\n")).toContain("Took 1.3s");
+    expect(native.children).toHaveLength(1);
   });
 
   it("selects the first and last logical lines around one omission row", () => {
@@ -202,6 +276,8 @@ describe("Codemode output", () => {
       },
       false,
       true,
+      {},
+      {},
     );
     expect(text).toContain("Invalid options");
     expect(text).not.toContain("took");
@@ -220,7 +296,7 @@ describe("Codemode output", () => {
       details: { calls: [] },
     };
     expect(render(input).text).toContain("Script completed is ordinary text");
-    expect(buildCodemodeResultView(input).durationMs).toBeUndefined();
+    expect(buildCodemodeResultView(input).output).toBe(input.content[0]!.text);
   });
 
   it("summarizes nested statuses without treating a caught failure as script failure", () => {
@@ -675,7 +751,7 @@ describe("Codemode output", () => {
         context,
       );
       const view = buildCodemodeResultView(input);
-      expect(view.durationMs).toBeNumber();
+      expect(view.output).not.toContain("Wall time");
       const rendered = definition.renderResult!(
         input,
         { expanded: false, isPartial: false },

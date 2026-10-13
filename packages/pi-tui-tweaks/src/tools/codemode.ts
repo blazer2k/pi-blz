@@ -1,4 +1,5 @@
 import type { ToolRenderers } from "@earendil-works/pi-coding-agent";
+import { Container, Spacer, Text, visibleWidth } from "@earendil-works/pi-tui";
 import { renderCodemodeCall } from "./codemode/call";
 import { formatCodemodeResult } from "./codemode/result";
 import type { CodemodeRenderState } from "./codemode/types";
@@ -12,6 +13,7 @@ import { getResultText } from "./rendering/tree";
 import { extractTextContent } from "./rendering/text";
 import {
   formatCollapsedOutput,
+  formatDuration,
   formatOutputLines,
   selectOutputWindow,
 } from "./rendering/output";
@@ -77,6 +79,27 @@ export function createCodemodeRenderers(
             ...context,
             lastComponent: state.nativeResult,
           });
+          if (
+            !options.isPartial &&
+            context.durationMs !== undefined &&
+            nativeResult instanceof Container
+          ) {
+            const duration =
+              context.durationMs < 1000
+                ? `${(context.durationMs / 1000).toFixed(1)}s`
+                : formatDuration(context.durationMs);
+            const label = theme.fg("muted", `Took ${duration}`);
+            const gap = nativeResult.children.at(-2);
+            const footer = nativeResult.children.at(-1);
+            if (
+              gap instanceof Spacer &&
+              footer instanceof Text &&
+              footer.render(visibleWidth(label))[0]?.trimEnd() === label
+            ) {
+              nativeResult.removeChild(footer);
+              nativeResult.removeChild(gap);
+            }
+          }
           state.nativeResult = nativeResult;
         } catch (error) {
           reportError(error);
@@ -100,6 +123,7 @@ export function createCodemodeRenderers(
             options,
             theme,
             width,
+            context.durationMs,
             nativeLines,
             context.cwd,
           );

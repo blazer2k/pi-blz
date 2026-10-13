@@ -1061,17 +1061,24 @@ describe("public renderer integration", () => {
       component.updateResult(input);
       for (const outputPad of [0, 1, 0]) {
         component.setOutputPad(outputPad);
-        for (const width of [8, 40, 80]) {
-          const rows = component
-            .render(width)
-            .map(stripAnsi)
-            .filter((row) => row.trim());
-          expect(rows.every((row) => visibleWidth(row) <= width)).toBe(true);
-          expect(
-            rows.every((row) => row.startsWith(" ") === (outputPad === 1)),
-          ).toBe(true);
-          if (name === "bash" && width === 80)
-            expect(rows.join("\n")).toContain("took 2.3s");
+        for (const expanded of [false, true, false]) {
+          component.setExpanded(expanded);
+          for (const width of [8, 40, 80]) {
+            const rows = component
+              .render(width)
+              .map(stripAnsi)
+              .filter((row) => row.trim());
+            expect(rows.every((row) => visibleWidth(row) <= width)).toBe(true);
+            expect(
+              rows.every((row) => row.startsWith(" ") === (outputPad === 1)),
+            ).toBe(true);
+            if (name !== "read" && width === 80) {
+              const text = rows.join("\n");
+              expect(text).toContain("took 2.3s");
+              expect(text.match(/\b(?:Took|took) /g)).toHaveLength(1);
+              expect(text).not.toContain("Wall time");
+            }
+          }
         }
       }
       expect(input).toEqual(snapshot);
@@ -1159,93 +1166,101 @@ describe("public renderer integration", () => {
     });
   });
 
-  it("uses Pi's saved Bash duration on reopening without extra records", async () => {
-    const { session } = await createSession(true);
-    session.sessionManager.appendMessage({
-      role: "user",
-      content: "run Bash",
-      timestamp: 1,
-    });
-    session.sessionManager.appendMessage({
-      role: "assistant",
-      content: [
-        {
-          type: "toolCall",
-          id: "history-bash",
-          name: "bash",
-          arguments: { command: "echo timed" },
+  for (const name of ["bash", "codemode"] as const) {
+    it(`uses Pi's saved ${name} duration on reopening without extra records`, async () => {
+      const { session } = await createSession(true);
+      const id = `history-${name}`;
+      const args: Record<string, string> =
+        name === "bash" ? { command: "echo timed" } : { code: 'text("timed")' };
+      session.sessionManager.appendMessage({
+        role: "user",
+        content: `run ${name}`,
+        timestamp: 1,
+      });
+      session.sessionManager.appendMessage({
+        role: "assistant",
+        content: [{ type: "toolCall", id, name, arguments: args }],
+        api: "anthropic-messages",
+        provider: "anthropic",
+        model: "offline",
+        usage: {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 0,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
         },
-      ],
-      api: "anthropic-messages",
-      provider: "anthropic",
-      model: "offline",
-      usage: {
-        input: 0,
-        output: 0,
-        cacheRead: 0,
-        cacheWrite: 0,
-        totalTokens: 0,
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-      },
-      stopReason: "toolUse",
-      timestamp: 1,
+        stopReason: "toolUse",
+        timestamp: 1,
+      });
+      const result =
+        name === "bash"
+          ? await session
+              .getToolDefinition(name)!
+              .execute(id, args, undefined, undefined, {
+                cwd: directory,
+                sessionManager: session.sessionManager,
+              } as unknown as ExtensionToolContext)
+          : {
+              content: [
+                {
+                  type: "text" as const,
+                  text: "Script completed\nWall time 0.1 seconds\nOutput:\n",
+                },
+                { type: "text" as const, text: "timed\nTook 1.3s" },
+              ],
+              details: { calls: [] },
+            };
+      const snapshot = structuredClone(result);
+      session.sessionManager.appendMessage({
+        role: "toolResult",
+        toolCallId: id,
+        toolName: name,
+        content: result.content,
+        details: result.details as ToolResultMessage["details"],
+        durationMs: 1250,
+        isError: false,
+        timestamp: 2,
+      });
+      expect(result).toEqual(snapshot);
+      const entries = session.sessionManager.getBranch();
+      expect(entries.filter((entry) => entry.type === "custom")).toEqual([]);
+      const file = session.sessionManager.getSessionFile()!;
+      await session.extensionRunner.emit({
+        type: "session_shutdown",
+        reason: "quit",
+      });
+      session.dispose();
+      sessions.splice(sessions.indexOf(session), 1);
+      const reopened = (
+        await createSession(true, undefined, SessionManager.open(file))
+      ).session;
+      const saved = reopened.sessionManager
+        .getBranch()
+        .find(
+          (entry) =>
+            entry.type === "message" && entry.message.role === "toolResult",
+        );
+      expect(saved?.type).toBe("message");
+      const message = (saved as { type: "message"; message: ToolResultMessage })
+        .message;
+      const component = toolComponent(reopened, name, args, id);
+      component.setArgsComplete();
+      component.updateResult(message);
+      for (const expanded of [false, true, false]) {
+        component.setExpanded(expanded);
+        const text = stripAnsi(component.render(80).join("\n"));
+        expect(text).toContain("took 1.3s");
+        expect(text.match(/\b(?:Took|took) /g)).toHaveLength(
+          name === "codemode" ? 2 : 1,
+        );
+        expect(text).not.toContain("Wall time");
+      }
+      expect(message.content).toEqual(snapshot.content);
+      expect(result).toEqual(snapshot);
     });
-    const result = await session
-      .getToolDefinition("bash")!
-      .execute(
-        "history-bash",
-        { command: "echo timed" },
-        undefined,
-        undefined,
-        {
-          cwd: directory,
-          sessionManager: session.sessionManager,
-        } as unknown as ExtensionToolContext,
-      );
-    const snapshot = structuredClone(result);
-    session.sessionManager.appendMessage({
-      role: "toolResult",
-      toolCallId: "history-bash",
-      toolName: "bash",
-      content: result.content,
-      details: result.details as ToolResultMessage["details"],
-      durationMs: 1250,
-      isError: false,
-      timestamp: 2,
-    });
-    expect(result).toEqual(snapshot);
-    const entries = session.sessionManager.getBranch();
-    expect(entries.filter((entry) => entry.type === "custom")).toEqual([]);
-    const file = session.sessionManager.getSessionFile()!;
-    await session.extensionRunner.emit({
-      type: "session_shutdown",
-      reason: "quit",
-    });
-    session.dispose();
-    sessions.splice(sessions.indexOf(session), 1);
-    const reopened = (
-      await createSession(true, undefined, SessionManager.open(file))
-    ).session;
-    const saved = reopened.sessionManager
-      .getBranch()
-      .find(
-        (entry) =>
-          entry.type === "message" && entry.message.role === "toolResult",
-      );
-    expect(saved?.type).toBe("message");
-    const message = (saved as { type: "message"; message: ToolResultMessage })
-      .message;
-    const component = toolComponent(
-      reopened,
-      "bash",
-      { command: "echo timed" },
-      "history-bash",
-    );
-    component.setArgsComplete();
-    component.updateResult(message);
-    expect(component.render(80).join("\n")).toContain("took 1.3s");
-    expect(result).toEqual(snapshot);
-  });
+  }
 
   it("uses the resolver chain in HTML exports without changing tool results", async () => {
     const { session } = await createSession(true);

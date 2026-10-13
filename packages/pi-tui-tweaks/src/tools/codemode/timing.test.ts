@@ -134,7 +134,7 @@ describe("Codemode timing", () => {
     expect(component.render(120).join("\n")).toContain("elapsed 1.8s");
   });
 
-  it("freezes observed duration on settlement and stops both indicators", () => {
+  it("keeps recorded duration on settlement and stops both indicators", () => {
     const { definition, state, context, progress, renderCall } = setup();
     progress();
     const timer = state.durationTimer;
@@ -147,7 +147,7 @@ describe("Codemode timing", () => {
       input,
       { expanded: false, isPartial: false },
       mkTheme(),
-      { ...context, isPartial: false },
+      { ...context, isPartial: false, durationMs: 1250 },
     );
     renderCall();
     expect(state.blinkTimer).toBeUndefined();
@@ -156,10 +156,10 @@ describe("Codemode timing", () => {
     expect(state.endedAt).toBe(2500);
     now = 9000;
     component.invalidate();
-    expect(component.render(120).join("\n")).toContain("took 1.5s");
+    expect(component.render(120).join("\n")).toContain("took 1.3s");
   });
 
-  it("prefers Pi's final reported wall time over observed time", () => {
+  it("prefers recorded duration over header and observed time", () => {
     const { definition, context, progress } = setup();
     progress();
     now = 9000;
@@ -175,9 +175,41 @@ describe("Codemode timing", () => {
       },
       { expanded: false, isPartial: false },
       mkTheme(),
-      context,
+      { ...context, durationMs: 451 },
     );
-    expect(component.render(120).join("\n")).toContain("took 400ms");
+    expect(component.render(120).join("\n")).toContain("took 451ms");
+  });
+
+  it("keeps recorded timing for zero-duration and aborted calls", () => {
+    for (const expanded of [false, true]) {
+      for (const isError of [false, true]) {
+        const { definition, context, state, progress } = setup(true, expanded);
+        progress();
+        now += 5000;
+        const durationMs = isError ? 600 : 0;
+        const component = definition.renderResult!(
+          {
+            content: [
+              {
+                type: "text",
+                text: isError ? "Script error:\nError: Script aborted" : "done",
+              },
+            ],
+            details: { calls: [] },
+          },
+          { expanded, isPartial: false },
+          mkTheme(),
+          { ...context, isPartial: false, isError, durationMs },
+        );
+        now += 5000;
+        const text = component.render(120).join("\n");
+        expect(text).toContain(`took ${durationMs}ms`);
+        expect(text.match(/\b(?:Took|took) /g)).toHaveLength(1);
+        expect(state.durationTimer).toBeUndefined();
+        expect(state.blinkTimer).toBeUndefined();
+        if (isError) expect(text).toContain("Script aborted");
+      }
+    }
   });
 
   it("does not invent start times or duration timers for historical calls", () => {

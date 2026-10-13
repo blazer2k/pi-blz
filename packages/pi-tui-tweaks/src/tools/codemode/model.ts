@@ -4,13 +4,15 @@ import { stripAnsi } from "../rendering/text";
 import type { ToolTextResult } from "../rendering/types";
 
 const SCRIPT_HEADER =
-  /^Script (completed|failed)\nWall time (\d+(?:\.\d+)?) seconds\nOutput:\n$/;
+  /^Script (?:completed|failed)\nWall time \d+(?:\.\d+)? seconds\nOutput:\n$/;
 
 export function buildCodemodeResultView(result: ToolTextResult) {
   const details = result.details as Partial<CodemodeToolDetails> | undefined;
   const first = result.content[0];
   const header =
-    first?.type === "text" ? first.text?.match(SCRIPT_HEADER) : undefined;
+    first?.type === "text" &&
+    typeof first.text === "string" &&
+    SCRIPT_HEADER.test(first.text);
   const blocks = (header ? result.content.slice(1) : result.content)
     .filter((block) => block.type === "text" && typeof block.text === "string")
     .map((block) => block.text!);
@@ -57,7 +59,6 @@ export function buildCodemodeResultView(result: ToolTextResult) {
     calls: details?.calls ?? [],
     output,
     diagnostic,
-    durationMs: header ? Number(header[2]) * 1000 : undefined,
     fullOutputPath: details?.fullOutputPath,
     images: result.content.filter((block) => block.type === "image").length,
     truncated,
