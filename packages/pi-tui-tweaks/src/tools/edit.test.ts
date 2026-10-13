@@ -88,7 +88,7 @@ describe("edit renderResult", () => {
     );
 
     const output = component.render(120).join("\n");
-    expect(output).toContain("truncated");
+    expect(output).toContain("Truncated");
     expect(output).toContain("toolDiffAdded:+2");
     expect(output).toContain("toolDiffRemoved:-1");
     expect(output).toContain("to expand");

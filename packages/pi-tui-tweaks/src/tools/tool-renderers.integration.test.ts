@@ -247,6 +247,7 @@ describe("public renderer integration", () => {
       tools: {
         ...initial.tools,
         capitalizeNames: false,
+        capitalizeMetadata: false,
         treeCorner: "square",
         expandedOutputLimit: 10,
         collapsedOutputDisplay: "summary",
@@ -328,14 +329,26 @@ describe("public renderer integration", () => {
         process.env.PI_TUI_TWEAKS_CONFIG_PATH!,
         JSON.stringify({
           ...config,
-          tools: { ...config.tools, enabled },
+          tools: { ...config.tools, enabled, capitalizeMetadata: enabled },
         }),
       );
       expect(getConfig().tools.enabled).toBe(config.tools.enabled);
+      expect(getConfig().tools.capitalizeMetadata).toBe(
+        config.tools.capitalizeMetadata,
+      );
       setWidget.mockClear();
       setEditorComponent.mockClear();
       await session.reload();
       expect(getConfig().tools.enabled).toBe(enabled);
+      expect(getConfig().tools.capitalizeMetadata).toBe(enabled);
+      if (enabled) {
+        const recased = toolComponent(session, "bash", args);
+        recased.setArgsComplete();
+        recased.updateResult(result);
+        const output = recased.render(80).map(stripAnsi).join("\n");
+        expect(output).toContain("bash $ echo config");
+        expect(output).toContain("└─ Took 1ms");
+      }
       for (const name of [
         "read",
         "write",
@@ -1074,7 +1087,7 @@ describe("public renderer integration", () => {
             ).toBe(true);
             if (name !== "read" && width === 80) {
               const text = rows.join("\n");
-              expect(text).toContain("took 2.3s");
+              expect(text).toContain("Took 2.3s");
               expect(text.match(/\b(?:Took|took) /g)).toHaveLength(1);
               expect(text).not.toContain("Wall time");
             }
@@ -1251,7 +1264,7 @@ describe("public renderer integration", () => {
       for (const expanded of [false, true, false]) {
         component.setExpanded(expanded);
         const text = stripAnsi(component.render(80).join("\n"));
-        expect(text).toContain("took 1.3s");
+        expect(text).toContain("Took 1.3s");
         expect(text.match(/\b(?:Took|took) /g)).toHaveLength(
           name === "codemode" ? 2 : 1,
         );

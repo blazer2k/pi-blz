@@ -168,6 +168,159 @@ describe("tool-call capitalization", () => {
     });
   }
 
+  it("applies metadata capitalization to core error/truncation rows without changing payloads", () => {
+    const payload = "took truncated script failed model calls stay lowercase";
+    const input = {
+      content: [{ type: "text" as const, text: payload }],
+      details: { truncation: { truncated: true } },
+    };
+    const snapshot = structuredClone(input);
+    for (const testCase of coreCases) {
+      const definition = setupTool(testCase.patch);
+      for (const expanded of [false, true]) {
+        const component = definition.renderResult!(
+          input,
+          { expanded, isPartial: false },
+          mkTheme(),
+          mkToolCtx({
+            expanded,
+            isError: true,
+            durationMs: 1234,
+            args: testCase.args,
+          }),
+        );
+        for (const capitalizeMetadata of [true, false, true]) {
+          setTestConfig({
+            tools: { capitalizeMetadata, capitalizeNames: false },
+          });
+          component.invalidate();
+          const output = text(component);
+          expect(output).toContain(
+            capitalizeMetadata ? "Truncated" : "truncated",
+          );
+          if (!capitalizeMetadata) expect(output).not.toContain("Truncated");
+          expect(output).toContain(payload);
+          if (testCase.name === "bash")
+            expect(output).toContain(
+              capitalizeMetadata ? "Took 1.2s" : "took 1.2s",
+            );
+        }
+      }
+    }
+    expect(input).toEqual(snapshot);
+  });
+
+  it("capitalizes only owned Codemode metadata in partial and final views", () => {
+    const wrapped = createCodemodeRenderers(nativeCodemode(), adapterOptions);
+    const payload = "took truncated script failed model calls stay lowercase";
+    const input = {
+      content: [
+        {
+          type: "text" as const,
+          text: "Script failed\nWall time 99.0 seconds\nOutput:\n",
+        },
+        { type: "text" as const, text: payload },
+      ],
+      details: {
+        fullOutputPath: "/tmp/full-output.txt",
+        calls: [
+          {
+            id: "a",
+            name: "read",
+            args: "lowercase args",
+            status: "ok" as const,
+            cost: 0.01,
+          },
+          {
+            id: "b",
+            name: "write",
+            args: "lowercase args",
+            status: "error" as const,
+            cost: 0.02,
+          },
+        ],
+      },
+    };
+    const snapshot = structuredClone(input);
+    for (const capitalizeMetadata of [true, false]) {
+      setTestConfig({ tools: { capitalizeMetadata, capitalizeNames: false } });
+      for (const expanded of [false, true])
+        for (const isPartial of [false, true]) {
+          const component = wrapped.renderResult!(
+            input,
+            { expanded, isPartial },
+            mkTheme(),
+            mkToolCtx({
+              expanded,
+              isPartial,
+              isError: true,
+              durationMs: 1200,
+              state: { _tuiTweaks: { startedAt: 1000, endedAt: 2200 } },
+            }),
+          );
+          const output = text(component);
+          for (const [original, capitalized] of [
+            ["truncated", "Truncated"],
+            ["script failed", "Script failed"],
+            ["model calls $0.03", "Model calls $0.03"],
+          ])
+            expect(output).toContain(
+              capitalizeMetadata ? capitalized! : original!,
+            );
+          expect(output).toContain(
+            `${capitalizeMetadata ? (isPartial ? "Elapsed" : "Took") : isPartial ? "elapsed" : "took"} 1.2s`,
+          );
+          expect(output).toContain("2 calls");
+          expect(output).toContain("1 failed");
+          if (!isPartial) expect(output).toContain(payload);
+          if (expanded) expect(output).toContain("lowercase args");
+        }
+    }
+    expect(input).toEqual(snapshot);
+  });
+
+  it("uses the shared metadata rule for native custom output and generic fallbacks", () => {
+    const payload = "took truncated script failed model calls stay lowercase";
+    const input = {
+      content: [{ type: "text" as const, text: payload }],
+      details: { truncation: { truncated: true } },
+    };
+    const native = () => new Text(payload, 0, 0);
+    for (const renderResult of [
+      undefined,
+      native,
+      () => {
+        throw new Error("native failure");
+      },
+    ]) {
+      const wrapped = createWrappedRenderers(
+        "custom",
+        { renderResult },
+        adapterOptions,
+      );
+      for (const capitalizeMetadata of [true, false]) {
+        setTestConfig({ tools: { capitalizeMetadata } });
+        for (const expanded of [false, true]) {
+          const output = text(
+            wrapped.renderResult!(
+              input,
+              { expanded, isPartial: false },
+              mkTheme(),
+              mkToolCtx({ expanded }),
+            ),
+          );
+          expect(output).toContain(
+            capitalizeMetadata ? "Truncated" : "truncated",
+          );
+          if (!capitalizeMetadata) expect(output).not.toContain("Truncated");
+          if (expanded || renderResult === native)
+            expect(output).toContain(payload);
+          expect(output).not.toContain("Stay lowercase");
+        }
+      }
+    }
+  });
+
   it("capitalizes core headers even when custom-tool wrapping is disabled", () => {
     setTestConfig({
       tools: {
@@ -372,13 +525,14 @@ describe("tool-call capitalization", () => {
     );
   });
 
-  it("leaves self-rendering third-party labels untouched with either setting", () => {
+  it("leaves self-rendering third-party labels and metadata untouched with either setting", () => {
     const native = {
       ...nativeCodemode(),
       name: "searchAPI",
       label: "searchAPI",
       renderShell: "self" as const,
       renderCall: () => new Text("searchAPI", 0, 0),
+      renderResult: () => new Text("took · truncated · script failed", 0, 0),
     };
     const fixture = setupCustomTool(native);
     try {
@@ -386,6 +540,7 @@ describe("tool-call capitalization", () => {
         setTestConfig({
           tools: {
             capitalizeNames: enabled,
+            capitalizeMetadata: enabled,
           },
         });
         const registered = fixture.renderers;
@@ -393,6 +548,16 @@ describe("tool-call capitalization", () => {
         expect(
           text(registered.renderCall!({}, mkTheme(), mkToolCtx())).trimEnd(),
         ).toBe("searchAPI");
+        expect(
+          text(
+            registered.renderResult!(
+              { content: [], details: undefined },
+              { expanded: true, isPartial: false },
+              mkTheme(),
+              mkToolCtx(),
+            ),
+          ).trimEnd(),
+        ).toBe("took · truncated · script failed");
       }
     } finally {
       fixture.dispose();

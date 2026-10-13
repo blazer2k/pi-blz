@@ -101,7 +101,7 @@ describe("built-in tool output", () => {
       " ● Bash $ printf hello",
       " │  hello",
       " │  world",
-      " ╰─ took 50ms",
+      " ╰─ Took 50ms",
     ]);
   });
 

@@ -48,7 +48,7 @@ describe("config validation", () => {
         style: "shimmer",
         shimmerColor: "accent",
       },
-      tools: { enabled: true, treeCorner: "rounded" },
+      tools: { enabled: true, capitalizeMetadata: true, treeCorner: "rounded" },
       editor: {
         style: "rounded",
         color: "dim",
@@ -100,6 +100,36 @@ describe("config validation", () => {
       ).toEqual({
         ...getDefaultConfig().tools,
         enabled: typeof enabled === "boolean" ? enabled : true,
+        expandedOutputLimit: 50,
+      });
+    }
+  });
+
+  it("validates metadata capitalization independently of header capitalization", () => {
+    for (const capitalizeMetadata of [
+      true,
+      false,
+      0,
+      1,
+      "true",
+      "false",
+      null,
+      [],
+      {},
+    ]) {
+      expect(
+        validateConfig({
+          tools: {
+            capitalizeMetadata,
+            capitalizeNames: false,
+            expandedOutputLimit: 50,
+          },
+        }).tools,
+      ).toEqual({
+        ...getDefaultConfig().tools,
+        capitalizeMetadata:
+          typeof capitalizeMetadata === "boolean" ? capitalizeMetadata : true,
+        capitalizeNames: false,
         expandedOutputLimit: 50,
       });
     }

@@ -131,7 +131,7 @@ describe("Codemode timing", () => {
     intervals.get(timer!)!();
     expect(invalidations()).toBeGreaterThan(0);
     component.invalidate();
-    expect(component.render(120).join("\n")).toContain("elapsed 1.8s");
+    expect(component.render(120).join("\n")).toContain("Elapsed 1.8s");
   });
 
   it("keeps recorded duration on settlement and stops both indicators", () => {
@@ -156,7 +156,7 @@ describe("Codemode timing", () => {
     expect(state.endedAt).toBe(2500);
     now = 9000;
     component.invalidate();
-    expect(component.render(120).join("\n")).toContain("took 1.3s");
+    expect(component.render(120).join("\n")).toContain("Took 1.3s");
   });
 
   it("prefers recorded duration over header and observed time", () => {
@@ -177,7 +177,7 @@ describe("Codemode timing", () => {
       mkTheme(),
       { ...context, durationMs: 451 },
     );
-    expect(component.render(120).join("\n")).toContain("took 451ms");
+    expect(component.render(120).join("\n")).toContain("Took 451ms");
   });
 
   it("keeps recorded timing for zero-duration and aborted calls", () => {
@@ -203,7 +203,7 @@ describe("Codemode timing", () => {
         );
         now += 5000;
         const text = component.render(120).join("\n");
-        expect(text).toContain(`took ${durationMs}ms`);
+        expect(text).toContain(`Took ${durationMs}ms`);
         expect(text.match(/\b(?:Took|took) /g)).toHaveLength(1);
         expect(state.durationTimer).toBeUndefined();
         expect(state.blinkTimer).toBeUndefined();
@@ -226,7 +226,7 @@ describe("Codemode timing", () => {
       mkTheme(),
       context,
     );
-    expect(component.render(120).join("\n")).not.toContain("took");
+    expect(component.render(120).join("\n")).not.toContain("Took");
     expect(state.endedAt).toBeUndefined();
   });
 

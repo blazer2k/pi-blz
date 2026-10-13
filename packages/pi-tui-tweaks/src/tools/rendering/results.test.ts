@@ -77,7 +77,7 @@ describe("formatSimpleErrorResult", () => {
         theme,
         80,
       );
-      expect(output).toContain("truncated");
+      expect(output).toContain("Truncated");
       expect(output).not.toContain("error ·");
     }
   });
@@ -175,7 +175,7 @@ describe("formatListResult", () => {
       80,
     );
 
-    expect(output).toContain("truncated · (empty)");
+    expect(output).toContain("Truncated · (empty)");
   });
 
   it("collapsed shows count and expand hint", () => {
@@ -256,7 +256,7 @@ describe("formatListResult", () => {
       details: { resultLimitReached: 1000 },
     };
     const output = formatListResult(result, state, opts, theme, baseConfig, 80);
-    expect(output).toContain("truncated · 2 files");
+    expect(output).toContain("Truncated · 2 files");
     expect(output).not.toContain("1000 limit");
   });
 

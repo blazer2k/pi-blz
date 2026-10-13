@@ -130,6 +130,6 @@ describe("grep renderResult", () => {
       ctx,
     );
     const output = component.render(120).join("\n");
-    expect(output).toContain("truncated");
+    expect(output).toContain("Truncated");
   });
 });

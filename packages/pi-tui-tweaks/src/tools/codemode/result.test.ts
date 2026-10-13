@@ -126,7 +126,7 @@ describe("Codemode output", () => {
   it("shows short output and a bottom duration without unnecessary hints", () => {
     const { text } = render(result("one\ntwo\nthree"));
     expect(text).toContain("│  one\n │  two\n │  three");
-    expect(text).toContain("╰─ took 1.2s");
+    expect(text).toContain("╰─ Took 1.2s");
     expect(text).not.toContain("Script completed");
     expect(text).not.toContain("to expand");
   });
@@ -149,7 +149,7 @@ describe("Codemode output", () => {
           { startedAt: 1000, endedAt: 9000 },
           { durationMs },
         );
-        expect(text).toContain(`╰─ took ${label}`);
+        expect(text).toContain(`╰─ Took ${label}`);
         expect(text.match(/\b(?:Took|took) /g)).toHaveLength(1);
         expect(text).not.toContain("Wall time");
         expect(input).toEqual(snapshot);
@@ -183,10 +183,10 @@ describe("Codemode output", () => {
       {},
       { durationMs: 1270 },
     );
-    expect(text.match(/Took 1\.3s/g)).toHaveLength(2);
+    expect(text.match(/Took 1\.3s/g)).toHaveLength(3);
     expect(text).toContain("Elapsed 1.3s");
     expect(text).toContain("Took 1.3s\n │\n │  Elapsed 1.3s");
-    expect(text.match(/╰─ took 1\.3s/g)).toHaveLength(1);
+    expect(text.match(/╰─ Took 1\.3s/g)).toHaveLength(1);
   });
 
   it("leaves unfamiliar native component layouts unchanged", () => {
@@ -228,7 +228,7 @@ describe("Codemode output", () => {
     const { text } = render(result("one\ntwo"));
     expect(text).not.toContain("one");
     expect(text).not.toContain("two");
-    expect(text).toContain("╰─ took 1.2s · 2 lines · ");
+    expect(text).toContain("╰─ Took 1.2s · 2 lines · ");
     expect(text).toContain("to expand");
   });
 
@@ -257,7 +257,7 @@ describe("Codemode output", () => {
       for (const output of [input, joined]) {
         const { text } = render(output, false, true);
         expect(text).toContain("Error: broken");
-        expect(text).toContain("script failed");
+        expect(text).toContain("Script failed");
         expect(text.match(/Error: broken/g)).toHaveLength(1);
       }
     }
@@ -280,7 +280,7 @@ describe("Codemode output", () => {
       {},
     );
     expect(text).toContain("Invalid options");
-    expect(text).not.toContain("took");
+    expect(text).not.toContain("Took");
     expect(text).not.toContain("to expand");
     expect(stripAnsi(component.render(15).join("\n"))).toContain("expand");
   });
@@ -311,7 +311,7 @@ describe("Codemode output", () => {
     for (const value of ["4 calls", "1 running", "1 failed", "1 cancelled"])
       expect(text).toContain(value);
     expect(text).not.toContain("nested arguments");
-    expect(text).not.toContain("script failed");
+    expect(text).not.toContain("Script failed");
   });
 
   it("uses named closing corners without rewriting script output", () => {
@@ -320,7 +320,7 @@ describe("Codemode output", () => {
       for (const expanded of [false, true]) {
         const { text } = render(result("payload ╰─ and └─"), expanded);
         expect(text).toContain(
-          `${treeCorner === "square" ? "└" : "╰"}─ took 1.2s`,
+          `${treeCorner === "square" ? "└" : "╰"}─ Took 1.2s`,
         );
         expect(text).toContain("payload ╰─ and └─");
       }
@@ -358,19 +358,19 @@ describe("Codemode output", () => {
       render(
         result("ok", [call("ok", "a", 0.000012), call("ok", "b", 0.000012)]),
       ).text,
-    ).toContain("model calls $0.000024");
+    ).toContain("Model calls $0.000024");
     expect(
       render(result("ok", [call("ok", "a", 1.23), call("ok", "b", 2.34)])).text,
-    ).toContain("model calls $3.57");
+    ).toContain("Model calls $3.57");
     expect(render(result("ok", [call("ok")])).text).not.toContain(
-      "model calls",
+      "Model calls",
     );
     const expanded = render(
       result("ok", [call("ok", "a", 1.23), call("ok", "b", 2.34)]),
       true,
     ).text;
     expect(expanded).toContain("Model calls: $3.57");
-    expect(expanded).toContain("model calls $3.57");
+    expect(expanded).toContain("Model calls $3.57");
   });
 
   it("shows no-output only for completed textless, imageless results", () => {
@@ -476,11 +476,11 @@ describe("Codemode output", () => {
       });
       const { text } = render(input);
       expect(text).toContain(`Full output: ${path}`);
-      expect(text).toContain("truncated");
+      expect(text).toContain("Truncated");
       expect(text).not.toContain("Total output lines");
       if (display === "summary") expect(text).toContain("1 returned line");
     }
-    expect(render(result("a\nb\nc\nd")).text).not.toContain("truncated");
+    expect(render(result("a\nb\nc\nd")).text).not.toContain("Truncated");
   });
 
   it("keeps failed-spill warnings and leaves unfamiliar envelopes untouched", () => {
@@ -692,7 +692,7 @@ describe("Codemode output", () => {
       .join("\n");
     expect(text).toContain("2 calls");
     expect(text).toContain("1 failed");
-    expect(text).not.toContain("script failed");
+    expect(text).not.toContain("Script failed");
   });
 
   it("renders real spilled output without reading the spill file", async () => {

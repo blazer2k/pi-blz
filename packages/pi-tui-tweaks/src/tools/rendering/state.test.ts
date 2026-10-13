@@ -42,7 +42,7 @@ describe("result status rendering", () => {
 
     expect(
       buildResultStatusParts({ isError: true, truncated: true }, theme),
-    ).toEqual(["muted:truncated"]);
+    ).toEqual(["muted:Truncated"]);
   });
 
   it("always colors tree connectors with the healthy default", () => {

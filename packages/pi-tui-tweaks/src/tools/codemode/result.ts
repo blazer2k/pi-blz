@@ -9,10 +9,12 @@ import {
 } from "../rendering/output";
 import {
   buildToolExpansionHint,
+  buildResultStatusParts,
   getCollapsedOutputDisplay,
 } from "../rendering/state";
 import type { ToolTextResult } from "../rendering/types";
 import { renderPath } from "../rendering/text";
+import { formatMetadataLabel } from "../rendering/labels";
 import { formatTreeLine, getTreeEndPrefix } from "../rendering/tree";
 import { buildCodemodeResultView } from "./model";
 import type { CodemodeRenderState } from "./types";
@@ -88,7 +90,8 @@ export function formatCodemodeResult(
     const count = data.calls.filter((call) => call.status === status).length;
     if (count) metadata.push(theme.fg(color, `${count} ${label}`));
   }
-  if (state.isError) metadata.push(theme.fg("error", "script failed"));
+  if (state.isError)
+    metadata.push(theme.fg("error", formatMetadataLabel("script failed")));
   const duration = options.isPartial
     ? state.startedAt === undefined
       ? undefined
@@ -98,7 +101,9 @@ export function formatCodemodeResult(
     metadata.push(
       theme.fg(
         "dim",
-        `${options.isPartial ? "elapsed" : "took"} ${formatDuration(duration)}`,
+        formatMetadataLabel(
+          `${options.isPartial ? "elapsed" : "took"} ${formatDuration(duration)}`,
+        ),
       ),
     );
   const priced = data.calls.filter(
@@ -108,7 +113,9 @@ export function formatCodemodeResult(
     const cost = priced.reduce((sum, call) => sum + call.cost!, 0);
     const amount =
       cost === 0 || cost >= 0.01 ? cost.toFixed(2) : cost.toPrecision(2);
-    metadata.push(theme.fg("dim", `model calls $${amount}`));
+    metadata.push(
+      theme.fg("dim", formatMetadataLabel(`model calls $${amount}`)),
+    );
   }
   if (!options.isPartial && display === "summary" && output.totalLines) {
     metadata.push(
@@ -125,7 +132,9 @@ export function formatCodemodeResult(
         `${data.images} ${data.images === 1 ? "image" : "images"}`,
       ),
     );
-  if (data.truncated) metadata.push(theme.fg("muted", "truncated"));
+  metadata.push(
+    ...buildResultStatusParts({ truncated: data.truncated }, theme),
+  );
   const hint = buildToolExpansionHint(
     theme,
     state,

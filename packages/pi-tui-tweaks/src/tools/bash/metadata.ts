@@ -4,6 +4,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { buildResultStatusParts } from "../rendering/state";
 import { formatDuration } from "../rendering/output";
+import { formatMetadataLabel } from "../rendering/labels";
 import type { BashRenderState } from "./types";
 
 type MetadataOptions = {
@@ -51,5 +52,7 @@ export function getDurationSummary(
 
   return elapsedMs === undefined
     ? undefined
-    : `${options.isPartial ? "elapsed" : "took"} ${formatDuration(elapsedMs)}`;
+    : formatMetadataLabel(
+        `${options.isPartial ? "elapsed" : "took"} ${formatDuration(elapsedMs)}`,
+      );
 }

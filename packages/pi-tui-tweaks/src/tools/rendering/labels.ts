@@ -21,8 +21,8 @@ function getEscapeSequenceEnd(text: string, start: number): number {
   return start;
 }
 
-export function formatToolLabel(text: string): string {
-  if (!text || !getConfig().tools.capitalizeNames) return text;
+function capitalizeLabel(text: string): string {
+  if (!text) return text;
 
   for (let index = 0; index < text.length; index++) {
     const char = text[index]!;
@@ -41,4 +41,12 @@ export function formatToolLabel(text: string): string {
     break;
   }
   return text;
+}
+
+export function formatToolLabel(text: string): string {
+  return getConfig().tools.capitalizeNames ? capitalizeLabel(text) : text;
+}
+
+export function formatMetadataLabel(text: string): string {
+  return getConfig().tools.capitalizeMetadata ? capitalizeLabel(text) : text;
 }

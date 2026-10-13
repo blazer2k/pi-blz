@@ -61,6 +61,7 @@ For example:
     "enabled": true,
     "enhanceCustomTools": true,
     "capitalizeNames": true,
+    "capitalizeMetadata": true,
     "treeCorner": "rounded",
     "indicator": {
       "style": "circle",
@@ -94,6 +95,7 @@ The table uses dotted paths for the nested JSON fields:
 | `tools.enabled`                      | `true`      | Enable this extension's tool rendering overrides      |
 | `tools.enhanceCustomTools`           | `true`      | Compact eligible extension tools, including Codemode  |
 | `tools.capitalizeNames`              | `true`      | Capitalize headers drawn by this extension            |
+| `tools.capitalizeMetadata`           | `true`      | Use sentence-case labels in generated tool metadata   |
 | `tools.treeCorner`                   | `"rounded"` | `"rounded"` (╰), `"square"` (└); closing connector    |
 | `tools.indicator.style`              | `"circle"`  | `"dot"`, `"circle"`, `"diamond"`                      |
 | `tools.indicator.color`              | `"success"` | `"success"`, `"text"`, `"toolTitle"`                  |
@@ -203,6 +205,17 @@ Tools that provide their own layout with `renderShell: "self"` keep that layout 
 It defaults to `true` and capitalizes the first visible character, for example `read` becomes `Read` and `mcp` becomes `Mcp`. Turning it off preserves the original spelling; it does not force lowercase. Tools that draw their own layout keep their own capitalization.
 
 This setting changes only the displayed header. Tool identifiers, arguments, resource tags such as `[skill]`, output text, and Pi's nested-call details stay unchanged.
+
+## Metadata capitalization
+
+`tools.capitalizeMetadata` defaults to `true` and uses sentence case for labels drawn by this extension: `Took`, `Elapsed`, `Truncated`, `Script failed`, and `Model calls`. For example:
+
+```text
+╰─ Took 1.2s · Truncated · 42 lines
+╰─ 3 calls · 1 failed · Took 1.2s · Model calls $0.02
+```
+
+Set it to `false` to preserve the previous metadata spelling. It is independent of `tools.capitalizeNames`. Numeric phrases, units, hints, `(no output)`, arguments, output text, Pi's nested-call details, and self-owned renderers stay unchanged. Apply changes with `/reload`.
 
 ## Compatibility with other extensions
 

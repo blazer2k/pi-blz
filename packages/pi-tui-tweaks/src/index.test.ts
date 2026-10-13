@@ -410,7 +410,7 @@ describe("extension lifecycle", () => {
       )
         .render(80)
         .join("\n");
-      expect(output).toContain("took 1.3s");
+      expect(output).toContain("Took 1.3s");
       expect(pi._entries()).toEqual([]);
       expect(pi._registeredTools()).toEqual([]);
     } finally {

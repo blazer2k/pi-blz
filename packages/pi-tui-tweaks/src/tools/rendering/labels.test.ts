@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { getDefaultConfig } from "../../config/definition";
 import { loadConfig } from "../../config/store";
-import { formatToolLabel } from "./labels";
+import { formatMetadataLabel, formatToolLabel } from "./labels";
 import { setTestConfig } from "../../testing/helpers";
 
 const originalPath = process.env.PI_TUI_TWEAKS_CONFIG_PATH;
@@ -46,8 +46,10 @@ describe("formatToolLabel", () => {
         "\x1b]8;;https://example.com\x1b\\Search\x1b]8;;\x1b\\",
       ],
       ["\x1b[?25l\x1bsearch", "\x1b[?25l\x1bSearch"],
-    ])
+    ]) {
       expect(formatToolLabel(source!)).toBe(expected!);
+      expect(formatMetadataLabel(source!)).toBe(expected!);
+    }
   });
 
   it("preserves exact spelling and escape sequences when disabled", () => {
@@ -65,6 +67,28 @@ describe("formatToolLabel", () => {
       "",
     ]) {
       expect(formatToolLabel(source)).toBe(source);
+    }
+  });
+
+  it("keeps metadata capitalization independent and preserves spelling when disabled", () => {
+    expect(getDefaultConfig().tools.capitalizeMetadata).toBe(true);
+    for (const capitalizeMetadata of [true, false]) {
+      for (const capitalizeNames of [true, false]) {
+        setTestConfig({ tools: { capitalizeMetadata, capitalizeNames } });
+        expect(formatToolLabel("bash")).toBe(capitalizeNames ? "Bash" : "bash");
+        for (const [source, capitalized] of [
+          ["took 1.2s", "Took 1.2s"],
+          ["script failed", "Script failed"],
+          ["model calls $0.02", "Model calls $0.02"],
+          ["3 calls", "3 calls"],
+          ["(no output)", "(no output)"],
+          ["\x1b[31mtruncated\x1b[0m", "\x1b[31mTruncated\x1b[0m"],
+        ]) {
+          expect(formatMetadataLabel(source!)).toBe(
+            capitalizeMetadata ? capitalized! : source!,
+          );
+        }
+      }
     }
   });
 

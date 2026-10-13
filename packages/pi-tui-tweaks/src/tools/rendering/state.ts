@@ -1,6 +1,7 @@
 import { keyText, type Theme } from "@earendil-works/pi-coding-agent";
 import type { Config } from "../../config/definition";
 import { getConfig } from "../../config/store";
+import { formatMetadataLabel } from "./labels";
 import type { BaseRenderState, BlinkIndicator } from "./types";
 
 export function getBlinkIndicator(): BlinkIndicator {
@@ -41,7 +42,9 @@ export function buildResultStatusParts(
   state: BaseRenderState,
   theme: Theme,
 ): string[] {
-  return state.truncated ? [theme.fg("muted", "truncated")] : [];
+  return state.truncated
+    ? [theme.fg("muted", formatMetadataLabel("truncated"))]
+    : [];
 }
 
 export function getStatusColor(
