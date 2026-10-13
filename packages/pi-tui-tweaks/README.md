@@ -134,7 +134,7 @@ The logo uses Pi's coral, blue, and yellow colors in the terminal's color mode. 
 
 In compact and rounded styles, the working directory and optional branch sit in the upper rule. The lower rule shows the model and optional thinking level on the left, with token usage, optional cost, and context usage on the right. Compact keeps native input layout and places autocomplete below the lower rule.
 
-`editor.color` and the `editor.show*` settings apply only to compact and rounded. The default color is `dim`; `thinking` follows Pi's thinking-level colors. Shell input uses Pi's Bash-mode color. High context usage retains warning and error colors.
+`editor.color` and the `editor.show*` settings apply only to compact and rounded. The default color is `dim`; `thinking` follows Pi's thinking-level colors. Shell input uses Pi's Bash-mode color. Embedded native Working and compaction indicators use the same color as the border. Retry and branch-summary indicators keep Pi's colors. High context usage retains warning and error colors.
 
 Compact and rounded use a footer for extension status messages. Native leaves both Working and footer status messages to Pi.
 

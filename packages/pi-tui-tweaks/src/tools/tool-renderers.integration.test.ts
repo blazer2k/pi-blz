@@ -475,7 +475,12 @@ describe("public renderer integration", () => {
       Parameters<ExtensionUIContext["setWorkingIndicator"]>[0]
     > = [];
     const uiContext = {
-      theme: { ...mkTheme(), getColorMode: () => "256color" },
+      theme: {
+        ...mkTheme(),
+        getColorMode: () => "256color",
+        fg: (token: string, value: string) =>
+          `\x1b[38;5;${token === "muted" ? 246 : 244}m${value}\x1b[39m`,
+      },
       setHeader() {},
       setWidget() {},
       setHiddenThinkingLabel() {},
@@ -593,9 +598,13 @@ describe("public renderer integration", () => {
           expect(workingOptions).toHaveLength(count);
           expect(host.workingIndicatorOptions).toBeUndefined();
           expect(host.statusContainer.children).toHaveLength(0);
-          expect(stripAnsi(host.editor.render(80)[0]!)).toContain(
-            "Native Working",
-          );
+          const indicator = host.activeStatusIndicator;
+          if (editorStyle !== "native") host.updateEditorBorderColor();
+          const top = host.editor.render(80)[0]!;
+          expect(stripAnsi(top)).toContain("Native Working");
+          if (editorStyle !== "native")
+            expect(top).toContain("\x1b[38;5;246mNative Working\x1b[39m");
+          expect(host.activeStatusIndicator).toBe(indicator);
         } else {
           expect(host.statusContainer.children).toHaveLength(1);
           expect(stripAnsi(host.editor.render(80)[0]!)).not.toContain(
@@ -645,7 +654,13 @@ describe("public renderer integration", () => {
             const indicator = host.activeStatusIndicator;
             expect(indicator.kind).toBe(kind);
             expect(host.statusContainer.children).toHaveLength(0);
-            expect(stripAnsi(host.editor.render(120)[0]!)).toContain(label);
+            if (kind === "compaction" && editorStyle !== "native")
+              host.updateEditorBorderColor();
+            const top = host.editor.render(120)[0]!;
+            expect(stripAnsi(top)).toContain(label);
+            if (kind === "compaction" && editorStyle !== "native")
+              expect(top).toContain(`\x1b[38;5;246m${label}`);
+            expect(host.activeStatusIndicator).toBe(indicator);
             const input = host.editor.getText();
             host.editor.setText("draft input");
             for (const width of editorStyle === "native"

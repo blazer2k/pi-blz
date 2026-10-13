@@ -55,7 +55,7 @@ function createEditor(
       if (color === "dim") dimFrameCalls++;
       return text;
     },
-    getThinkingBorderColor: () => {
+    getThinkingBorderColor: (_level: string) => {
       thinkingBorderCalls++;
       return (text: string) => text;
     },
@@ -113,6 +113,8 @@ function createEditor(
 
   return {
     editor,
+    uiTheme,
+    pi,
     native: new CustomEditor(tui, editorTheme, keybindings, { paddingX: 1 }),
     getFrameColors: () => frameColors,
     getDimFrameCalls: () => dimFrameCalls,
@@ -149,6 +151,61 @@ describe("EnhancedEditor", () => {
         expect(getThinkingBorderCalls() > 0).toBe(editorColor === "thinking");
         if (editorColor !== "thinking")
           expect(getFrameColors()).toContain(editorColor);
+      }
+    }
+  });
+
+  it("shares border colors with cached supplied statuses without refresh loops or disposal", () => {
+    for (const style of ["compact", "rounded"] as const) {
+      for (const label of ["Native Working", "Compacting context"]) {
+        setTestConfig({ workingIndicator: { style: "native" } });
+        const { editor, uiTheme, pi } = createEditor("hello", style);
+        let palette = 0;
+        const color = (index: number, value: string) =>
+          `\x1b[38;5;${index + palette}m${value}\x1b[39m`;
+        uiTheme.fg = (token, value) =>
+          color(token === "dim" ? 240 : 250, value);
+        uiTheme.getThinkingBorderColor = (level) => (value) =>
+          color(level === "high" ? 200 : 201, value);
+        uiTheme.getBashModeBorderColor = () => (value) => color(40, value);
+        let cached = color(99, label);
+        const indicator = {
+          renderInBorder: (width: number) => truncateToWidth(cached, width, ""),
+          renderSpinnerInBorder: (width: number) =>
+            truncateToWidth(editor.borderColor("*"), width, ""),
+          invalidate: mock(() => {
+            cached = editor.borderColor(label);
+          }),
+          dispose: mock(() => {}),
+        } as unknown as EditorStatusIndicator;
+        editor.setWorkingStatusIndicator(indicator);
+        for (const [editorColor, input, level, index] of [
+          ["dim", "hello", "high", 240],
+          ["muted", "hello", "high", 250],
+          ["thinking", "hello", "high", 200],
+          ["thinking", "hello", "low", 201],
+          ["dim", " !pwd", "low", 40],
+          ["dim", "hello", "low", 240],
+        ] as const) {
+          setTestConfig({ editor: { color: editorColor } });
+          editor.setText(input);
+          pi.getThinkingLevel = () => level;
+          expect(editor.render(80)[0]).toContain(color(index, label));
+          expect(editor.borderColor(label)).toBe(color(index, label));
+          const refreshed = (indicator.invalidate as ReturnType<typeof mock>)
+            .mock.calls.length;
+          editor.render(80);
+          expect(indicator.invalidate).toHaveBeenCalledTimes(refreshed);
+        }
+        palette = 1;
+        expect(editor.render(80)[0]).toContain(color(240, label));
+        editor.borderColor = (value) => color(99, value);
+        indicator.invalidate();
+        expect(editor.render(80)[0]).toContain(color(240, label));
+        expect(indicator.dispose).not.toHaveBeenCalled();
+        editor.setWorkingStatusIndicator(undefined);
+        expect(editor.render(80)[0]).not.toContain(label);
+        expect(indicator.dispose).not.toHaveBeenCalled();
       }
     }
   });
@@ -270,6 +327,7 @@ describe("EnhancedEditor", () => {
         renderSpinnerInBorder: mock((width: number) =>
           truncateToWidth("\x1b[33m*\x1b[0m", width, ""),
         ),
+        invalidate: mock(() => {}),
         dispose: mock(() => {}),
       } as unknown as EditorStatusIndicator;
       editor.setWorkingStatusIndicator(indicator);

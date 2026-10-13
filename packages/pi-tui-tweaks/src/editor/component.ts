@@ -23,6 +23,7 @@ import type { SessionUsage } from "./usage";
 
 export class EnhancedEditor extends CustomEditor {
   private nativeStatusIndicator?: EditorStatusIndicator;
+  private renderedBorder?: string;
 
   constructor(
     tui: TUI,
@@ -99,7 +100,7 @@ export class EnhancedEditor extends CustomEditor {
     return buildCompactTopLine(
       width,
       this.buildFrameData(config).cwd,
-      this.getBorder(config),
+      this.borderColor,
       hiddenLineCount,
       this.nativeStatusIndicator,
     );
@@ -116,13 +117,21 @@ export class EnhancedEditor extends CustomEditor {
       width,
       this.buildFrameData(config),
       this.ctx.ui.theme,
-      this.getBorder(config),
+      this.borderColor,
       hiddenLineCount,
     );
   }
 
   override render(width: number): string[] {
     const config = getConfig();
+    const border = this.getBorder(config);
+    const renderedBorder = border("─");
+    const borderChanged =
+      this.renderedBorder !== renderedBorder ||
+      this.borderColor("─") !== renderedBorder;
+    this.borderColor = border;
+    this.renderedBorder = renderedBorder;
+    if (borderChanged) this.nativeStatusIndicator?.invalidate();
     if (this.style === "compact") {
       return super
         .render(Math.max(1, width))
@@ -136,7 +145,7 @@ export class EnhancedEditor extends CustomEditor {
       width,
       this.buildFrameData(config),
       this.ctx.ui.theme,
-      this.getBorder(config),
+      this.borderColor,
       this.nativeStatusIndicator,
     );
   }
