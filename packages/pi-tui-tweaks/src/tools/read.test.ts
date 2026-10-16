@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import type { Theme } from "@earendil-works/pi-coding-agent";
+import { getPackageDir, type Theme } from "@earendil-works/pi-coding-agent";
+import { join } from "node:path";
 import { stripAnsi } from "./rendering/text";
 import { patchReadTool } from "./read";
 import { mkTheme, mkToolCtx, setupTool } from "../testing/helpers";
@@ -68,6 +69,57 @@ describe("read renderCall", () => {
       }
     });
   }
+
+  it("formats raw ranges consistently in normal, resource, docs, and skill headers", () => {
+    const def = setupReadTool();
+    const paths = [
+      "src/index.ts",
+      "/tmp/read-ranges/AGENTS.md",
+      join(getPackageDir(), "docs", "extensions.md"),
+      "/tmp/read-ranges/my-skill/SKILL.md",
+    ];
+    for (const [offset, limit, range] of [
+      [25, 13, ":25-37"],
+      ["25", "13", ":25-37"],
+      [null, "13", ":1-13"],
+      ["25", null, ":25"],
+      ["abc", 13, ""],
+      [25, "", ""],
+      [25, "Infinity", ""],
+      [NaN, 13, ""],
+      [false, 13, ""],
+      [25, [], ""],
+    ] as const) {
+      for (const path of paths)
+        for (const expanded of [false, true]) {
+          const ranges: string[] = [];
+          const theme = {
+            ...mkTheme(),
+            fg: (color: string, value: string) => {
+              if (color === "dim" && value.startsWith(":")) ranges.push(value);
+              return value;
+            },
+          } as Theme;
+          const args = { path, offset, limit };
+          const snapshot = structuredClone(args);
+          const output = def.renderCall!(
+            args,
+            theme,
+            mkToolCtx({
+              expanded,
+              executionStarted: false,
+              state: { hasResult: true },
+            }),
+          )
+            .render(240)
+            .map(stripAnsi)
+            .join("\n");
+          expect([...new Set(ranges)]).toEqual(range ? [range] : []);
+          if (range) expect(output).toContain(range);
+          expect(args).toEqual(snapshot);
+        }
+    }
+  });
 
   it("expands a truncated path and adds call-driven result hints", () => {
     const def = setupReadTool();

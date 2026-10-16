@@ -8,6 +8,7 @@ import {
 } from "node:path";
 import {
   getPackageDir,
+  formatReadLineRange,
   type ReadToolInput,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
@@ -106,11 +107,9 @@ function getCompactReadClassification(
   return undefined;
 }
 
-function formatReadLineRange(args: ReadToolInput, theme: Theme): string {
-  if (args.offset == null && args.limit == null) return "";
-  const startLine = args.offset ?? 1;
-  const endLine = args.limit != null ? startLine + args.limit - 1 : "";
-  return theme.fg("dim", `:${startLine}${endLine ? `-${endLine}` : ""}`);
+function styledReadLineRange(args: ReadToolInput, theme: Theme): string {
+  const range = formatReadLineRange(args.offset, args.limit);
+  return range ? theme.fg("dim", range) : "";
 }
 
 function formatCompactReadCall(
@@ -119,7 +118,7 @@ function formatCompactReadCall(
   theme: Theme,
   maxWidth: number,
 ): string {
-  const lineRange = formatReadLineRange(args, theme);
+  const lineRange = styledReadLineRange(args, theme);
 
   if (classification.kind === "skill") {
     const title = theme.fg("customMessageLabel", theme.bold("[skill] "));
@@ -153,7 +152,7 @@ export function renderReadCall(
   const state = toolContext.state as BaseRenderState;
   const { text, prefix } = getCallRenderParts(state, theme, toolContext);
   const classification = getCompactReadClassification(args, toolContext.cwd);
-  const lineRange = formatReadLineRange(args, theme);
+  const lineRange = styledReadLineRange(args, theme);
   const fullPath = renderPath(args.path, theme, toolContext.cwd);
 
   text.setText((width) => {

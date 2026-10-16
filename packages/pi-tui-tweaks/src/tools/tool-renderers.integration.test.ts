@@ -1136,7 +1136,14 @@ describe("public renderer integration", () => {
     it(`keeps Pi's native tool inventory and loadout for tools=${JSON.stringify(tools)}`, async () => {
       const baseline = (await createSession(false, tools)).session;
       const enhanced = (await createSession(true, tools)).session;
-      expect(enhanced.getAllTools()).toEqual(baseline.getAllTools());
+      const inventory = (session: AgentSession) =>
+        session.getAllTools().map(({ reachesTools, ...info }) => {
+          expect(reachesTools).toBe(
+            session.getToolDefinition(info.name)!.reachesTools,
+          );
+          return { ...info, reachesTools: typeof reachesTools };
+        });
+      expect(inventory(enhanced)).toEqual(inventory(baseline));
       expect(enhanced.getActiveToolNames()).toEqual(
         baseline.getActiveToolNames(),
       );
@@ -1148,6 +1155,18 @@ describe("public renderer integration", () => {
         expect(definition.promptSnippet).toBe(native.promptSnippet);
         expect(definition.promptGuidelines).toEqual(native.promptGuidelines);
         expect(definition.renderShell).toBe(native.renderShell);
+        if (info.name === "codemode") {
+          expect(typeof definition.reachesTools).toBe("function");
+          for (const code of [
+            'await tools.read({ path: "x" });',
+            "ALL_TOOLS",
+            'await describeTool("read")',
+          ]) {
+            expect(definition.reachesTools!({ code })).toEqual(
+              native.reachesTools!({ code }),
+            );
+          }
+        }
       }
     });
   }
